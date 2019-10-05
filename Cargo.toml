@@ -1,0 +1,27 @@
+[package]
+name = "rust3d"
+version = "0.1.0"
+authors = ["Thomas SIMON <thomas.simon.work@gmail.com>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[features]
+default = ["wgpu/vulkan"]
+metal = ["wgpu/metal"]
+dx11 = ["wgpu/dx11"]
+dx12 = ["wgpu/dx12"]
+vulkan = ["wgpu/vulkan"]
+
+[dependencies]
+wgpu = { version = "0.3.0" }
+env_logger = "0.6"
+glsl-to-spirv = "0.1"
+log = "0.4"
+png = "0.15"
+winit = "0.20.0-alpha3"
+raw-window-handle = "0.1"
+nalgebra = "0.18"
+
+[profile.release]
+lto = true
