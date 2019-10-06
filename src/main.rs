@@ -3,6 +3,15 @@ mod cube;
 mod fake_texels;
 mod framework;
 mod game_state;
+extern crate nalgebra as na;
+use na::{Matrix4, Point3, Rotation3, Vector3};
+
+use imgui::*;
+use imgui_wgpu::Renderer;
+use imgui_winit_support;
+use imgui_winit_support::WinitPlatform;
+use std::time::Instant;
+
 #[derive(Clone, Copy)]
 pub struct Vertex {
     _pos: [f32; 4],
@@ -19,6 +28,13 @@ struct Example {
     forward_depth: wgpu::TextureView,
     screen_res: (u32, u32),
     game_state: game_state::State,
+    imgui_wrap: ImguiWrap,
+}
+
+struct ImguiWrap {
+    imgui: Context,
+    platform: WinitPlatform,
+    renderer: Renderer,
 }
 
 impl Example {}
@@ -26,7 +42,9 @@ impl Example {}
 impl framework::Example for Example {
     fn init(
         sc_desc: &wgpu::SwapChainDescriptor,
-        device: &wgpu::Device,
+        device: &mut wgpu::Device,
+        window: &winit::window::Window,
+        hidpi_factor: f64,
     ) -> (Self, Option<wgpu::CommandBuffer>) {
         use std::mem;
 
@@ -124,7 +142,11 @@ impl framework::Example for Example {
             lod_max_clamp: 100.0,
             compare_function: wgpu::CompareFunction::Always,
         });
-        let mx_total = camera::create_view_proj(sc_desc.width as f32 / sc_desc.height as f32, 0.0);
+        let mx_total = camera::create_view_proj(
+            sc_desc.width as f32 / sc_desc.height as f32,
+            &Point3::new(0.0, 0.0, 0.0),
+            &Vector3::new(0.0, 0.0, 0.0),
+        );
         let mx_ref: &[f32] = mx_total.as_slice();
         let uniform_buf = device
             .create_buffer_mapped(16, wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::COPY_DST)
@@ -231,6 +253,41 @@ impl framework::Example for Example {
             usage: wgpu::TextureUsage::OUTPUT_ATTACHMENT,
         });
 
+        let imgui_wrap = {
+            // Set up dear imgui
+            let mut imgui = imgui::Context::create();
+            let mut platform = imgui_winit_support::WinitPlatform::init(&mut imgui);
+            platform.attach_window(
+                imgui.io_mut(),
+                window,
+                imgui_winit_support::HiDpiMode::Default,
+            );
+            imgui.set_ini_filename(None);
+
+            let font_size = (13.0 * hidpi_factor) as f32;
+            imgui.io_mut().font_global_scale = (1.0 / hidpi_factor) as f32;
+
+            imgui.fonts().add_font(&[FontSource::DefaultFontData {
+                config: Some(imgui::FontConfig {
+                    oversample_h: 1,
+                    pixel_snap_h: true,
+                    size_pixels: font_size,
+                    ..Default::default()
+                }),
+            }]);
+
+            //
+            // Set up dear imgui wgpu renderer
+            //
+            let renderer = Renderer::new(&mut imgui, device, sc_desc.format, None);
+
+            ImguiWrap {
+                imgui,
+                platform,
+                renderer,
+            }
+        };
+
         // Done
         let this = Example {
             vertex_buf,
@@ -242,23 +299,46 @@ impl framework::Example for Example {
             forward_depth: depth_texture.create_default_view(),
             screen_res: (sc_desc.width, sc_desc.height),
             game_state: game_state::State::new(),
+            imgui_wrap,
         };
         (this, Some(init_encoder.finish()))
     }
 
-    fn update(&mut self, _event: winit::event::WindowEvent) {
+    fn update(&mut self, _event: &winit::event::Event<()>, window: &winit::window::Window) {
         use winit::event;
         use winit::event::WindowEvent;
+        self.imgui_wrap
+            .platform
+            .handle_event(self.imgui_wrap.imgui.io_mut(), window, _event);
+
         match _event {
-            WindowEvent::KeyboardInput {
-                input:
-                    event::KeyboardInput {
-                        virtual_keycode: Some(event::VirtualKeyCode::Space),
-                        state: event::ElementState::Pressed,
+            event::Event::WindowEvent { event, .. } => {
+                match event {
+                    WindowEvent::KeyboardInput {
+                        input:
+                            event::KeyboardInput {
+                                virtual_keycode: Some(vkc),
+                                state: event::ElementState::Pressed,
+                                ..
+                            },
                         ..
-                    },
-                ..
-            } => self.game_state.position += 1.0,
+                    } => {
+                        self.game_state.key_pressed.insert(vkc.clone());
+                    }
+                    WindowEvent::KeyboardInput {
+                        input:
+                            event::KeyboardInput {
+                                virtual_keycode: Some(vkc),
+                                state: event::ElementState::Released,
+                                ..
+                            },
+                        ..
+                    } => {
+                        self.game_state.key_pressed.remove(vkc);
+                    }
+                    _ => {}
+                };
+            }
             _ => {}
         }
     }
@@ -289,14 +369,52 @@ impl framework::Example for Example {
     fn render(
         &mut self,
         frame: &wgpu::SwapChainOutput,
-        device: &wgpu::Device,
+        device: &mut wgpu::Device,
+        window: &winit::window::Window,
     ) -> wgpu::CommandBuffer {
+        let mut now = Instant::now();
+        let mut delta = now - self.game_state.last_frame;
+        let last_compute_time = delta.clone();
+
+        //empiric, a feed back loop could find this value automatically
+        let oversleep = 60;
+
+        //144fps = 6944us
+        //200fps = 5000us
+        let min = 1000000_u64 / self.game_state.fps;
+        let min_us = std::time::Duration::from_micros(min - oversleep);
+
+        if min_us > delta {
+            std::thread::sleep(min_us - delta);
+            now = Instant::now();
+            delta = now - self.game_state.last_frame;
+        }
+
+        now = Instant::now();
+        delta = now - self.game_state.last_frame;
+        self.game_state.last_frame = now;
+        let last_compute_time_total = delta.clone();
+
+        let last_compute_tt_sec = last_compute_time_total.as_secs_f64();
+
+        //Game
+        if self
+            .game_state
+            .key_pressed
+            .contains(&winit::event::VirtualKeyCode::Space)
+        {
+            self.game_state.position.x += (10.0 * last_compute_tt_sec) as f32;
+        }
+
+        //Render
+
         let mut encoder =
             device.create_command_encoder(&wgpu::CommandEncoderDescriptor { todo: 0 });
 
         camera::update_camera_uniform(
             self.screen_res,
-            self.game_state.position,
+            &self.game_state.position,
+            &self.game_state.dir,
             &self.uniform_buf,
             device,
             &mut encoder,
@@ -330,7 +448,39 @@ impl framework::Example for Example {
             rpass.set_bind_group(0, &self.bind_group, &[]);
             rpass.set_index_buffer(&self.index_buf, 0);
             rpass.set_vertex_buffers(0, &[(&self.vertex_buf, 0)]);
-            rpass.draw_indexed(0..self.index_count as u32, 0, 0..1000000);
+            rpass.draw_indexed(0..self.index_count as u32, 0, 0..100000);
+        }
+
+        //Imgui
+
+        {
+            self.imgui_wrap
+                .platform
+                .prepare_frame(self.imgui_wrap.imgui.io_mut(), &window)
+                .expect("Failed to prepare frame");
+
+            let ui = self.imgui_wrap.imgui.frame();
+
+            {
+                let mut_fps = &mut self.game_state.fps;
+                let window = imgui::Window::new(im_str!("Statistics"));
+                window
+                    .size([400.0, 200.0], Condition::FirstUseEver)
+                    .position([3.0, 3.0], Condition::FirstUseEver)
+                    .build(&ui, || {
+                        imgui::Slider::new(im_str!("fps"), 1..=240).build(&ui, mut_fps);
+                        ui.text(im_str!("Frametime: {}us", last_compute_time.as_micros()));
+                        ui.text(im_str!(
+                            " \" Capped: {}us",
+                            last_compute_time_total.as_micros()
+                        ));
+                    });
+            }
+            self.imgui_wrap.platform.prepare_render(&ui, window);
+            self.imgui_wrap
+                .renderer
+                .render(ui, device, &mut encoder, &frame.view)
+                .expect("Rendering failed");
         }
 
         encoder.finish()

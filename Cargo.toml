@@ -22,6 +22,15 @@ png = "0.15"
 winit = "0.20.0-alpha3"
 raw-window-handle = "0.1"
 nalgebra = "0.18"
+imgui = "0.2.0"
+imgui-wgpu = "0.1.0"
+
+[dependencies.imgui-winit-support]
+version = "0.2.0"
+default-features = false
+features = ["winit-20"]
+
+
 
 [profile.release]
-lto = true
+#lto = true

@@ -12,8 +12,8 @@ void main() {
     v_TexCoord = a_TexCoord;
 
     int max = 100;
-    int x= gl_InstanceIndex%max - max/2;
-    int y =(gl_InstanceIndex/max) %max  - max/2;
+    int x = gl_InstanceIndex%max - max/2;
+    int y =(gl_InstanceIndex/max) %max - max/2;
     int z =(gl_InstanceIndex/(max*max)) - max/2;
 
 
