@@ -7,7 +7,7 @@ fn vertex(pos: [i8; 3], tc: [i8; 2]) -> Vertex {
     }
 }
 
-pub fn create_vertices() -> (Vec<Vertex>, Vec<u16>) {
+pub fn create_vertices() -> (Vec<Vertex>, Vec<u32>) {
     let vertex_data = [
         // top (0, 0, 1)
         vertex([-1, -1, 1], [0, 0]),
@@ -41,7 +41,7 @@ pub fn create_vertices() -> (Vec<Vertex>, Vec<u16>) {
         vertex([1, -1, -1], [0, 1]),
     ];
 
-    let index_data: &[u16] = &[
+    let index_data: &[u32] = &[
         0, 1, 2, 2, 3, 0, // top
         4, 5, 6, 6, 7, 4, // bottom
         8, 9, 10, 10, 11, 8, // right

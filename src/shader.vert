@@ -9,17 +9,25 @@ layout(set = 0, binding = 0) uniform Locals {
 };
 
 void main() {
+
+
     v_TexCoord = a_TexCoord;
+    if((gl_VertexIndex/2000) %2 == 0){
+        v_TexCoord = vec2(0.0,0.0);
+    }
+
 
     int max = 100;
     int x = gl_InstanceIndex%max - max/2;
-    int y =(gl_InstanceIndex/max) %max - max/2;
-    int z =(gl_InstanceIndex/(max*max)) - max/2;
+    int y =(gl_InstanceIndex/max) - max/2;
+//    int y =(gl_InstanceIndex/max) %max - max/2;
+
+    //    int z =(gl_InstanceIndex/(max*max)) - max/2;
 
 
     float fx = float(x)*3.0;
     float fy = float(y)*3.0;
-    float fz = float(z)*3.0;
+//    float fz = float(z)*3.0;
 
-    gl_Position = u_Transform * (a_Pos + vec4(fx,fy,fz,1.0));
+    gl_Position = u_Transform * (a_Pos + vec4(fx,fy,0.0,1.0));
 }

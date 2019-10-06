@@ -3,6 +3,8 @@ mod cube;
 mod fake_texels;
 mod framework;
 mod game_state;
+mod heightmap;
+mod shader;
 extern crate nalgebra as na;
 use na::{Matrix4, Point3, Rotation3, Vector3};
 
@@ -19,9 +21,12 @@ pub struct Vertex {
 }
 
 struct Example {
-    vertex_buf: wgpu::Buffer,
-    index_buf: wgpu::Buffer,
-    index_count: usize,
+    cube_vertex_buf: wgpu::Buffer,
+    cube_index_buf: wgpu::Buffer,
+    cube_index_count: usize,
+    height_vertex_buf: wgpu::Buffer,
+    height_index_buf: wgpu::Buffer,
+    height_index_count: usize,
     bind_group: wgpu::BindGroup,
     uniform_buf: wgpu::Buffer,
     pipeline: wgpu::RenderPipeline,
@@ -53,14 +58,23 @@ impl framework::Example for Example {
 
         // Create the vertex and index buffers
         let vertex_size = mem::size_of::<Vertex>();
-        let (vertex_data, index_data) = cube::create_vertices();
-        let vertex_buf = device
+        let (vertex_data, cube_index_data) = cube::create_vertices();
+        let cube_vertex_buf = device
             .create_buffer_mapped(vertex_data.len(), wgpu::BufferUsage::VERTEX)
             .fill_from_slice(&vertex_data);
 
-        let index_buf = device
-            .create_buffer_mapped(index_data.len(), wgpu::BufferUsage::INDEX)
-            .fill_from_slice(&index_data);
+        let cube_index_buf = device
+            .create_buffer_mapped(cube_index_data.len(), wgpu::BufferUsage::INDEX)
+            .fill_from_slice(&cube_index_data);
+
+        let (vertex_data, height_index_data) = heightmap::create_vertices();
+        let height_vertex_buf = device
+            .create_buffer_mapped(vertex_data.len(), wgpu::BufferUsage::VERTEX)
+            .fill_from_slice(&vertex_data);
+
+        let height_index_buf = device
+            .create_buffer_mapped(height_index_data.len(), wgpu::BufferUsage::INDEX)
+            .fill_from_slice(&height_index_data);
 
         // Create pipeline layout
         let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
@@ -175,12 +189,9 @@ impl framework::Example for Example {
         });
 
         // Create the render pipeline
-        let vs_bytes =
-            framework::load_glsl(include_str!("shader.vert"), framework::ShaderStage::Vertex);
-        let fs_bytes = framework::load_glsl(
-            include_str!("shader.frag"),
-            framework::ShaderStage::Fragment,
-        );
+        let vs_bytes = shader::load_glsl(include_str!("shader.vert"), shader::ShaderStage::Vertex);
+        let fs_bytes =
+            shader::load_glsl(include_str!("shader.frag"), shader::ShaderStage::Fragment);
         let vs_module = device.create_shader_module(&vs_bytes);
         let fs_module = device.create_shader_module(&fs_bytes);
 
@@ -217,7 +228,7 @@ impl framework::Example for Example {
                 stencil_read_mask: 0,
                 stencil_write_mask: 0,
             }),
-            index_format: wgpu::IndexFormat::Uint16,
+            index_format: wgpu::IndexFormat::Uint32,
             vertex_buffers: &[wgpu::VertexBufferDescriptor {
                 stride: vertex_size as wgpu::BufferAddress,
                 step_mode: wgpu::InputStepMode::Vertex,
@@ -290,9 +301,12 @@ impl framework::Example for Example {
 
         // Done
         let this = Example {
-            vertex_buf,
-            index_buf,
-            index_count: index_data.len(),
+            cube_vertex_buf,
+            cube_index_buf,
+            height_vertex_buf,
+            height_index_buf,
+            cube_index_count: cube_index_data.len(),
+            height_index_count: height_index_data.len(),
             bind_group,
             uniform_buf,
             pipeline,
@@ -336,6 +350,13 @@ impl framework::Example for Example {
                     } => {
                         self.game_state.key_pressed.remove(vkc);
                     }
+
+                    WindowEvent::MouseWheel {
+                        delta: event::MouseScrollDelta::LineDelta(dx, dy),
+                        ..
+                    } => {
+                        self.game_state.last_scroll = *dy;
+                    }
                     _ => {}
                 };
             }
@@ -378,16 +399,10 @@ impl framework::Example for Example {
 
         //empiric, a feed back loop could find this value automatically
         let oversleep = 60;
-
-        //144fps = 6944us
-        //200fps = 5000us
-        let min = 1000000_u64 / self.game_state.fps;
-        let min_us = std::time::Duration::from_micros(min - oversleep);
-
-        if min_us > delta {
-            std::thread::sleep(min_us - delta);
-            now = Instant::now();
-            delta = now - self.game_state.last_frame;
+        let min_us = 1000000_u64 / self.game_state.fps;
+        let min_wait_until_next_frame = std::time::Duration::from_micros(min_us - oversleep);
+        if min_wait_until_next_frame > delta {
+            std::thread::sleep(min_wait_until_next_frame - delta);
         }
 
         now = Instant::now();
@@ -395,19 +410,51 @@ impl framework::Example for Example {
         self.game_state.last_frame = now;
         let last_compute_time_total = delta.clone();
 
-        let last_compute_tt_sec = last_compute_time_total.as_secs_f64();
+        let delta_sim_sec = last_compute_time_total.as_secs_f32();
 
-        //Game
-        if self
-            .game_state
-            .key_pressed
-            .contains(&winit::event::VirtualKeyCode::Space)
+        // Movements
         {
-            self.game_state.position.x += (10.0 * last_compute_tt_sec) as f32;
+            use winit::event::VirtualKeyCode as Key;
+            let key_pressed = &self.game_state.key_pressed;
+            let on = |vkc| key_pressed.contains(&vkc);
+
+            let mut offset = Vector3::new(0.0, 0.0, 0.0);
+            let mut rotation = self.game_state.dir.clone();
+
+            let k = (if !on(Key::LShift) { 1.0 } else { 2.0 }) * self.game_state.position.z;
+            //Game
+            if on(Key::S) {
+                offset.x -= k;
+            }
+            if on(Key::Z) {
+                offset.x += k;
+            }
+            if on(Key::Q) {
+                offset.y += k;
+            }
+            if on(Key::D) {
+                offset.y -= k;
+            }
+
+            if on(Key::LControl) {
+                if self.game_state.last_scroll > 0.0 {
+                    rotation.x += 1.0
+                }
+                if self.game_state.last_scroll < 0.0 {
+                    rotation.z -= 1.0
+                }
+            } else {
+                offset.z = -self.game_state.last_scroll * k * 10.0;
+            }
+
+            self.game_state.last_scroll = 0.0;
+
+            self.game_state.position += offset * delta_sim_sec;
+            self.game_state.dir =
+                (self.game_state.dir + rotation * 10.0 * delta_sim_sec).normalize();
         }
 
         //Render
-
         let mut encoder =
             device.create_command_encoder(&wgpu::CommandEncoderDescriptor { todo: 0 });
 
@@ -446,9 +493,15 @@ impl framework::Example for Example {
             });
             rpass.set_pipeline(&self.pipeline);
             rpass.set_bind_group(0, &self.bind_group, &[]);
-            rpass.set_index_buffer(&self.index_buf, 0);
-            rpass.set_vertex_buffers(0, &[(&self.vertex_buf, 0)]);
-            rpass.draw_indexed(0..self.index_count as u32, 0, 0..100000);
+
+            rpass.set_index_buffer(&self.height_index_buf, 0);
+            rpass.set_vertex_buffers(0, &[(&self.height_vertex_buf, 0)]);
+
+            rpass.draw_indexed(0..(self.height_index_count) as u32, 0, 0..1);
+
+            //            rpass.set_index_buffer(&self.cube_index_buf, 0);
+            //            rpass.set_vertex_buffers(0, &[(&self.cube_vertex_buf, 0)]);
+            //            rpass.draw_indexed(0..self.cube_index_count as u32, 0, 0..10000);
         }
 
         //Imgui
@@ -488,5 +541,5 @@ impl framework::Example for Example {
 }
 
 fn main() {
-    framework::run::<Example>("cube");
+    framework::run::<Example>("Oxidator");
 }

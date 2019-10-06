@@ -7,6 +7,7 @@ pub struct State {
     pub position: Point3<f32>,
     pub dir: Vector3<f32>,
     pub key_pressed: HashSet<winit::event::VirtualKeyCode>,
+    pub last_scroll: f32,
     pub fps: u64,
     pub last_frame: Instant,
 }
@@ -14,9 +15,10 @@ pub struct State {
 impl State {
     pub fn new() -> Self {
         State {
-            position: Point3::new(0.0, 0.0, 0.0),
-            dir: Vector3::new(1.0, 0.0, 0.0),
+            position: Point3::new(0.0, 0.0, 30.0),
+            dir: Vector3::new(0.3, 0.0, -1.0),
             key_pressed: HashSet::new(),
+            last_scroll: 0.0,
             fps: 144,
             last_frame: Instant::now(),
         }
