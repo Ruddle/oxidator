@@ -23,7 +23,9 @@ struct Example {
     forward_depth: wgpu::TextureView,
     heightmap_gpu: HeightmapGpu,
     cube_gpu: CubeGpu,
+    bind_group_layout: wgpu::BindGroupLayout,
     bind_group: wgpu::BindGroup,
+    format: TextureFormat,
     uniform_buf: wgpu::Buffer,
     screen_res: (u32, u32),
     game_state: game_state::State,
@@ -50,7 +52,6 @@ impl framework::Example for Example {
         let mut init_encoder =
             device.create_command_encoder(&wgpu::CommandEncoderDescriptor { todo: 0 });
 
-        // Create pipeline layout
         let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             bindings: &[
                 wgpu::BindGroupLayoutBinding {
@@ -174,7 +175,7 @@ impl framework::Example for Example {
         });
 
         let imgui_wrap = {
-            // Set up dear imgui
+            // imgui
             let mut imgui = imgui::Context::create();
             let mut platform = imgui_winit_support::WinitPlatform::init(&mut imgui);
             platform.attach_window(
@@ -196,9 +197,7 @@ impl framework::Example for Example {
                 }),
             }]);
 
-            //
-            // Set up dear imgui wgpu renderer
-            //
+            // imgui <-> wgpu
             let renderer = Renderer::new(&mut imgui, device, sc_desc.format, None);
 
             ImguiWrap {
@@ -223,8 +222,10 @@ impl framework::Example for Example {
 
         // Done
         let this = Example {
+            bind_group_layout,
             bind_group,
             uniform_buf,
+            format,
             cube_gpu,
             heightmap_gpu,
             forward_depth: depth_texture.create_default_view(),
@@ -435,6 +436,7 @@ impl framework::Example for Example {
             {
                 let mut_fps = &mut self.game_state.fps;
                 let debug_i1 = &mut self.game_state.debug_i1;
+                let mut rebuild_heightmap = false;
                 let window = imgui::Window::new(im_str!("Statistics"));
                 window
                     .size([400.0, 200.0], Condition::FirstUseEver)
@@ -447,8 +449,24 @@ impl framework::Example for Example {
                             last_compute_time_total.as_micros()
                         ));
 
-                        imgui::Slider::new(im_str!("debug_i1"), (1..=100000)).build(&ui, debug_i1);
+                        if imgui::Slider::new(im_str!("debug_i1"), (1..=200)).build(&ui, debug_i1) {
+                            println!("Slider");
+                            rebuild_heightmap = true;
+                        }
                     });
+
+                if rebuild_heightmap {
+                    let heightmap_gpu = HeightmapGpu::new(
+                        device,
+                        &mut encoder,
+                        self.format,
+                        &self.bind_group_layout,
+                        *debug_i1 as u32,
+                        32,
+                    );
+
+                    std::mem::replace(&mut self.heightmap_gpu, heightmap_gpu);
+                }
             }
             self.imgui_wrap.platform.prepare_render(&ui, window);
             self.imgui_wrap

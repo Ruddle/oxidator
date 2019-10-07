@@ -12,39 +12,6 @@ pub fn create_vertices(width_n: u32, height_n: u32) -> (Vec<Vertex>, Vec<u32>) {
     let mut vertex_data = Vec::with_capacity(nb_square * 4);
     let mut index_data = Vec::with_capacity(nb_square * 4);
 
-    let mut last_index = 0;
-    //    for i in 0_u32..size - 1 {
-    //        for j in 0_u32..size - 1 {
-    //            let vertex = |x: f32, y: f32| -> Vertex {
-    //                Vertex {
-    //                    _pos: [x, y, 5.0 * (f32::sin(x / 3.0) * y) / 1000.0, 0.0],
-    //                    _tex_coord: [x / size as f32, y / size as f32],
-    //                }
-    //            };
-    //
-    //            let index_a: u32 = last_index;
-    //            let a = vertex(i as f32, j as f32);
-    //            let b = vertex(i as f32 + 1.0, j as f32);
-    //            let c = vertex(i as f32 + 1.0, j as f32 + 1.0);
-    //            let d = vertex(i as f32, j as f32 + 1.0);
-    //
-    //            vertex_data.push(a);
-    //            vertex_data.push(b);
-    //            vertex_data.push(c);
-    //            vertex_data.push(d);
-    //
-    //            index_data.push(index_a);
-    //            index_data.push(index_a + 1);
-    //            index_data.push(index_a + 2);
-    //            index_data.push(index_a);
-    //            index_data.push(index_a + 2);
-    //            index_data.push(index_a + 3);
-    //
-    //            last_index = index_a + 3 + 1;
-    //        }
-    //    }
-    //    println!("last_index {}", last_index);
-
     fn z(x: f32, y: f32) -> f32 {
         30.0 * f32::sin((x + y) / 95.0)
             + 15.0 * (f32::sin(x / 20.0) * f32::cos(y / 45.0 + 1.554))
@@ -55,17 +22,13 @@ pub fn create_vertices(width_n: u32, height_n: u32) -> (Vec<Vertex>, Vec<u32>) {
         for chunk_i in 0..width_n {
             for j in 0_u32..CHUNK_SIZE {
                 for i in 0_u32..CHUNK_SIZE {
-                    let vertex = |x: f32, y: f32| -> Vertex {
-                        Vertex {
-                            _pos: [x, y, z(x, y)],
-                        }
-                    };
-
-                    let a = vertex(
+                    let (x, y) = (
                         (i + chunk_i * CHUNK_SIZE) as f32,
                         (j + chunk_j * CHUNK_SIZE) as f32,
                     );
-                    vertex_data.push(a);
+                    vertex_data.push(Vertex {
+                        _pos: [x, y, z(x, y)],
+                    });
                 }
             }
         }
@@ -98,18 +61,6 @@ pub fn create_vertices(width_n: u32, height_n: u32) -> (Vec<Vertex>, Vec<u32>) {
 
     println!("index_data size  {}", index_data.len());
     println!("vertex_data size {}", vertex_data.len());
-
-    //    for chunk in index_data.chunks(3) {
-    //        if let &[a, b, c] = chunk {
-    //            let va = vertex_data[a as usize];
-    //            let vb = vertex_data[b as usize];
-    //            let vc = vertex_data[c as usize];
-    //            println!("Index    : {:?} {:?} {:?}", a, b, c);
-    //            println!("Triangle : {:?} {:?} {:?}", va._pos, vb._pos, vc._pos)
-    //        } else {
-    //            println!("ERROR chunk");
-    //        }
-    //    }
 
     (vertex_data, index_data)
 }
