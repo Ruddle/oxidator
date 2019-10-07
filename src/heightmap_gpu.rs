@@ -15,8 +15,10 @@ impl HeightmapGpu {
         device: &Device,
         init_encoder: &mut CommandEncoder,
         format: TextureFormat,
-        vertex_size: usize,
+
         main_bind_group_layout: &BindGroupLayout,
+        width_n: u32,
+        height_n: u32,
     ) -> Self {
         // Create the texture
         let size = 16u32;
@@ -72,11 +74,29 @@ impl HeightmapGpu {
             compare_function: wgpu::CompareFunction::Always,
         });
 
+        //Map size
+        let map_size = [
+            width_n * heightmap::CHUNK_SIZE,
+            height_n * heightmap::CHUNK_SIZE,
+            width_n,
+            height_n,
+            heightmap::CHUNK_SIZE,
+        ];
+
+        let uniform_buf = device
+            .create_buffer_mapped(5, wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::COPY_DST)
+            .fill_from_slice(&map_size);
+
         // Create pipeline layout
         let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             bindings: &[
                 wgpu::BindGroupLayoutBinding {
                     binding: 0,
+                    visibility: wgpu::ShaderStage::VERTEX | wgpu::ShaderStage::FRAGMENT,
+                    ty: wgpu::BindingType::UniformBuffer { dynamic: false },
+                },
+                wgpu::BindGroupLayoutBinding {
+                    binding: 1,
                     visibility: wgpu::ShaderStage::FRAGMENT,
                     ty: wgpu::BindingType::SampledTexture {
                         multisampled: false,
@@ -84,7 +104,7 @@ impl HeightmapGpu {
                     },
                 },
                 wgpu::BindGroupLayoutBinding {
-                    binding: 1,
+                    binding: 2,
                     visibility: wgpu::ShaderStage::FRAGMENT,
                     ty: wgpu::BindingType::Sampler,
                 },
@@ -97,10 +117,17 @@ impl HeightmapGpu {
             bindings: &[
                 wgpu::Binding {
                     binding: 0,
-                    resource: wgpu::BindingResource::TextureView(&texture_view),
+                    resource: wgpu::BindingResource::Buffer {
+                        buffer: &uniform_buf,
+                        range: 0..12,
+                    },
                 },
                 wgpu::Binding {
                     binding: 1,
+                    resource: wgpu::BindingResource::TextureView(&texture_view),
+                },
+                wgpu::Binding {
+                    binding: 2,
                     resource: wgpu::BindingResource::Sampler(&sampler),
                 },
             ],
@@ -157,27 +184,20 @@ impl HeightmapGpu {
             }),
             index_format: wgpu::IndexFormat::Uint32,
             vertex_buffers: &[wgpu::VertexBufferDescriptor {
-                stride: vertex_size as wgpu::BufferAddress,
+                stride: std::mem::size_of::<heightmap::Vertex>() as wgpu::BufferAddress,
                 step_mode: wgpu::InputStepMode::Vertex,
-                attributes: &[
-                    wgpu::VertexAttributeDescriptor {
-                        format: wgpu::VertexFormat::Float4,
-                        offset: 0,
-                        shader_location: 0,
-                    },
-                    wgpu::VertexAttributeDescriptor {
-                        format: wgpu::VertexFormat::Float2,
-                        offset: 4 * 4,
-                        shader_location: 1,
-                    },
-                ],
+                attributes: &[wgpu::VertexAttributeDescriptor {
+                    format: wgpu::VertexFormat::Float4,
+                    offset: 0,
+                    shader_location: 0,
+                }],
             }],
             sample_count: 1,
             sample_mask: !0,
             alpha_to_coverage_enabled: false,
         });
 
-        let (vertex_data, height_index_data) = heightmap::create_vertices();
+        let (vertex_data, height_index_data) = heightmap::create_vertices(width_n, height_n);
         let height_vertex_buf = device
             .create_buffer_mapped(vertex_data.len(), wgpu::BufferUsage::VERTEX)
             .fill_from_slice(&vertex_data);

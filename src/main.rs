@@ -305,8 +305,9 @@ impl framework::Example for Example {
             device,
             &mut init_encoder,
             format,
-            vertex_size,
             &bind_group_layout,
+            128,
+            64,
         );
 
         // Done
