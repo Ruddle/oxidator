@@ -1,4 +1,9 @@
-use crate::Vertex;
+#[derive(Clone, Copy)]
+pub struct Vertex {
+    _pos: [f32; 4],
+    _tex_coord: [f32; 2],
+}
+
 
 fn vertex(pos: [i8; 3], tc: [i8; 2]) -> Vertex {
     Vertex {

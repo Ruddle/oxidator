@@ -15,13 +15,12 @@ impl HeightmapGpu {
         device: &Device,
         init_encoder: &mut CommandEncoder,
         format: TextureFormat,
-
         main_bind_group_layout: &BindGroupLayout,
         width_n: u32,
         height_n: u32,
     ) -> Self {
         // Create the texture
-        let size = 16u32;
+        let size = 2u32;
         let texels = crate::fake_texels::checker(size as usize);
         let texture_extent = wgpu::Extent3d {
             width: size,
