@@ -13,6 +13,7 @@ pub struct State {
     pub key_pressed: HashSet<winit::event::VirtualKeyCode>,
     pub last_scroll: f32,
     pub fps: u64,
+    pub start_time: Instant,
     pub last_frame: Instant,
     pub debug_i1: i32,
 }
@@ -29,6 +30,7 @@ impl State {
             key_pressed: HashSet::new(),
             last_scroll: 0.0,
             fps: 144,
+            start_time: Instant::now(),
             last_frame: Instant::now(),
             debug_i1: 1,
         }

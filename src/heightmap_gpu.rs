@@ -1,5 +1,5 @@
+use crate::glsl_compiler;
 use crate::heightmap;
-use crate::shader;
 use wgpu::{BindGroup, BindGroupLayout, RenderPass, RenderPipeline, TextureFormat};
 use wgpu::{CommandEncoder, Device};
 pub struct HeightmapGpu {
@@ -137,13 +137,13 @@ impl HeightmapGpu {
         });
 
         // Create the render pipeline
-        let vs_bytes = shader::load_glsl(
+        let vs_bytes = glsl_compiler::load(
             include_str!("shader/heightmap.vert"),
-            shader::ShaderStage::Vertex,
+            glsl_compiler::ShaderStage::Vertex,
         );
-        let fs_bytes = shader::load_glsl(
+        let fs_bytes = glsl_compiler::load(
             include_str!("shader/heightmap.frag"),
-            shader::ShaderStage::Fragment,
+            glsl_compiler::ShaderStage::Fragment,
         );
         let vs_module = device.create_shader_module(&vs_bytes);
         let fs_module = device.create_shader_module(&fs_bytes);

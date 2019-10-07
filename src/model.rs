@@ -4,6 +4,10 @@ pub struct Vertex {
     _tex_coord: [f32; 2],
 }
 
+pub struct TriangleList {
+    pub vertex_data: Vec<Vertex>,
+    pub index_data: Vec<u32>,
+}
 
 fn vertex(pos: [i8; 3], tc: [i8; 2]) -> Vertex {
     Vertex {
@@ -12,7 +16,7 @@ fn vertex(pos: [i8; 3], tc: [i8; 2]) -> Vertex {
     }
 }
 
-pub fn create_vertices() -> (Vec<Vertex>, Vec<u32>) {
+pub fn create_cube() -> TriangleList {
     let vertex_data = [
         // top (0, 0, 1)
         vertex([-1, -1, 1], [0, 0]),
@@ -55,5 +59,8 @@ pub fn create_vertices() -> (Vec<Vertex>, Vec<u32>) {
         20, 21, 22, 22, 23, 20, // back
     ];
 
-    (vertex_data.to_vec(), index_data.to_vec())
+    TriangleList {
+        vertex_data: vertex_data.to_vec(),
+        index_data: index_data.to_vec(),
+    }
 }

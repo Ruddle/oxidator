@@ -1,28 +1,28 @@
 mod camera;
-mod cube;
-mod cube_gpu;
 mod fake_texels;
 mod framework;
 mod game_state;
+mod glsl_compiler;
 mod heightmap;
 mod heightmap_gpu;
-mod shader;
+mod model;
+mod model_gpu;
 extern crate nalgebra as na;
 use na::{Matrix4, Point3, Rotation3, Vector3};
 
-use cube_gpu::CubeGpu;
 use heightmap_gpu::HeightmapGpu;
 use imgui::*;
 use imgui_wgpu::Renderer;
 use imgui_winit_support;
 use imgui_winit_support::WinitPlatform;
+use model_gpu::ModelGpu;
 use std::time::Instant;
 use wgpu::TextureFormat;
 
 struct App {
     forward_depth: wgpu::TextureView,
     heightmap_gpu: HeightmapGpu,
-    cube_gpu: CubeGpu,
+    cube_gpu: ModelGpu,
     bind_group_layout: wgpu::BindGroupLayout,
     bind_group: wgpu::BindGroup,
     format: TextureFormat,
@@ -219,7 +219,13 @@ impl framework::App for App {
             32,
         );
 
-        let cube_gpu = CubeGpu::new(device, &mut init_encoder, format, &bind_group_layout);
+        let cube_gpu = ModelGpu::new(
+            &model::create_cube(),
+            device,
+            &mut init_encoder,
+            format,
+            &bind_group_layout,
+        );
 
         // Done
         let this = App {
@@ -450,23 +456,43 @@ impl framework::App for App {
                             last_compute_time_total.as_micros()
                         ));
 
-                        if imgui::Slider::new(im_str!("debug_i1"), (1..=200)).build(&ui, debug_i1) {
-                            println!("Slider");
+                        if imgui::Slider::new(im_str!("debug_i1"), (1..=1000)).build(&ui, debug_i1)
+                        {
                             rebuild_heightmap = true;
                         }
                     });
 
-                if rebuild_heightmap {
-                    let heightmap_gpu = HeightmapGpu::new(
-                        device,
-                        &mut encoder,
-                        self.format,
-                        &self.bind_group_layout,
-                        *debug_i1 as u32,
-                        32,
-                    );
+                if true || rebuild_heightmap {
+                    //                    let heightmap_gpu = HeightmapGpu::new(
+                    //                        device,
+                    //                        &mut encoder,
+                    //                        self.format,
+                    //                        &self.bind_group_layout,
+                    //                        *debug_i1 as u32,
+                    //                        32,
+                    //                    );
+                    let t = self.game_state.start_time.elapsed().as_secs_f32();
 
-                    std::mem::replace(&mut self.heightmap_gpu, heightmap_gpu);
+                    let mut positions = Vec::with_capacity((*debug_i1 * *debug_i1 * 3) as usize);
+                    for i in 0..*debug_i1 {
+                        for j in 0..*debug_i1 {
+                            positions.push((3 * i) as f32);
+                            positions.push((3 * j) as f32);
+                            positions.push(
+                                10.0 + 5.0
+                                    * f32::sin(
+                                        (1.0 + 5.0 * i as f32 / (*debug_i1 as f32))
+                                            * (1.0 + 5.0 * j as f32 / (*debug_i1 as f32))
+                                            * t,
+                                    ),
+                            );
+                        }
+                    }
+
+                    self.cube_gpu
+                        .update_instance(&positions[..], &mut encoder, device);
+
+                    //                    std::mem::replace(&mut self.heightmap_gpu, heightmap_gpu);
                 }
             }
             self.imgui_wrap.platform.prepare_render(&ui, window);
