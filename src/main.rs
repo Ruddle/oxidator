@@ -424,21 +424,21 @@ impl framework::Example for Example {
             let k = (if !on(Key::LShift) { 1.0 } else { 2.0 }) * self.game_state.position.z;
             //Game
             if on(Key::S) {
-                offset.x -= k;
+                offset.y -= k;
             }
             if on(Key::Z) {
-                offset.x += k;
-            }
-            if on(Key::Q) {
                 offset.y += k;
             }
+            if on(Key::Q) {
+                offset.x -= k;
+            }
             if on(Key::D) {
-                offset.y -= k;
+                offset.x += k;
             }
 
             if on(Key::LControl) {
                 if self.game_state.last_scroll > 0.0 {
-                    rotation.x += 1.0
+                    rotation.y += 1.0
                 }
                 if self.game_state.last_scroll < 0.0 {
                     rotation.z -= 1.0
@@ -451,7 +451,7 @@ impl framework::Example for Example {
 
             self.game_state.position += offset * delta_sim_sec;
             self.game_state.dir =
-                (self.game_state.dir + rotation * 10.0 * delta_sim_sec).normalize();
+                (self.game_state.dir + rotation * 33.0 * delta_sim_sec).normalize();
 
             self.game_state.position_smooth += (self.game_state.position.coords
                 - self.game_state.position_smooth.coords)

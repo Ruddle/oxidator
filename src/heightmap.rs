@@ -8,8 +8,10 @@ use crate::Vertex;
 pub const CHUNK_SIZE: u32 = 16;
 
 pub fn create_vertices() -> (Vec<Vertex>, Vec<u32>) {
-    let size = CHUNK_SIZE * 64;
-    let nb_square = ((size - 1) * (size - 1)) as usize;
+    let width = CHUNK_SIZE * 128;
+    let height = CHUNK_SIZE * 32;
+
+    let nb_square = ((width - 1) * (height - 1)) as usize;
     let mut vertex_data = Vec::with_capacity(nb_square * 4);
     let mut index_data = Vec::with_capacity(nb_square * 4);
 
@@ -50,12 +52,12 @@ pub fn create_vertices() -> (Vec<Vertex>, Vec<u32>) {
         30.0 * f32::sin((x + y) / 95.0) + 15.0 * (f32::sin(x / 20.0) * f32::cos(y / 45.0 + 1.554))
     }
 
-    for j in 0_u32..size {
-        for i in 0_u32..size {
+    for j in 0_u32..height {
+        for i in 0_u32..width {
             let vertex = |x: f32, y: f32| -> Vertex {
                 Vertex {
                     _pos: [x, y, z(x, y), 0.0],
-                    _tex_coord: [x / size as f32, y / size as f32],
+                    _tex_coord: [x / width as f32, y / height as f32],
                 }
             };
 
@@ -64,12 +66,12 @@ pub fn create_vertices() -> (Vec<Vertex>, Vec<u32>) {
         }
     }
 
-    for i in 0_u32..size - 1 {
-        for j in 0_u32..size - 1 {
-            let a: u32 = i + j * size;
-            let b: u32 = i + 1 + j * size;
-            let c: u32 = i + 1 + (j + 1) * size;
-            let d: u32 = i + (j + 1) * size;
+    for i in 0_u32..width - 1 {
+        for j in 0_u32..height - 1 {
+            let a: u32 = i + j * width;
+            let b: u32 = i + 1 + j * width;
+            let c: u32 = i + 1 + (j + 1) * width;
+            let d: u32 = i + (j + 1) * width;
             index_data.push(a);
             index_data.push(b);
             index_data.push(c);
