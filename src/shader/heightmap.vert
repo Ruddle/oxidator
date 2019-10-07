@@ -1,6 +1,6 @@
 #version 450
 
-layout(location = 0) in vec4 a_Pos;
+layout(location = 0) in vec3 a_Pos;
 
 layout(location = 0) out vec2 v_TexCoord;
 
@@ -19,5 +19,5 @@ layout(set = 1, binding = 0) uniform MapCfg {
 
 void main() {
     v_TexCoord = a_Pos.xy / vec2(width,height);
-    gl_Position = u_Transform * ( vec4(a_Pos.xyz,1.0) );
+    gl_Position = u_Transform * ( vec4(a_Pos,1.0) );
 }

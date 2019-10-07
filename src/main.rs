@@ -307,7 +307,7 @@ impl framework::Example for Example {
             format,
             &bind_group_layout,
             128,
-            64,
+            32,
         );
 
         // Done

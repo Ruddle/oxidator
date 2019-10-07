@@ -1,6 +1,6 @@
 #[derive(Clone, Copy)]
 pub struct Vertex {
-    _pos: [f32; 4],
+    _pos: [f32; 3],
 }
 pub const CHUNK_SIZE: u32 = 16;
 
@@ -57,7 +57,7 @@ pub fn create_vertices(width_n: u32, height_n: u32) -> (Vec<Vertex>, Vec<u32>) {
                 for i in 0_u32..CHUNK_SIZE {
                     let vertex = |x: f32, y: f32| -> Vertex {
                         Vertex {
-                            _pos: [x, y, z(x, y), 0.0],
+                            _pos: [x, y, z(x, y)],
                         }
                     };
 

@@ -187,7 +187,7 @@ impl HeightmapGpu {
                 stride: std::mem::size_of::<heightmap::Vertex>() as wgpu::BufferAddress,
                 step_mode: wgpu::InputStepMode::Vertex,
                 attributes: &[wgpu::VertexAttributeDescriptor {
-                    format: wgpu::VertexFormat::Float4,
+                    format: wgpu::VertexFormat::Float3,
                     offset: 0,
                     shader_location: 0,
                 }],
