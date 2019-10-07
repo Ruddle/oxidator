@@ -5,6 +5,8 @@ use crate::Vertex;
 //    _tex_coord: [f32; 2],
 //}
 
+pub const CHUNK_SIZE: u32 = 10;
+
 pub fn create_vertices() -> (Vec<Vertex>, Vec<u32>) {
     let size = 1000_u32;
     let nb_square = ((size - 1) * (size - 1)) as usize;
@@ -42,12 +44,17 @@ pub fn create_vertices() -> (Vec<Vertex>, Vec<u32>) {
     //            last_index = index_a + 3 + 1;
     //        }
     //    }
+    //    println!("last_index {}", last_index);
+
+    fn z(x: f32, y: f32) -> f32 {
+        30.0 * f32::sin((x + y) / 95.0) + 15.0 * (f32::sin(x / 20.0) * f32::cos(y / 45.0 + 1.554))
+    }
 
     for j in 0_u32..size {
         for i in 0_u32..size {
             let vertex = |x: f32, y: f32| -> Vertex {
                 Vertex {
-                    _pos: [x, y, 5.0 * (f32::sin(x / 3.0) * y) / 1000.0, 0.0],
+                    _pos: [x, y, z(x, y), 0.0],
                     _tex_coord: [x / size as f32, y / size as f32],
                 }
             };
@@ -56,6 +63,7 @@ pub fn create_vertices() -> (Vec<Vertex>, Vec<u32>) {
             vertex_data.push(a);
         }
     }
+
     for i in 0_u32..size - 1 {
         for j in 0_u32..size - 1 {
             let a: u32 = i + j * size;
@@ -70,8 +78,6 @@ pub fn create_vertices() -> (Vec<Vertex>, Vec<u32>) {
             index_data.push(d);
         }
     }
-
-    println!("last_index {}", last_index);
 
     println!("index_data size  {}", index_data.len());
     println!("vertex_data size {}", vertex_data.len());

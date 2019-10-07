@@ -10,6 +10,7 @@ pub struct State {
     pub last_scroll: f32,
     pub fps: u64,
     pub last_frame: Instant,
+    pub debug_i1: i32,
 }
 
 impl State {
@@ -21,6 +22,7 @@ impl State {
             last_scroll: 0.0,
             fps: 144,
             last_frame: Instant::now(),
+            debug_i1: 1,
         }
     }
 }

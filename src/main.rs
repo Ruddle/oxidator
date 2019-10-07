@@ -497,7 +497,14 @@ impl framework::Example for Example {
             rpass.set_index_buffer(&self.height_index_buf, 0);
             rpass.set_vertex_buffers(0, &[(&self.height_vertex_buf, 0)]);
 
-            rpass.draw_indexed(0..(self.height_index_count) as u32, 0, 0..1);
+            let nb_chunks = self.game_state.debug_i1 as u32;
+            let chunk_size = ((self.height_index_count as u32 / nb_chunks) / 3) * 3;
+            for k in 0..nb_chunks {
+                let range =
+                    (chunk_size * k)..(chunk_size) * (k + 1).min(self.height_index_count as u32);
+                rpass.draw_indexed(range, 0, 0..1);
+            }
+            //            rpass.draw_indexed(0..(self.height_index_count) as u32, 0, 0..1);
 
             //            rpass.set_index_buffer(&self.cube_index_buf, 0);
             //            rpass.set_vertex_buffers(0, &[(&self.cube_vertex_buf, 0)]);
@@ -516,6 +523,7 @@ impl framework::Example for Example {
 
             {
                 let mut_fps = &mut self.game_state.fps;
+                let debug_i1 = &mut self.game_state.debug_i1;
                 let window = imgui::Window::new(im_str!("Statistics"));
                 window
                     .size([400.0, 200.0], Condition::FirstUseEver)
@@ -527,6 +535,8 @@ impl framework::Example for Example {
                             " \" Capped: {}us",
                             last_compute_time_total.as_micros()
                         ));
+
+                        imgui::Slider::new(im_str!("debug_i1"), (1..=100000)).build(&ui, debug_i1);
                     });
             }
             self.imgui_wrap.platform.prepare_render(&ui, window);
