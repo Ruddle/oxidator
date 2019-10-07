@@ -11,7 +11,12 @@ pub struct TriangleList {
 
 fn vertex(pos: [i8; 3], tc: [i8; 2]) -> Vertex {
     Vertex {
-        _pos: [pos[0] as f32, pos[1] as f32, pos[2] as f32, 1.0],
+        _pos: [
+            pos[0] as f32 / 2.0,
+            pos[1] as f32 / 2.0,
+            pos[2] as f32 / 2.0,
+            1.0,
+        ],
         _tex_coord: [tc[0] as f32, tc[1] as f32],
     }
 }

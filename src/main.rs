@@ -210,14 +210,8 @@ impl framework::App for App {
 
         let format: TextureFormat = sc_desc.format;
 
-        let heightmap_gpu = HeightmapGpu::new(
-            device,
-            &mut init_encoder,
-            format,
-            &bind_group_layout,
-            128,
-            32,
-        );
+        let heightmap_gpu =
+            HeightmapGpu::new(device, &mut init_encoder, format, &bind_group_layout, 1, 1);
 
         let cube_gpu = ModelGpu::new(
             &model::create_cube(),
@@ -476,13 +470,13 @@ impl framework::App for App {
                     let mut positions = Vec::with_capacity((*debug_i1 * *debug_i1 * 3) as usize);
                     for i in 0..*debug_i1 {
                         for j in 0..*debug_i1 {
-                            positions.push((3 * i) as f32);
-                            positions.push((3 * j) as f32);
+                            positions.push(0.5 + (2 * i) as f32);
+                            positions.push(0.5 + (2 * j) as f32);
                             positions.push(
-                                10.0 + 5.0
+                                10.0 + 3.0
                                     * f32::sin(
-                                        (1.0 + 5.0 * i as f32 / (*debug_i1 as f32))
-                                            * (1.0 + 5.0 * j as f32 / (*debug_i1 as f32))
+                                        (1.0 + 2.0 * i as f32 / (*debug_i1 as f32))
+                                            * (1.0 + 2.0 * j as f32 / (*debug_i1 as f32))
                                             * t,
                                     ),
                             );
