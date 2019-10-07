@@ -19,7 +19,7 @@ use imgui_winit_support::WinitPlatform;
 use std::time::Instant;
 use wgpu::TextureFormat;
 
-struct Example {
+struct App {
     forward_depth: wgpu::TextureView,
     heightmap_gpu: HeightmapGpu,
     cube_gpu: CubeGpu,
@@ -38,9 +38,9 @@ struct ImguiWrap {
     renderer: Renderer,
 }
 
-impl Example {}
+impl App {}
 
-impl framework::Example for Example {
+impl framework::App for App {
     fn init(
         sc_desc: &wgpu::SwapChainDescriptor,
         device: &mut wgpu::Device,
@@ -92,6 +92,7 @@ impl framework::Example for Example {
             format: wgpu::TextureFormat::Rgba8UnormSrgb,
             usage: wgpu::TextureUsage::SAMPLED | wgpu::TextureUsage::COPY_DST,
         });
+
         let texture_view = texture.create_default_view();
         let temp_buf = device
             .create_buffer_mapped(texels.len(), wgpu::BufferUsage::COPY_SRC)
@@ -221,7 +222,7 @@ impl framework::Example for Example {
         let cube_gpu = CubeGpu::new(device, &mut init_encoder, format, &bind_group_layout);
 
         // Done
-        let this = Example {
+        let this = App {
             bind_group_layout,
             bind_group,
             uniform_buf,
@@ -234,6 +235,29 @@ impl framework::Example for Example {
             imgui_wrap,
         };
         (this, Some(init_encoder.finish()))
+    }
+
+    fn resize(
+        &mut self,
+        sc_desc: &wgpu::SwapChainDescriptor,
+        device: &wgpu::Device,
+    ) -> Option<wgpu::CommandBuffer> {
+        self.screen_res = (sc_desc.width, sc_desc.height);
+        let depth_texture = device.create_texture(&wgpu::TextureDescriptor {
+            size: wgpu::Extent3d {
+                width: sc_desc.width,
+                height: sc_desc.height,
+                depth: 1,
+            },
+            array_layer_count: 1,
+            mip_level_count: 1,
+            sample_count: 1,
+            dimension: wgpu::TextureDimension::D2,
+            format: wgpu::TextureFormat::Depth32Float,
+            usage: wgpu::TextureUsage::OUTPUT_ATTACHMENT,
+        });
+        self.forward_depth = depth_texture.create_default_view();
+        None
     }
 
     fn update(&mut self, _event: &winit::event::Event<()>, window: &winit::window::Window) {
@@ -280,29 +304,6 @@ impl framework::Example for Example {
             }
             _ => {}
         }
-    }
-
-    fn resize(
-        &mut self,
-        sc_desc: &wgpu::SwapChainDescriptor,
-        device: &wgpu::Device,
-    ) -> Option<wgpu::CommandBuffer> {
-        self.screen_res = (sc_desc.width, sc_desc.height);
-        let depth_texture = device.create_texture(&wgpu::TextureDescriptor {
-            size: wgpu::Extent3d {
-                width: sc_desc.width,
-                height: sc_desc.height,
-                depth: 1,
-            },
-            array_layer_count: 1,
-            mip_level_count: 1,
-            sample_count: 1,
-            dimension: wgpu::TextureDimension::D2,
-            format: wgpu::TextureFormat::Depth32Float,
-            usage: wgpu::TextureUsage::OUTPUT_ATTACHMENT,
-        });
-        self.forward_depth = depth_texture.create_default_view();
-        None
     }
 
     fn render(
@@ -480,5 +481,5 @@ impl framework::Example for Example {
 }
 
 fn main() {
-    framework::run::<Example>("Oxidator");
+    framework::run::<App>("Oxidator");
 }

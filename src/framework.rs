@@ -9,7 +9,7 @@ pub fn cast_slice<T>(data: &[T]) -> &[u8] {
     unsafe { from_raw_parts(data.as_ptr() as *const u8, data.len() * size_of::<T>()) }
 }
 
-pub trait Example: 'static + Sized {
+pub trait App: 'static + Sized {
     fn init(
         sc_desc: &wgpu::SwapChainDescriptor,
         device: &mut wgpu::Device,
@@ -30,7 +30,7 @@ pub trait Example: 'static + Sized {
     ) -> wgpu::CommandBuffer;
 }
 
-pub fn run<E: Example>(title: &str) {
+pub fn run<E: App>(title: &str) {
     use winit::{
         event,
         event_loop::{ControlFlow, EventLoop},
