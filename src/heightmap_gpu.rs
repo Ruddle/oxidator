@@ -8,6 +8,8 @@ pub struct HeightmapGpu {
     height_vertex_buf: wgpu::Buffer,
     height_index_buf: wgpu::Buffer,
     height_index_count: usize,
+    width_n: u32,
+    height_n: u32,
 }
 
 impl HeightmapGpu {
@@ -196,9 +198,13 @@ impl HeightmapGpu {
             alpha_to_coverage_enabled: false,
         });
 
-        let (vertex_data, height_index_data) = heightmap::create_vertices(width_n, height_n);
+        let (vertex_data, height_index_data) =
+            heightmap::create_vertices_indices(width_n, height_n, 0.0);
         let height_vertex_buf = device
-            .create_buffer_mapped(vertex_data.len(), wgpu::BufferUsage::VERTEX)
+            .create_buffer_mapped(
+                vertex_data.len(),
+                wgpu::BufferUsage::VERTEX | wgpu::BufferUsage::COPY_DST,
+            )
             .fill_from_slice(&vertex_data);
 
         let height_index_buf = device
@@ -213,6 +219,8 @@ impl HeightmapGpu {
             height_vertex_buf,
             height_index_buf,
             height_index_count,
+            width_n,
+            height_n,
         }
     }
 
@@ -233,5 +241,25 @@ impl HeightmapGpu {
         }
 
         //        rpass.draw_indexed(0..(self.height_index_count) as u32, 0, 0..1);
+    }
+
+    pub fn update_all(&mut self, device: &Device, encoder: &mut CommandEncoder, t: f32) {
+        let vertex_data = heightmap::create_vertices(self.width_n, self.height_n, t);
+
+        //        self.height_vertex_buf = device
+        //            .create_buffer_mapped(vertex_data.len(), wgpu::BufferUsage::VERTEX)
+        //            .fill_from_slice(&vertex_data);
+
+        //        let height_vertex_buf = device
+        //            .create_buffer_mapped(vertex_data.len(), wgpu::BufferUsage::COPY_SRC)
+        //            .fill_from_slice(&vertex_data);
+        //
+        //        encoder.copy_buffer_to_buffer(
+        //            &height_vertex_buf,
+        //            0,
+        //            &self.height_vertex_buf,
+        //            0,
+        //            vertex_data.len() as u64 * std::mem::size_of::<heightmap::Vertex>() as u64 / 20,
+        //        );
     }
 }
