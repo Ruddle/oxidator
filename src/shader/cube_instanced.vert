@@ -12,9 +12,9 @@ void main() {
 
 
     v_TexCoord = a_TexCoord;
-    if((gl_VertexIndex/6) %2 == 0){
-        v_TexCoord = vec2(1.0,0.0);
-    }
+//    if((gl_VertexIndex/6) %2 == 0){
+//        v_TexCoord = vec2(1.0,0.0);
+//    }
 
 
     int max = 100;

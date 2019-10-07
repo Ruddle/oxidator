@@ -8,8 +8,10 @@ use crate::Vertex;
 pub const CHUNK_SIZE: u32 = 16;
 
 pub fn create_vertices() -> (Vec<Vertex>, Vec<u32>) {
-    let width = CHUNK_SIZE * 128;
-    let height = CHUNK_SIZE * 32;
+    let width_n = 128;
+    let height_n = 32;
+    let width = CHUNK_SIZE * width_n;
+    let height = CHUNK_SIZE * height_n;
 
     let nb_square = ((width - 1) * (height - 1)) as usize;
     let mut vertex_data = Vec::with_capacity(nb_square * 4);
@@ -49,29 +51,57 @@ pub fn create_vertices() -> (Vec<Vertex>, Vec<u32>) {
     //    println!("last_index {}", last_index);
 
     fn z(x: f32, y: f32) -> f32 {
-        30.0 * f32::sin((x + y) / 95.0) + 15.0 * (f32::sin(x / 20.0) * f32::cos(y / 45.0 + 1.554))
+        30.0 * f32::sin((x + y) / 95.0)
+            + 15.0 * (f32::sin(x / 20.0) * f32::cos(y / 45.0 + 1.554))
+            + 3.0 * (f32::sin(x / 3.0) * f32::cos(y / 3.3 + 1.94))
     }
 
-    for j in 0_u32..height {
-        for i in 0_u32..width {
-            let vertex = |x: f32, y: f32| -> Vertex {
-                Vertex {
-                    _pos: [x, y, z(x, y), 0.0],
-                    _tex_coord: [x / width as f32, y / height as f32],
-                }
-            };
+    for chunk_j in 0..height_n {
+        for chunk_i in 0..width_n {
+            let pair = (chunk_j + chunk_i) % 2 == 0;
 
-            let a = vertex(i as f32, j as f32);
-            vertex_data.push(a);
+            for j in 0_u32..CHUNK_SIZE {
+                for i in 0_u32..CHUNK_SIZE {
+                    let vertex = |x: f32, y: f32| -> Vertex {
+                        Vertex {
+                            _pos: [x, y, z(x, y), 0.0],
+                            _tex_coord: [
+                                if pair {
+                                    x / width as f32
+                                } else {
+                                    1.0 - x / width as f32
+                                },
+                                y / height as f32,
+                            ],
+                        }
+                    };
+
+                    let a = vertex(
+                        (i + chunk_i * CHUNK_SIZE) as f32,
+                        (j + chunk_j * CHUNK_SIZE) as f32,
+                    );
+                    vertex_data.push(a);
+                }
+            }
         }
     }
 
+    let index_of = |i: u32, j: u32| -> u32 {
+        let chunk_i = i / CHUNK_SIZE;
+        let chunk_j = j / CHUNK_SIZE;
+        let chunk_number = chunk_i + chunk_j * width_n;
+        let di = i % CHUNK_SIZE;
+        let dj = j % CHUNK_SIZE;
+
+        chunk_number * CHUNK_SIZE * CHUNK_SIZE + di + dj * CHUNK_SIZE
+    };
+
     for i in 0_u32..width - 1 {
         for j in 0_u32..height - 1 {
-            let a: u32 = i + j * width;
-            let b: u32 = i + 1 + j * width;
-            let c: u32 = i + 1 + (j + 1) * width;
-            let d: u32 = i + (j + 1) * width;
+            let a: u32 = index_of(i, j);
+            let b: u32 = index_of(i + 1, j);
+            let c: u32 = index_of(i + 1, j + 1);
+            let d: u32 = index_of(i, j + 1);
             index_data.push(a);
             index_data.push(b);
             index_data.push(c);

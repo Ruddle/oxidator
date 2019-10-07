@@ -4,15 +4,18 @@ mod fake_texels;
 mod framework;
 mod game_state;
 mod heightmap;
+mod heightmap_gpu;
 mod shader;
 extern crate nalgebra as na;
 use na::{Matrix4, Point3, Rotation3, Vector3};
 
+use heightmap_gpu::HeightmapGpu;
 use imgui::*;
 use imgui_wgpu::Renderer;
 use imgui_winit_support;
 use imgui_winit_support::WinitPlatform;
 use std::time::Instant;
+use wgpu::TextureFormat;
 
 #[derive(Clone, Copy)]
 pub struct Vertex {
@@ -24,13 +27,14 @@ struct Example {
     cube_vertex_buf: wgpu::Buffer,
     cube_index_buf: wgpu::Buffer,
     cube_index_count: usize,
-    height_vertex_buf: wgpu::Buffer,
-    height_index_buf: wgpu::Buffer,
-    height_index_count: usize,
+
     bind_group: wgpu::BindGroup,
     uniform_buf: wgpu::Buffer,
     pipeline: wgpu::RenderPipeline,
     forward_depth: wgpu::TextureView,
+
+    heightmap_gpu: HeightmapGpu,
+
     screen_res: (u32, u32),
     game_state: game_state::State,
     imgui_wrap: ImguiWrap,
@@ -66,15 +70,6 @@ impl framework::Example for Example {
         let cube_index_buf = device
             .create_buffer_mapped(cube_index_data.len(), wgpu::BufferUsage::INDEX)
             .fill_from_slice(&cube_index_data);
-
-        let (vertex_data, height_index_data) = heightmap::create_vertices();
-        let height_vertex_buf = device
-            .create_buffer_mapped(vertex_data.len(), wgpu::BufferUsage::VERTEX)
-            .fill_from_slice(&vertex_data);
-
-        let height_index_buf = device
-            .create_buffer_mapped(height_index_data.len(), wgpu::BufferUsage::INDEX)
-            .fill_from_slice(&height_index_data);
 
         // Create pipeline layout
         let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
@@ -189,9 +184,14 @@ impl framework::Example for Example {
         });
 
         // Create the render pipeline
-        let vs_bytes = shader::load_glsl(include_str!("shader.vert"), shader::ShaderStage::Vertex);
-        let fs_bytes =
-            shader::load_glsl(include_str!("shader.frag"), shader::ShaderStage::Fragment);
+        let vs_bytes = shader::load_glsl(
+            include_str!("shader/cube_instanced.vert"),
+            shader::ShaderStage::Vertex,
+        );
+        let fs_bytes = shader::load_glsl(
+            include_str!("shader/cube_instanced.frag"),
+            shader::ShaderStage::Fragment,
+        );
         let vs_module = device.create_shader_module(&vs_bytes);
         let fs_module = device.create_shader_module(&fs_bytes);
 
@@ -299,17 +299,27 @@ impl framework::Example for Example {
             }
         };
 
+        let format: TextureFormat = sc_desc.format;
+
+        let heightmap_gpu = HeightmapGpu::new(
+            device,
+            &mut init_encoder,
+            format,
+            vertex_size,
+            &bind_group_layout,
+        );
+
         // Done
         let this = Example {
             cube_vertex_buf,
             cube_index_buf,
-            height_vertex_buf,
-            height_index_buf,
+
             cube_index_count: cube_index_data.len(),
-            height_index_count: height_index_data.len(),
+
             bind_group,
             uniform_buf,
             pipeline,
+            heightmap_gpu,
             forward_depth: depth_texture.create_default_view(),
             screen_res: (sc_desc.width, sc_desc.height),
             game_state: game_state::State::new(),
@@ -444,7 +454,7 @@ impl framework::Example for Example {
                     rotation.z -= 1.0
                 }
             } else {
-                offset.z = -self.game_state.last_scroll * k * 10.0;
+                offset.z = -self.game_state.last_scroll * k * 20.0;
             }
 
             self.game_state.last_scroll = 0.0;
@@ -499,24 +509,14 @@ impl framework::Example for Example {
                     clear_stencil: 0,
                 }),
             });
+
+            self.heightmap_gpu.render(&mut rpass, &self.bind_group);
+
             rpass.set_pipeline(&self.pipeline);
             rpass.set_bind_group(0, &self.bind_group, &[]);
-
-            rpass.set_index_buffer(&self.height_index_buf, 0);
-            rpass.set_vertex_buffers(0, &[(&self.height_vertex_buf, 0)]);
-
-            let nb_chunks = self.game_state.debug_i1 as u32;
-            let chunk_size = ((self.height_index_count as u32 / nb_chunks) / 3) * 3;
-            for k in 0..nb_chunks {
-                let range =
-                    (chunk_size * k)..(chunk_size) * (k + 1).min(self.height_index_count as u32);
-                rpass.draw_indexed(range, 0, 0..1);
-            }
-            //            rpass.draw_indexed(0..(self.height_index_count) as u32, 0, 0..1);
-
-            //            rpass.set_index_buffer(&self.cube_index_buf, 0);
-            //            rpass.set_vertex_buffers(0, &[(&self.cube_vertex_buf, 0)]);
-            //            rpass.draw_indexed(0..self.cube_index_count as u32, 0, 0..10000);
+            rpass.set_index_buffer(&self.cube_index_buf, 0);
+            rpass.set_vertex_buffers(0, &[(&self.cube_vertex_buf, 0)]);
+            rpass.draw_indexed(0..self.cube_index_count as u32, 0, 0..10000);
         }
 
         //Imgui
