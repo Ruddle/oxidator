@@ -5,10 +5,10 @@ use crate::Vertex;
 //    _tex_coord: [f32; 2],
 //}
 
-pub const CHUNK_SIZE: u32 = 10;
+pub const CHUNK_SIZE: u32 = 16;
 
 pub fn create_vertices() -> (Vec<Vertex>, Vec<u32>) {
-    let size = 1000_u32;
+    let size = CHUNK_SIZE * 64;
     let nb_square = ((size - 1) * (size - 1)) as usize;
     let mut vertex_data = Vec::with_capacity(nb_square * 4);
     let mut index_data = Vec::with_capacity(nb_square * 4);

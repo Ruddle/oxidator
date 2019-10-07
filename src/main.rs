@@ -452,6 +452,14 @@ impl framework::Example for Example {
             self.game_state.position += offset * delta_sim_sec;
             self.game_state.dir =
                 (self.game_state.dir + rotation * 10.0 * delta_sim_sec).normalize();
+
+            self.game_state.position_smooth += (self.game_state.position.coords
+                - self.game_state.position_smooth.coords)
+                * delta_sim_sec
+                * 15.0;
+
+            self.game_state.dir_smooth +=
+                (self.game_state.dir - self.game_state.dir_smooth) * delta_sim_sec * 15.0;
         }
 
         //Render
@@ -460,8 +468,8 @@ impl framework::Example for Example {
 
         camera::update_camera_uniform(
             self.screen_res,
-            &self.game_state.position,
-            &self.game_state.dir,
+            &self.game_state.position_smooth,
+            &self.game_state.dir_smooth,
             &self.uniform_buf,
             device,
             &mut encoder,
