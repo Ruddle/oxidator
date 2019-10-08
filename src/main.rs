@@ -474,7 +474,11 @@ impl framework::App for App {
                     //                    std::mem::replace(&mut self.heightmap_gpu, heightmap_gpu);
                     let t = self.game_state.start_time.elapsed().as_secs_f32();
 
-                    self.heightmap_gpu.update_all(&device, &mut encoder, t);
+                    //                    self.heightmap_gpu.update_all(&device, &mut encoder, t);
+
+                    self.heightmap_gpu
+                        .update_chunk(&device, &mut encoder, t, (0, 0));
+
                     //                    let mut positions = Vec::with_capacity((*debug_i1 * *debug_i1 * 3) as usize);
                     //                    for i in 0..*debug_i1 {
                     //                        for j in 0..*debug_i1 {

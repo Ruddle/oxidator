@@ -1,7 +1,9 @@
 use crate::glsl_compiler;
 use crate::heightmap;
+use crate::heightmap::CHUNK_SIZE;
 use wgpu::{BindGroup, BindGroupLayout, RenderPass, RenderPipeline, TextureFormat};
 use wgpu::{CommandEncoder, Device};
+
 pub struct HeightmapGpu {
     pipeline: RenderPipeline,
     bind_group: BindGroup,
@@ -187,11 +189,18 @@ impl HeightmapGpu {
             vertex_buffers: &[wgpu::VertexBufferDescriptor {
                 stride: std::mem::size_of::<heightmap::Vertex>() as wgpu::BufferAddress,
                 step_mode: wgpu::InputStepMode::Vertex,
-                attributes: &[wgpu::VertexAttributeDescriptor {
-                    format: wgpu::VertexFormat::Float3,
-                    offset: 0,
-                    shader_location: 0,
-                }],
+                attributes: &[
+                    wgpu::VertexAttributeDescriptor {
+                        format: wgpu::VertexFormat::Float3,
+                        offset: 0,
+                        shader_location: 0,
+                    },
+                    wgpu::VertexAttributeDescriptor {
+                        format: wgpu::VertexFormat::Float3,
+                        offset: 4 * 3,
+                        shader_location: 1,
+                    },
+                ],
             }],
             sample_count: 1,
             sample_mask: !0,
@@ -232,15 +241,15 @@ impl HeightmapGpu {
         rpass.set_index_buffer(&self.height_index_buf, 0);
         rpass.set_vertex_buffers(0, &[(&self.height_vertex_buf, 0)]);
 
-        let nb_chunks = 1_u32; //self.game_state.debug_i1 as u32;
-        let chunk_size = ((self.height_index_count as u32 / nb_chunks) / 3) * 3;
-        for k in 0..nb_chunks {
-            let range =
-                (chunk_size * k)..(chunk_size) * (k + 1).min(self.height_index_count as u32);
-            rpass.draw_indexed(range, 0, 0..1);
-        }
+        //        let nb_chunks = 1_u32; //self.game_state.debug_i1 as u32;
+        //        let chunk_size = ((self.height_index_count as u32 / nb_chunks) / 3) * 3;
+        //        for k in 0..nb_chunks {
+        //            let range =
+        //                (chunk_size * k)..(chunk_size) * (k + 1).min(self.height_index_count as u32);
+        //            rpass.draw_indexed(range, 0, 0..1);
+        //        }
 
-        //        rpass.draw_indexed(0..(self.height_index_count) as u32, 0, 0..1);
+        rpass.draw_indexed(0..(self.height_index_count) as u32, 0, 0..1);
     }
 
     pub fn update_all(&mut self, device: &Device, encoder: &mut CommandEncoder, t: f32) {
@@ -250,16 +259,39 @@ impl HeightmapGpu {
         //            .create_buffer_mapped(vertex_data.len(), wgpu::BufferUsage::VERTEX)
         //            .fill_from_slice(&vertex_data);
 
-        //        let height_vertex_buf = device
-        //            .create_buffer_mapped(vertex_data.len(), wgpu::BufferUsage::COPY_SRC)
-        //            .fill_from_slice(&vertex_data);
-        //
-        //        encoder.copy_buffer_to_buffer(
-        //            &height_vertex_buf,
-        //            0,
-        //            &self.height_vertex_buf,
-        //            0,
-        //            vertex_data.len() as u64 * std::mem::size_of::<heightmap::Vertex>() as u64 / 20,
-        //        );
+        let height_vertex_buf = device
+            .create_buffer_mapped(vertex_data.len(), wgpu::BufferUsage::COPY_SRC)
+            .fill_from_slice(&vertex_data);
+
+        encoder.copy_buffer_to_buffer(
+            &height_vertex_buf,
+            0,
+            &self.height_vertex_buf,
+            0,
+            vertex_data.len() as u64 * std::mem::size_of::<heightmap::Vertex>() as u64,
+        );
+    }
+
+    pub fn update_chunk(
+        &mut self,
+        device: &Device,
+        encoder: &mut CommandEncoder,
+        t: f32,
+        chunk: (u32, u32),
+    ) {
+        let vertex_data =
+            heightmap::create_vertices_of_chunk(self.width_n, self.height_n, t, chunk.0, chunk.1);
+
+        let height_vertex_buf = device
+            .create_buffer_mapped(vertex_data.len(), wgpu::BufferUsage::COPY_SRC)
+            .fill_from_slice(&vertex_data);
+
+        encoder.copy_buffer_to_buffer(
+            &height_vertex_buf,
+            0,
+            &self.height_vertex_buf,
+            ((chunk.0 + chunk.1 * self.width_n) * CHUNK_SIZE * CHUNK_SIZE) as u64,
+            vertex_data.len() as u64 * std::mem::size_of::<heightmap::Vertex>() as u64,
+        );
     }
 }
