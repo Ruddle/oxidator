@@ -1,6 +1,6 @@
 use crate::glsl_compiler;
 use crate::heightmap;
-use crate::heightmap::CHUNK_SIZE;
+
 use wgpu::{BindGroup, BindGroupLayout, RenderPass, RenderPipeline, TextureFormat};
 use wgpu::{CommandEncoder, Device};
 
@@ -10,8 +10,8 @@ pub struct HeightmapGpu {
     height_vertex_buf: wgpu::Buffer,
     height_index_buf: wgpu::Buffer,
     height_index_count: usize,
-    width_n: u32,
-    height_n: u32,
+    width: u32,
+    height: u32,
 }
 
 impl HeightmapGpu {
@@ -20,52 +20,107 @@ impl HeightmapGpu {
         init_encoder: &mut CommandEncoder,
         format: TextureFormat,
         main_bind_group_layout: &BindGroupLayout,
-        width_n: u32,
-        height_n: u32,
+        width: u32,
+        height: u32,
     ) -> Self {
-        // Create the texture
-        let size = 2u32;
-        let texels = crate::fake_texels::checker(size as usize);
-        let texture_extent = wgpu::Extent3d {
-            width: size,
-            height: size,
-            depth: 1,
-        };
-        let texture = device.create_texture(&wgpu::TextureDescriptor {
-            size: texture_extent,
-            array_layer_count: 1,
-            mip_level_count: 1,
-            sample_count: 1,
-            dimension: wgpu::TextureDimension::D2,
-            format: wgpu::TextureFormat::Rgba8UnormSrgb,
-            usage: wgpu::TextureUsage::SAMPLED | wgpu::TextureUsage::COPY_DST,
-        });
-        let texture_view = texture.create_default_view();
-        let temp_buf = device
-            .create_buffer_mapped(texels.len(), wgpu::BufferUsage::COPY_SRC)
-            .fill_from_slice(&texels);
-        init_encoder.copy_buffer_to_texture(
-            wgpu::BufferCopyView {
-                buffer: &temp_buf,
-                offset: 0,
-                row_pitch: 4 * size,
-                image_height: size,
-            },
-            wgpu::TextureCopyView {
-                texture: &texture,
-                mip_level: 0,
-                array_layer: 0,
-                origin: wgpu::Origin3d {
-                    x: 0.0,
-                    y: 0.0,
-                    z: 0.0,
-                },
-            },
-            texture_extent,
-        );
+        let texture_view_checker = {
+            let size = 2u32;
+            let texels = crate::fake_texels::checker(size as usize);
+            let texture_extent = wgpu::Extent3d {
+                width: size,
+                height: size,
+                depth: 1,
+            };
+            let texture = device.create_texture(&wgpu::TextureDescriptor {
+                size: texture_extent,
+                array_layer_count: 1,
+                mip_level_count: 1,
+                sample_count: 1,
+                dimension: wgpu::TextureDimension::D2,
+                format: wgpu::TextureFormat::Rgba8UnormSrgb,
+                usage: wgpu::TextureUsage::SAMPLED | wgpu::TextureUsage::COPY_DST,
+            });
 
-        // Create other resources
-        let sampler = device.create_sampler(&wgpu::SamplerDescriptor {
+            let temp_buf = device
+                .create_buffer_mapped(texels.len(), wgpu::BufferUsage::COPY_SRC)
+                .fill_from_slice(&texels);
+            init_encoder.copy_buffer_to_texture(
+                wgpu::BufferCopyView {
+                    buffer: &temp_buf,
+                    offset: 0,
+                    row_pitch: 4 * size,
+                    image_height: size,
+                },
+                wgpu::TextureCopyView {
+                    texture: &texture,
+                    mip_level: 0,
+                    array_layer: 0,
+                    origin: wgpu::Origin3d {
+                        x: 0.0,
+                        y: 0.0,
+                        z: 0.0,
+                    },
+                },
+                texture_extent,
+            );
+            texture.create_default_view()
+        };
+
+        let sampler_checker = device.create_sampler(&wgpu::SamplerDescriptor {
+            address_mode_u: wgpu::AddressMode::Repeat,
+            address_mode_v: wgpu::AddressMode::Repeat,
+            address_mode_w: wgpu::AddressMode::Repeat,
+            mag_filter: wgpu::FilterMode::Nearest,
+            min_filter: wgpu::FilterMode::Nearest,
+            mipmap_filter: wgpu::FilterMode::Nearest,
+            lod_min_clamp: -100.0,
+            lod_max_clamp: 100.0,
+            compare_function: wgpu::CompareFunction::Always,
+        });
+
+        let texture_view_height = {
+            let texels = heightmap::create_texels(width, height, 0.0);
+            let texture_extent = wgpu::Extent3d {
+                width,
+                height,
+                depth: 1,
+            };
+            let texture = device.create_texture(&wgpu::TextureDescriptor {
+                size: texture_extent,
+                array_layer_count: 1,
+                mip_level_count: 1,
+                sample_count: 1,
+                dimension: wgpu::TextureDimension::D2,
+                format: wgpu::TextureFormat::Rgba32Float,
+                usage: wgpu::TextureUsage::SAMPLED,
+            });
+
+            let temp_buf = device
+                .create_buffer_mapped(texels.len(), wgpu::BufferUsage::COPY_SRC)
+                .fill_from_slice(&texels);
+            init_encoder.copy_buffer_to_texture(
+                wgpu::BufferCopyView {
+                    buffer: &temp_buf,
+                    offset: 0,
+                    row_pitch: 4 * 4 * width,
+                    image_height: height,
+                },
+                wgpu::TextureCopyView {
+                    texture: &texture,
+                    mip_level: 0,
+                    array_layer: 0,
+                    origin: wgpu::Origin3d {
+                        x: 0.0,
+                        y: 0.0,
+                        z: 0.0,
+                    },
+                },
+                texture_extent,
+            );
+            texture.create_default_view()
+        };
+
+        let sampler_height = device.create_sampler(&wgpu::SamplerDescriptor {
             address_mode_u: wgpu::AddressMode::Repeat,
             address_mode_v: wgpu::AddressMode::Repeat,
             address_mode_w: wgpu::AddressMode::Repeat,
@@ -78,16 +133,10 @@ impl HeightmapGpu {
         });
 
         //Map size
-        let map_size = [
-            width_n * heightmap::CHUNK_SIZE,
-            height_n * heightmap::CHUNK_SIZE,
-            width_n,
-            height_n,
-            heightmap::CHUNK_SIZE,
-        ];
+        let map_size = [width, height];
 
         let uniform_buf = device
-            .create_buffer_mapped(5, wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::COPY_DST)
+            .create_buffer_mapped(2, wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::COPY_DST)
             .fill_from_slice(&map_size);
 
         // Create pipeline layout
@@ -111,6 +160,19 @@ impl HeightmapGpu {
                     visibility: wgpu::ShaderStage::FRAGMENT,
                     ty: wgpu::BindingType::Sampler,
                 },
+                wgpu::BindGroupLayoutBinding {
+                    binding: 3,
+                    visibility: wgpu::ShaderStage::FRAGMENT,
+                    ty: wgpu::BindingType::SampledTexture {
+                        multisampled: false,
+                        dimension: wgpu::TextureViewDimension::D2,
+                    },
+                },
+                wgpu::BindGroupLayoutBinding {
+                    binding: 4,
+                    visibility: wgpu::ShaderStage::FRAGMENT,
+                    ty: wgpu::BindingType::Sampler,
+                },
             ],
         });
 
@@ -122,16 +184,24 @@ impl HeightmapGpu {
                     binding: 0,
                     resource: wgpu::BindingResource::Buffer {
                         buffer: &uniform_buf,
-                        range: 0..12,
+                        range: 0..8,
                     },
                 },
                 wgpu::Binding {
                     binding: 1,
-                    resource: wgpu::BindingResource::TextureView(&texture_view),
+                    resource: wgpu::BindingResource::TextureView(&texture_view_checker),
                 },
                 wgpu::Binding {
                     binding: 2,
-                    resource: wgpu::BindingResource::Sampler(&sampler),
+                    resource: wgpu::BindingResource::Sampler(&sampler_checker),
+                },
+                wgpu::Binding {
+                    binding: 3,
+                    resource: wgpu::BindingResource::TextureView(&texture_view_height),
+                },
+                wgpu::Binding {
+                    binding: 4,
+                    resource: wgpu::BindingResource::Sampler(&sampler_height),
                 },
             ],
         });
@@ -189,18 +259,11 @@ impl HeightmapGpu {
             vertex_buffers: &[wgpu::VertexBufferDescriptor {
                 stride: std::mem::size_of::<heightmap::Vertex>() as wgpu::BufferAddress,
                 step_mode: wgpu::InputStepMode::Vertex,
-                attributes: &[
-                    wgpu::VertexAttributeDescriptor {
-                        format: wgpu::VertexFormat::Float3,
-                        offset: 0,
-                        shader_location: 0,
-                    },
-                    wgpu::VertexAttributeDescriptor {
-                        format: wgpu::VertexFormat::Float3,
-                        offset: 4 * 3,
-                        shader_location: 1,
-                    },
-                ],
+                attributes: &[wgpu::VertexAttributeDescriptor {
+                    format: wgpu::VertexFormat::Float2,
+                    offset: 0,
+                    shader_location: 0,
+                }],
             }],
             sample_count: 1,
             sample_mask: !0,
@@ -208,12 +271,9 @@ impl HeightmapGpu {
         });
 
         let (vertex_data, height_index_data) =
-            heightmap::create_vertices_indices(width_n, height_n, 0.0);
+            heightmap::create_vertices_indices(width, height, 0.0);
         let height_vertex_buf = device
-            .create_buffer_mapped(
-                vertex_data.len(),
-                wgpu::BufferUsage::VERTEX | wgpu::BufferUsage::COPY_DST,
-            )
+            .create_buffer_mapped(vertex_data.len(), wgpu::BufferUsage::VERTEX)
             .fill_from_slice(&vertex_data);
 
         let height_index_buf = device
@@ -228,8 +288,8 @@ impl HeightmapGpu {
             height_vertex_buf,
             height_index_buf,
             height_index_count,
-            width_n,
-            height_n,
+            width,
+            height,
         }
     }
 
@@ -241,57 +301,6 @@ impl HeightmapGpu {
         rpass.set_index_buffer(&self.height_index_buf, 0);
         rpass.set_vertex_buffers(0, &[(&self.height_vertex_buf, 0)]);
 
-        //        let nb_chunks = 1_u32; //self.game_state.debug_i1 as u32;
-        //        let chunk_size = ((self.height_index_count as u32 / nb_chunks) / 3) * 3;
-        //        for k in 0..nb_chunks {
-        //            let range =
-        //                (chunk_size * k)..(chunk_size) * (k + 1).min(self.height_index_count as u32);
-        //            rpass.draw_indexed(range, 0, 0..1);
-        //        }
-
         rpass.draw_indexed(0..(self.height_index_count) as u32, 0, 0..1);
-    }
-
-    pub fn update_all(&mut self, device: &Device, encoder: &mut CommandEncoder, t: f32) {
-        let vertex_data = heightmap::create_vertices(self.width_n, self.height_n, t);
-
-        //        self.height_vertex_buf = device
-        //            .create_buffer_mapped(vertex_data.len(), wgpu::BufferUsage::VERTEX)
-        //            .fill_from_slice(&vertex_data);
-
-        let height_vertex_buf = device
-            .create_buffer_mapped(vertex_data.len(), wgpu::BufferUsage::COPY_SRC)
-            .fill_from_slice(&vertex_data);
-
-        encoder.copy_buffer_to_buffer(
-            &height_vertex_buf,
-            0,
-            &self.height_vertex_buf,
-            0,
-            vertex_data.len() as u64 * std::mem::size_of::<heightmap::Vertex>() as u64,
-        );
-    }
-
-    pub fn update_chunk(
-        &mut self,
-        device: &Device,
-        encoder: &mut CommandEncoder,
-        t: f32,
-        chunk: (u32, u32),
-    ) {
-        let vertex_data =
-            heightmap::create_vertices_of_chunk(self.width_n, self.height_n, t, chunk.0, chunk.1);
-
-        let height_vertex_buf = device
-            .create_buffer_mapped(vertex_data.len(), wgpu::BufferUsage::COPY_SRC)
-            .fill_from_slice(&vertex_data);
-
-        encoder.copy_buffer_to_buffer(
-            &height_vertex_buf,
-            0,
-            &self.height_vertex_buf,
-            ((chunk.0 + chunk.1 * self.width_n) * CHUNK_SIZE * CHUNK_SIZE) as u64,
-            vertex_data.len() as u64 * std::mem::size_of::<heightmap::Vertex>() as u64,
-        );
     }
 }

@@ -8,6 +8,7 @@ mod heightmap_gpu;
 mod model;
 mod model_gpu;
 extern crate nalgebra as na;
+extern crate shaderc;
 use na::{Matrix4, Point3, Rotation3, Vector3};
 
 use heightmap_gpu::HeightmapGpu;
@@ -215,8 +216,8 @@ impl framework::App for App {
             &mut init_encoder,
             format,
             &bind_group_layout,
-            128,
-            32,
+            2048,
+            32 * 16,
         );
 
         let cube_gpu = ModelGpu::new(
@@ -476,8 +477,8 @@ impl framework::App for App {
 
                     //                    self.heightmap_gpu.update_all(&device, &mut encoder, t);
 
-                    self.heightmap_gpu
-                        .update_chunk(&device, &mut encoder, t, (0, 0));
+                    //                    self.heightmap_gpu
+                    //                        .update_chunk(&device, &mut encoder, t, (0, 0));
 
                     //                    let mut positions = Vec::with_capacity((*debug_i1 * *debug_i1 * 3) as usize);
                     //                    for i in 0..*debug_i1 {
