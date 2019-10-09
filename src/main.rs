@@ -216,8 +216,8 @@ impl framework::App for App {
             &mut init_encoder,
             format,
             &bind_group_layout,
-            2048,
-            32 * 16,
+            4096,
+            4096,
         );
 
         let cube_gpu = ModelGpu::new(
@@ -393,6 +393,13 @@ impl framework::App for App {
         let mut encoder =
             device.create_command_encoder(&wgpu::CommandEncoderDescriptor { todo: 0 });
 
+        self.heightmap_gpu.update_uniform(
+            &device,
+            &mut encoder,
+            self.game_state.position_smooth.x,
+            self.game_state.position_smooth.y,
+        );
+
         camera::update_camera_uniform(
             self.screen_res,
             &self.game_state.position_smooth,
@@ -450,7 +457,7 @@ impl framework::App for App {
                     .size([400.0, 200.0], Condition::FirstUseEver)
                     .position([3.0, 3.0], Condition::FirstUseEver)
                     .build(&ui, || {
-                        imgui::Slider::new(im_str!("fps"), 1..=240).build(&ui, mut_fps);
+                        imgui::Slider::new(im_str!("fps"), 1..=480).build(&ui, mut_fps);
                         ui.text(im_str!("Frametime: {}us", last_compute_time.as_micros()));
                         ui.text(im_str!(
                             " \" Capped: {}us",
@@ -463,41 +470,37 @@ impl framework::App for App {
                         }
                     });
 
-                if true || rebuild_heightmap {
-                    //                    let heightmap_gpu = HeightmapGpu::new(
-                    //                        device,
-                    //                        &mut encoder,
-                    //                        self.format,
-                    //                        &self.bind_group_layout,
-                    //                        *debug_i1 as u32,
-                    //                        32,
-                    //                    );
-                    //                    std::mem::replace(&mut self.heightmap_gpu, heightmap_gpu);
+                if rebuild_heightmap {
                     let t = self.game_state.start_time.elapsed().as_secs_f32();
 
-                    //                    self.heightmap_gpu.update_all(&device, &mut encoder, t);
-
-                    //                    self.heightmap_gpu
-                    //                        .update_chunk(&device, &mut encoder, t, (0, 0));
-
-                    //                    let mut positions = Vec::with_capacity((*debug_i1 * *debug_i1 * 3) as usize);
-                    //                    for i in 0..*debug_i1 {
-                    //                        for j in 0..*debug_i1 {
-                    //                            positions.push(0.5 + (2 * i) as f32);
-                    //                            positions.push(0.5 + (2 * j) as f32);
-                    //                            positions.push(
-                    //                                10.0 + 3.0
-                    //                                    * f32::sin(
-                    //                                        (1.0 + 2.0 * i as f32 / (*debug_i1 as f32))
-                    //                                            * (1.0 + 2.0 * j as f32 / (*debug_i1 as f32))
-                    //                                            * t,
-                    //                                    ),
-                    //                            );
+                    //                    let mut new_texels = Vec::new();
+                    //                    for j in 0..20 {
+                    //                        for i in 0..20 {
+                    //                            let index = (i + j * self.heightmap_gpu.width) as usize;
+                    //                            let z = heightmap::z(i as f32 + t, j as f32 + t);
+                    //                            new_texels.push((index, z));
                     //                        }
                     //                    }
-                    //
-                    //                    self.cube_gpu
-                    //                        .update_instance(&positions[..], &mut encoder, device);
+                    //                    self.heightmap_gpu.update(new_texels, &device, &mut encoder);
+
+                    let mut positions = Vec::with_capacity((*debug_i1 * *debug_i1 * 3) as usize);
+                    for i in 0..*debug_i1 {
+                        for j in 0..*debug_i1 {
+                            positions.push(0.5 + (2 * i) as f32);
+                            positions.push(0.5 + (2 * j) as f32);
+                            positions.push(
+                                10.0 + 3.0
+                                    * f32::sin(
+                                        (1.0 + 2.0 * i as f32 / (*debug_i1 as f32))
+                                            * (1.0 + 2.0 * j as f32 / (*debug_i1 as f32))
+                                            * t,
+                                    ),
+                            );
+                        }
+                    }
+
+                    self.cube_gpu
+                        .update_instance(&positions[..], &mut encoder, device);
                 }
             }
             self.imgui_wrap.platform.prepare_render(&ui, window);

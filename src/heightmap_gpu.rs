@@ -1,17 +1,21 @@
 use crate::glsl_compiler;
 use crate::heightmap;
 
-use wgpu::{BindGroup, BindGroupLayout, RenderPass, RenderPipeline, TextureFormat};
+use wgpu::{BindGroup, BindGroupLayout, RenderPass, RenderPipeline, Texture, TextureFormat};
 use wgpu::{CommandEncoder, Device};
 
 pub struct HeightmapGpu {
     pipeline: RenderPipeline,
     bind_group: BindGroup,
-    height_vertex_buf: wgpu::Buffer,
-    height_index_buf: wgpu::Buffer,
-    height_index_count: usize,
-    width: u32,
-    height: u32,
+    vertex_buf: wgpu::Buffer,
+    index_buf: wgpu::Buffer,
+    index_count: usize,
+    pub width: u32,
+    pub height: u32,
+    texels: Vec<f32>,
+    ring_size: u32,
+    texture: Texture,
+    uniform_buf: wgpu::Buffer,
 }
 
 impl HeightmapGpu {
@@ -78,66 +82,71 @@ impl HeightmapGpu {
             compare_function: wgpu::CompareFunction::Always,
         });
 
-        let texture_view_height = {
-            let texels = heightmap::create_texels(width, height, 0.0);
-            let texture_extent = wgpu::Extent3d {
-                width,
-                height,
-                depth: 1,
-            };
-            let texture = device.create_texture(&wgpu::TextureDescriptor {
-                size: texture_extent,
-                array_layer_count: 1,
-                mip_level_count: 1,
-                sample_count: 1,
-                dimension: wgpu::TextureDimension::D2,
-                format: wgpu::TextureFormat::Rgba32Float,
-                usage: wgpu::TextureUsage::SAMPLED,
-            });
+        let start = std::time::Instant::now();
+        let texels = heightmap::create_texels(width, height, 0.0);
+        println!("texels took {}us", start.elapsed().as_micros());
 
-            let temp_buf = device
-                .create_buffer_mapped(texels.len(), wgpu::BufferUsage::COPY_SRC)
-                .fill_from_slice(&texels);
-            init_encoder.copy_buffer_to_texture(
-                wgpu::BufferCopyView {
-                    buffer: &temp_buf,
-                    offset: 0,
-                    row_pitch: 4 * 4 * width,
-                    image_height: height,
-                },
-                wgpu::TextureCopyView {
-                    texture: &texture,
-                    mip_level: 0,
-                    array_layer: 0,
-                    origin: wgpu::Origin3d {
-                        x: 0.0,
-                        y: 0.0,
-                        z: 0.0,
-                    },
-                },
-                texture_extent,
-            );
-            texture.create_default_view()
+        let texture_extent = wgpu::Extent3d {
+            width,
+            height,
+            depth: 1,
         };
 
+        let texture = device.create_texture(&wgpu::TextureDescriptor {
+            size: texture_extent,
+            array_layer_count: 1,
+            mip_level_count: 1,
+            sample_count: 1,
+            dimension: wgpu::TextureDimension::D2,
+            format: wgpu::TextureFormat::R32Float,
+            usage: wgpu::TextureUsage::SAMPLED,
+        });
+
+        let temp_buf = device
+            .create_buffer_mapped(texels.len(), wgpu::BufferUsage::COPY_SRC)
+            .fill_from_slice(&texels);
+
+        init_encoder.copy_buffer_to_texture(
+            wgpu::BufferCopyView {
+                buffer: &temp_buf,
+                offset: 0,
+                row_pitch: 4 * width,
+                image_height: height,
+            },
+            wgpu::TextureCopyView {
+                texture: &texture,
+                mip_level: 0,
+                array_layer: 0,
+                origin: wgpu::Origin3d {
+                    x: 0.0,
+                    y: 0.0,
+                    z: 0.0,
+                },
+            },
+            texture_extent,
+        );
+
+        let texture_view_height = texture.create_default_view();
+
         let sampler_height = device.create_sampler(&wgpu::SamplerDescriptor {
-            address_mode_u: wgpu::AddressMode::Repeat,
-            address_mode_v: wgpu::AddressMode::Repeat,
-            address_mode_w: wgpu::AddressMode::Repeat,
-            mag_filter: wgpu::FilterMode::Nearest,
-            min_filter: wgpu::FilterMode::Nearest,
-            mipmap_filter: wgpu::FilterMode::Nearest,
+            address_mode_u: wgpu::AddressMode::ClampToEdge,
+            address_mode_v: wgpu::AddressMode::ClampToEdge,
+            address_mode_w: wgpu::AddressMode::ClampToEdge,
+            mag_filter: wgpu::FilterMode::Linear,
+            min_filter: wgpu::FilterMode::Linear,
+            mipmap_filter: wgpu::FilterMode::Linear,
             lod_min_clamp: -100.0,
             lod_max_clamp: 100.0,
             compare_function: wgpu::CompareFunction::Always,
         });
 
         //Map size
-        let map_size = [width, height];
+        let ring_size = 128;
+        let map_size_cam_pos = [width as f32, height as f32, ring_size as f32, 0.0, 0.0];
 
         let uniform_buf = device
-            .create_buffer_mapped(2, wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::COPY_DST)
-            .fill_from_slice(&map_size);
+            .create_buffer_mapped(5, wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::COPY_DST)
+            .fill_from_slice(&map_size_cam_pos);
 
         // Create pipeline layout
         let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
@@ -162,7 +171,7 @@ impl HeightmapGpu {
                 },
                 wgpu::BindGroupLayoutBinding {
                     binding: 3,
-                    visibility: wgpu::ShaderStage::VERTEX,
+                    visibility: wgpu::ShaderStage::VERTEX | wgpu::ShaderStage::FRAGMENT,
                     ty: wgpu::BindingType::SampledTexture {
                         multisampled: false,
                         dimension: wgpu::TextureViewDimension::D2,
@@ -170,7 +179,7 @@ impl HeightmapGpu {
                 },
                 wgpu::BindGroupLayoutBinding {
                     binding: 4,
-                    visibility: wgpu::ShaderStage::VERTEX,
+                    visibility: wgpu::ShaderStage::VERTEX | wgpu::ShaderStage::FRAGMENT,
                     ty: wgpu::BindingType::Sampler,
                 },
             ],
@@ -184,7 +193,7 @@ impl HeightmapGpu {
                     binding: 0,
                     resource: wgpu::BindingResource::Buffer {
                         buffer: &uniform_buf,
-                        range: 0..8,
+                        range: 0..20,
                     },
                 },
                 wgpu::Binding {
@@ -270,26 +279,30 @@ impl HeightmapGpu {
             alpha_to_coverage_enabled: false,
         });
 
-        let (vertex_data, height_index_data) =
-            heightmap::create_vertices_indices(width, height, 0.0);
-        let height_vertex_buf = device
+        let (vertex_data, height_index_data) = heightmap::create_vertex_index_rings(ring_size);
+        //            heightmap::create_vertices_indices(width, height, 0.0);
+        let vertex_buf = device
             .create_buffer_mapped(vertex_data.len(), wgpu::BufferUsage::VERTEX)
             .fill_from_slice(&vertex_data);
 
-        let height_index_buf = device
+        let index_buf = device
             .create_buffer_mapped(height_index_data.len(), wgpu::BufferUsage::INDEX)
             .fill_from_slice(&height_index_data);
 
-        let height_index_count = height_index_data.len();
+        let index_count = height_index_data.len();
 
         HeightmapGpu {
             pipeline,
             bind_group,
-            height_vertex_buf,
-            height_index_buf,
-            height_index_count,
+            vertex_buf,
+            index_buf,
+            index_count,
             width,
             height,
+            texels,
+            ring_size,
+            texture,
+            uniform_buf,
         }
     }
 
@@ -297,10 +310,73 @@ impl HeightmapGpu {
         rpass.set_pipeline(&self.pipeline);
         rpass.set_bind_group(0, main_bind_group, &[]);
         rpass.set_bind_group(1, &self.bind_group, &[]);
+        rpass.set_index_buffer(&self.index_buf, 0);
+        rpass.set_vertex_buffers(0, &[(&self.vertex_buf, 0)]);
+        rpass.draw_indexed(0..(self.index_count) as u32, 0, 0..1);
+    }
 
-        rpass.set_index_buffer(&self.height_index_buf, 0);
-        rpass.set_vertex_buffers(0, &[(&self.height_vertex_buf, 0)]);
+    pub fn update_uniform(
+        &mut self,
+        device: &Device,
+        encoder: &mut CommandEncoder,
+        camera_x: f32,
+        camera_y: f32,
+    ) {
+        let half_ring = self.ring_size as f32 / 2.0_f32;
+        //Map size
+        let map_size_cam_pos = [
+            self.width as f32,
+            self.height as f32,
+            self.ring_size as f32,
+            (camera_x.max(0.0).min(self.width as f32) / 1.0).floor() * 1.0,
+            (camera_y.max(0.0).min(self.height as f32) / 1.0).floor() * 1.0,
+        ];
 
-        rpass.draw_indexed(0..(self.height_index_count) as u32, 0, 0..1);
+        let uniform_buf = device
+            .create_buffer_mapped(5, wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::COPY_DST)
+            .fill_from_slice(&map_size_cam_pos);
+
+        encoder.copy_buffer_to_buffer(&uniform_buf, 0, &self.uniform_buf, 0, 64);
+    }
+
+    pub fn update(
+        &mut self,
+        editions: Vec<(usize, f32)>,
+        device: &Device,
+        encoder: &mut CommandEncoder,
+    ) {
+        for (i, z) in editions {
+            self.texels[i] = z;
+        }
+
+        let temp_buf = device
+            .create_buffer_mapped(self.texels.len(), wgpu::BufferUsage::COPY_SRC)
+            .fill_from_slice(&self.texels);
+
+        let texture_extent = wgpu::Extent3d {
+            width: self.width,
+            height: self.height,
+            depth: 1,
+        };
+
+        encoder.copy_buffer_to_texture(
+            wgpu::BufferCopyView {
+                buffer: &temp_buf,
+                offset: 0,
+                row_pitch: 4 * self.width,
+                image_height: self.height,
+            },
+            wgpu::TextureCopyView {
+                texture: &self.texture,
+                mip_level: 0,
+                array_layer: 0,
+                origin: wgpu::Origin3d {
+                    x: 0.0,
+                    y: 0.0,
+                    z: 0.0,
+                },
+            },
+            texture_extent,
+        );
     }
 }
