@@ -28,7 +28,7 @@ void main() {
 
 
 
-    float z =  texture(sampler2D(height_tex, height_sampler), vec2(0.0,0.0)).r;
+    float z =  texture(sampler2D(height_tex, height_sampler),v_TexCoord ).r;
 
 
 

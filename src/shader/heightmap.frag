@@ -13,8 +13,7 @@ layout(set = 1, binding = 0) uniform MapCfg {
 layout(set = 1, binding = 1) uniform texture2D t_Color_checker;
 layout(set = 1, binding = 2) uniform sampler s_Color_checker;
 
-layout(set = 1, binding = 3) uniform texture2D height_tex;
-layout(set = 1, binding = 4) uniform sampler height_sampler;
+
 
 void main() {
     vec4 tex = texture(sampler2D(t_Color, s_Color), v_TexCoord);
@@ -23,8 +22,6 @@ void main() {
 
 
 
-    float z = texture(sampler2D(height_tex, height_sampler), v_TexCoord).r;
-
     //
-    o_Target =  mix(vec4(vec3(z,z,z),1.0), tex_checker, 0.1);
+    o_Target =  mix(tex, tex_checker, 0.1);
 }

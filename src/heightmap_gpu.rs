@@ -162,7 +162,7 @@ impl HeightmapGpu {
                 },
                 wgpu::BindGroupLayoutBinding {
                     binding: 3,
-                    visibility: wgpu::ShaderStage::FRAGMENT,
+                    visibility: wgpu::ShaderStage::VERTEX,
                     ty: wgpu::BindingType::SampledTexture {
                         multisampled: false,
                         dimension: wgpu::TextureViewDimension::D2,
@@ -170,7 +170,7 @@ impl HeightmapGpu {
                 },
                 wgpu::BindGroupLayoutBinding {
                     binding: 4,
-                    visibility: wgpu::ShaderStage::FRAGMENT,
+                    visibility: wgpu::ShaderStage::VERTEX,
                     ty: wgpu::BindingType::Sampler,
                 },
             ],

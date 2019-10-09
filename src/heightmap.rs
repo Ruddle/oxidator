@@ -7,13 +7,13 @@ fn z(x: f32, y: f32) -> f32 {
     30.0 * f32::sin((x + y) / 95.0)
         + 15.0 * (f32::sin(x / 20.0) * f32::cos(y / 45.0 + 1.554))
         + 3.0 * (f32::sin(x / 3.0 + f32::sin(x / 12.0)) * f32::cos(y / 3.3 + 1.94))
-    //        + 1.0 * (f32::sin(x * 3.0) * f32::cos(y * 3.3 + 1.94))
+        + 1.0 * (f32::sin(x * 3.0) * f32::cos(y * 3.3 + 1.94))
 }
 
 pub fn create_texels(width: u32, height: u32, t: f32) -> Vec<f32> {
     let mut texels = Vec::new();
-    for i in 0..width {
-        for j in 0..height {
+    for j in 0..height {
+        for i in 0..width {
             texels.push(z(i as f32 + t, j as f32 + t));
             texels.push(z(i as f32 + t, j as f32 + t));
             texels.push(z(i as f32 + t, j as f32 + t));
