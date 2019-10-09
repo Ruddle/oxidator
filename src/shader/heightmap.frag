@@ -20,6 +20,10 @@ layout(set = 1, binding = 4) uniform sampler height_sampler;
 
 
 
+const vec3 ambientColor = vec3(0.05);
+const vec3 diffuseColor = vec3(1.0, 1.0, 1.0);
+const vec3 specColor = vec3(0.8);
+
 void main() {
     vec4 tex = texture(sampler2D(t_Color, s_Color), v_TexCoord);
     vec4 tex_checker = texture(sampler2D(t_Color_checker, s_Color_checker),
@@ -32,10 +36,36 @@ void main() {
     vec3 a = vec3(a_xy, texture(sampler2D(height_tex, height_sampler),a_xy/ vec2(width,height) ).r );
     vec2 b_xy=  pos_xy+vec2(0,1) ;
     vec3 b = vec3(b_xy, texture(sampler2D(height_tex, height_sampler),b_xy/ vec2(width,height) ).r );
-    vec3 normal = cross(a-pos, b-pos);
+    vec3 normal = normalize(cross(a-pos, b-pos));
 
 
-    vec3 c2 = vec3(   pow(max(abs(color.x-0.5) ,abs(color.y-0.5))*2.0,16)  );
-//
-    o_Target =  mix(vec4(normal,1.0), tex_checker, 0.1);
+    //blinn phong
+    vec3 lightPos = vec3(0.0*width/2.0,0.0*height/2.0,2000.0);
+
+    vec3 vertPos = pos;
+    vec3 lightDir = normalize(lightPos - vertPos);
+
+    float lambertian = max(dot(lightDir,normal), 0.0);
+    float specular = 0.0;
+
+    if(lambertian > 0.0) {
+        vec3 viewDir = normalize(-vertPos);
+        vec3 halfDir = normalize(lightDir + viewDir);
+        float specAngle = max(dot(halfDir, normal), 0.0);
+        specular = pow(specAngle, 16.0);
+
+    }
+
+    float m = 0.1;
+    if(gl_FragCoord.z > 0.37){
+        m=0.1;//0.0
+    }
+
+    vec3 phong = vec3(ambientColor +
+    lambertian* mix(tex.xyz,tex_checker.xyz,m) +
+    specular*specColor);
+
+
+
+    o_Target =   vec4(phong,1.0);
 }

@@ -347,7 +347,20 @@ impl framework::App for App {
             let mut offset = Vector3::new(0.0, 0.0, 0.0);
             let mut rotation = self.game_state.dir.clone();
 
-            let k = (if !on(Key::LShift) { 1.0 } else { 2.0 }) * self.game_state.position.z;
+            let camera_ground_height = self.heightmap_gpu.get_z(
+                self.game_state
+                    .position
+                    .x
+                    .max(0.0)
+                    .min(self.heightmap_gpu.width as f32 - 1.0),
+                self.game_state
+                    .position
+                    .y
+                    .max(0.0)
+                    .min(self.heightmap_gpu.height as f32 - 1.0),
+            );
+            let height_from_ground = self.game_state.position.z - camera_ground_height;
+            let k = (if !on(Key::LShift) { 1.0 } else { 2.0 }) * height_from_ground.max(10.0);
             //Game
             if on(Key::S) {
                 offset.y -= k;
@@ -378,6 +391,8 @@ impl framework::App for App {
             self.game_state.position += offset * delta_sim_sec;
             self.game_state.dir =
                 (self.game_state.dir + rotation * 33.0 * delta_sim_sec).normalize();
+
+            self.game_state.position.z = self.game_state.position.z.max(camera_ground_height + 3.0);
 
             self.game_state.position_smooth += (self.game_state.position.coords
                 - self.game_state.position_smooth.coords)
@@ -470,31 +485,49 @@ impl framework::App for App {
                         }
                     });
 
-                if rebuild_heightmap {
+                if true || rebuild_heightmap {
                     let t = self.game_state.start_time.elapsed().as_secs_f32();
 
                     //                    let mut new_texels = Vec::new();
-                    //                    for j in 0..20 {
-                    //                        for i in 0..20 {
+                    //                    let size_to_update = 100;
+                    //                    for j in 0..size_to_update {
+                    //                        for i in 0..size_to_update {
                     //                            let index = (i + j * self.heightmap_gpu.width) as usize;
-                    //                            let z = heightmap::z(i as f32 + t, j as f32 + t);
-                    //                            new_texels.push((index, z));
+                    //                            let z = heightmap::z(i as f32 + t, j as f32 + t * 3.0);
+                    //                            new_texels.push(z);
                     //                        }
                     //                    }
-                    //                    self.heightmap_gpu.update(new_texels, &device, &mut encoder);
+                    //                    self.heightmap_gpu.update(
+                    //                        0,
+                    //                        0,
+                    //                        size_to_update,
+                    //                        size_to_update,
+                    //                        new_texels,
+                    //                        &device,
+                    //                        &mut encoder,
+                    //                    );
 
                     let mut positions = Vec::with_capacity((*debug_i1 * *debug_i1 * 3) as usize);
                     for i in 0..*debug_i1 {
                         for j in 0..*debug_i1 {
-                            positions.push(0.5 + (2 * i) as f32);
-                            positions.push(0.5 + (2 * j) as f32);
+                            let x = 0.5 + (2 * i) as f32;
+                            let y = 0.5 + (2 * j) as f32;
+                            positions.push(x);
+                            positions.push(y);
                             positions.push(
-                                10.0 + 3.0
-                                    * f32::sin(
-                                        (1.0 + 2.0 * i as f32 / (*debug_i1 as f32))
-                                            * (1.0 + 2.0 * j as f32 / (*debug_i1 as f32))
-                                            * t,
-                                    ),
+                                self.heightmap_gpu.get_z(x, y)
+                                    + 0.5
+                                    + 5.0
+                                        * f32::powi(
+                                            0.5 + 0.5
+                                                * f32::sin(
+                                                    5.0 * (x / (*debug_i1 as f32))
+                                                        * 5.0
+                                                        * (y / (*debug_i1 as f32))
+                                                        + t * 4.0,
+                                                ),
+                                            2,
+                                        ),
                             );
                         }
                     }

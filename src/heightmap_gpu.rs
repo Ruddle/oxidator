@@ -12,7 +12,7 @@ pub struct HeightmapGpu {
     index_count: usize,
     pub width: u32,
     pub height: u32,
-    texels: Vec<f32>,
+    pub texels: Vec<f32>,
     ring_size: u32,
     texture: Texture,
     uniform_buf: wgpu::Buffer,
@@ -339,23 +339,37 @@ impl HeightmapGpu {
         encoder.copy_buffer_to_buffer(&uniform_buf, 0, &self.uniform_buf, 0, 64);
     }
 
+    pub fn get_z(&self, x: f32, y: f32) -> f32 {
+        let i = x as usize + (y as usize) * self.width as usize;
+        self.texels[i]
+    }
+
     pub fn update(
         &mut self,
-        editions: Vec<(usize, f32)>,
+        min_x: u32,
+        min_y: u32,
+        width: u32,
+        height: u32,
+        editions: Vec<f32>,
         device: &Device,
         encoder: &mut CommandEncoder,
     ) {
-        for (i, z) in editions {
-            self.texels[i] = z;
+        for i in min_x..min_x + width {
+            for j in min_y..min_y + height {
+                let ind_local = (i - min_x) + (j - min_y) * width;
+
+                let ind_global = i + j * self.width;
+                self.texels[ind_global as usize] = editions[ind_local as usize];
+            }
         }
 
         let temp_buf = device
-            .create_buffer_mapped(self.texels.len(), wgpu::BufferUsage::COPY_SRC)
-            .fill_from_slice(&self.texels);
+            .create_buffer_mapped(editions.len(), wgpu::BufferUsage::COPY_SRC)
+            .fill_from_slice(&editions);
 
         let texture_extent = wgpu::Extent3d {
-            width: self.width,
-            height: self.height,
+            width,
+            height,
             depth: 1,
         };
 
@@ -363,16 +377,16 @@ impl HeightmapGpu {
             wgpu::BufferCopyView {
                 buffer: &temp_buf,
                 offset: 0,
-                row_pitch: 4 * self.width,
-                image_height: self.height,
+                row_pitch: 4 * width,
+                image_height: height,
             },
             wgpu::TextureCopyView {
                 texture: &self.texture,
                 mip_level: 0,
                 array_layer: 0,
                 origin: wgpu::Origin3d {
-                    x: 0.0,
-                    y: 0.0,
+                    x: min_x as f32,
+                    y: min_y as f32,
                     z: 0.0,
                 },
             },
