@@ -25,6 +25,8 @@ nalgebra = "0.18"
 imgui = "0.2.0"
 imgui-wgpu = "0.1.0"
 shaderc = "0.6"
+actix = "0.7"
+futures = "0.1.29"
 
 [dependencies.imgui-winit-support]
 version = "0.2.0"
