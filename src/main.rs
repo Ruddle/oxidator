@@ -5,6 +5,7 @@ mod game_state;
 mod glsl_compiler;
 mod heightmap;
 mod heightmap_gpu;
+mod input_state;
 mod model;
 mod model_gpu;
 extern crate nalgebra as na;
@@ -18,18 +19,24 @@ use imgui_winit_support;
 use imgui_winit_support::WinitPlatform;
 use model_gpu::ModelGpu;
 use std::time::Instant;
-use wgpu::TextureFormat;
+use wgpu::{BufferMapAsyncResult, Extent3d, TextureFormat};
 
 struct App {
     forward_depth: wgpu::TextureView,
+    position_att: wgpu::Texture,
+    position_att_view: wgpu::TextureView,
     heightmap_gpu: HeightmapGpu,
     cube_gpu: ModelGpu,
     bind_group_layout: wgpu::BindGroupLayout,
     bind_group: wgpu::BindGroup,
     format: TextureFormat,
     uniform_buf: wgpu::Buffer,
+    cursor_sample_position: wgpu::Buffer,
     screen_res: (u32, u32),
+
+    frame_count: u32,
     game_state: game_state::State,
+    input_state: input_state::InputState,
     imgui_wrap: ImguiWrap,
 }
 
@@ -162,20 +169,6 @@ impl framework::App for App {
             ],
         });
 
-        let depth_texture = device.create_texture(&wgpu::TextureDescriptor {
-            size: wgpu::Extent3d {
-                width: sc_desc.width,
-                height: sc_desc.height,
-                depth: 1,
-            },
-            array_layer_count: 1,
-            mip_level_count: 1,
-            sample_count: 1,
-            dimension: wgpu::TextureDimension::D2,
-            format: wgpu::TextureFormat::Depth32Float,
-            usage: wgpu::TextureUsage::OUTPUT_ATTACHMENT,
-        });
-
         let imgui_wrap = {
             // imgui
             let mut imgui = imgui::Context::create();
@@ -216,8 +209,8 @@ impl framework::App for App {
             &mut init_encoder,
             format,
             &bind_group_layout,
-            4096,
-            4096,
+            2048,
+            2048,
         );
 
         let cube_gpu = ModelGpu::new(
@@ -228,6 +221,39 @@ impl framework::App for App {
             &bind_group_layout,
         );
 
+        let depth_texture = device.create_texture(&wgpu::TextureDescriptor {
+            size: wgpu::Extent3d {
+                width: sc_desc.width,
+                height: sc_desc.height,
+                depth: 1,
+            },
+            array_layer_count: 1,
+            mip_level_count: 1,
+            sample_count: 1,
+            dimension: wgpu::TextureDimension::D2,
+            format: wgpu::TextureFormat::Depth32Float,
+            usage: wgpu::TextureUsage::OUTPUT_ATTACHMENT,
+        });
+
+        let position_att = device.create_texture(&wgpu::TextureDescriptor {
+            size: wgpu::Extent3d {
+                width: sc_desc.width,
+                height: sc_desc.height,
+                depth: 1,
+            },
+            array_layer_count: 1,
+            mip_level_count: 1,
+            sample_count: 1,
+            dimension: wgpu::TextureDimension::D2,
+            format: wgpu::TextureFormat::Rgba32Float,
+            usage: wgpu::TextureUsage::OUTPUT_ATTACHMENT | wgpu::TextureUsage::SAMPLED,
+        });
+
+        let initial: &[f32; 4] = &[0.0, 0.0, 0.0, 0.0];
+        let cursor_sample_position = device
+            .create_buffer_mapped(4, wgpu::BufferUsage::COPY_DST)
+            .fill_from_slice(initial);
+
         // Done
         let this = App {
             bind_group_layout,
@@ -237,9 +263,14 @@ impl framework::App for App {
             cube_gpu,
             heightmap_gpu,
             forward_depth: depth_texture.create_default_view(),
+            position_att_view: position_att.create_default_view(),
+            position_att,
+            cursor_sample_position,
             screen_res: (sc_desc.width, sc_desc.height),
             game_state: game_state::State::new(),
+            input_state: input_state::InputState::new(),
             imgui_wrap,
+            frame_count: 0,
         };
         (this, Some(init_encoder.finish()))
     }
@@ -264,6 +295,24 @@ impl framework::App for App {
             usage: wgpu::TextureUsage::OUTPUT_ATTACHMENT,
         });
         self.forward_depth = depth_texture.create_default_view();
+
+        let position_att = device.create_texture(&wgpu::TextureDescriptor {
+            size: wgpu::Extent3d {
+                width: sc_desc.width,
+                height: sc_desc.height,
+                depth: 1,
+            },
+            array_layer_count: 1,
+            mip_level_count: 1,
+            sample_count: 1,
+            dimension: wgpu::TextureDimension::D2,
+            format: wgpu::TextureFormat::Rgba32Float,
+            usage: wgpu::TextureUsage::OUTPUT_ATTACHMENT | wgpu::TextureUsage::SAMPLED,
+        });
+
+        self.position_att_view = position_att.create_default_view();
+        self.position_att = position_att;
+
         None
     }
 
@@ -286,7 +335,7 @@ impl framework::App for App {
                             },
                         ..
                     } => {
-                        self.game_state.key_pressed.insert(vkc.clone());
+                        self.input_state.key_pressed.insert(vkc.clone());
                     }
                     WindowEvent::KeyboardInput {
                         input:
@@ -297,15 +346,22 @@ impl framework::App for App {
                             },
                         ..
                     } => {
-                        self.game_state.key_pressed.remove(vkc);
+                        self.input_state.key_pressed.remove(vkc);
                     }
 
                     WindowEvent::MouseWheel {
                         delta: event::MouseScrollDelta::LineDelta(dx, dy),
                         ..
                     } => {
-                        self.game_state.last_scroll = *dy;
+                        self.input_state.last_scroll = *dy;
                     }
+
+                    WindowEvent::CursorMoved {
+                        position,
+                        modifiers,
+                        ..
+                    } => self.input_state.cursor_pos = (position.x as u32, position.y as u32),
+
                     _ => {}
                 };
             }
@@ -318,14 +374,14 @@ impl framework::App for App {
         frame: &wgpu::SwapChainOutput,
         device: &mut wgpu::Device,
         window: &winit::window::Window,
-    ) -> wgpu::CommandBuffer {
+    ) -> Vec<wgpu::CommandBuffer> {
         let mut now = Instant::now();
         let mut delta = now - self.game_state.last_frame;
         let last_compute_time = delta.clone();
 
         //empiric, a feed back loop could find this value automatically
         let oversleep = 60;
-        let min_us = 1000000_u64 / self.game_state.fps;
+        let min_us = 1000000_u64 / self.input_state.fps;
         let min_wait_until_next_frame = std::time::Duration::from_micros(min_us - oversleep);
         if min_wait_until_next_frame > delta {
             std::thread::sleep(min_wait_until_next_frame - delta);
@@ -338,10 +394,12 @@ impl framework::App for App {
 
         let delta_sim_sec = last_compute_time_total.as_secs_f32();
 
+        self.frame_count += 1;
+
         // Movements
         {
             use winit::event::VirtualKeyCode as Key;
-            let key_pressed = &self.game_state.key_pressed;
+            let key_pressed = &self.input_state.key_pressed;
             let on = |vkc| key_pressed.contains(&vkc);
 
             let mut offset = Vector3::new(0.0, 0.0, 0.0);
@@ -376,17 +434,17 @@ impl framework::App for App {
             }
 
             if on(Key::LControl) {
-                if self.game_state.last_scroll > 0.0 {
+                if self.input_state.last_scroll > 0.0 {
                     rotation.y += 1.0
                 }
-                if self.game_state.last_scroll < 0.0 {
+                if self.input_state.last_scroll < 0.0 {
                     rotation.z -= 1.0
                 }
             } else {
-                offset.z = -self.game_state.last_scroll * k * 20.0;
+                offset.z = -self.input_state.last_scroll * k * 20.0;
             }
 
-            self.game_state.last_scroll = 0.0;
+            self.input_state.last_scroll = 0.0;
 
             self.game_state.position += offset * delta_sim_sec;
             self.game_state.dir =
@@ -405,12 +463,25 @@ impl framework::App for App {
         }
 
         //Render
-        let mut encoder =
+        let mut encoder_render =
             device.create_command_encoder(&wgpu::CommandEncoderDescriptor { todo: 0 });
+
+        let mut c = |e: BufferMapAsyncResult<&[f32]>| match e {
+            Ok(e) => {
+                //                    println!("debug cursor {:?}", e.data.to_vec());
+                let data = e.data.to_vec();
+                let pos = Vector3::new(data[0], data[1], data[2]);
+                //TODO
+                //                self.game_state.mouse_world_pos = pos;
+            }
+            Err(_) => {}
+        };
+
+        self.cursor_sample_position.map_read_async(0, 4 * 4, c);
 
         self.heightmap_gpu.update_uniform(
             &device,
-            &mut encoder,
+            &mut encoder_render,
             self.game_state.position_smooth.x,
             self.game_state.position_smooth.y,
         );
@@ -421,23 +492,37 @@ impl framework::App for App {
             &self.game_state.dir_smooth,
             &self.uniform_buf,
             device,
-            &mut encoder,
+            &mut encoder_render,
         );
 
         {
-            let mut rpass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                color_attachments: &[wgpu::RenderPassColorAttachmentDescriptor {
-                    attachment: &frame.view,
-                    resolve_target: None,
-                    load_op: wgpu::LoadOp::Clear,
-                    store_op: wgpu::StoreOp::Store,
-                    clear_color: wgpu::Color {
-                        r: 0.1,
-                        g: 0.2,
-                        b: 0.3,
-                        a: 1.0,
+            let mut rpass = encoder_render.begin_render_pass(&wgpu::RenderPassDescriptor {
+                color_attachments: &[
+                    wgpu::RenderPassColorAttachmentDescriptor {
+                        attachment: &frame.view,
+                        resolve_target: None,
+                        load_op: wgpu::LoadOp::Clear,
+                        store_op: wgpu::StoreOp::Store,
+                        clear_color: wgpu::Color {
+                            r: 0.1,
+                            g: 0.2,
+                            b: 0.3,
+                            a: 1.0,
+                        },
                     },
-                }],
+                    wgpu::RenderPassColorAttachmentDescriptor {
+                        attachment: &self.position_att_view,
+                        resolve_target: None,
+                        load_op: wgpu::LoadOp::Clear,
+                        store_op: wgpu::StoreOp::Store,
+                        clear_color: wgpu::Color {
+                            r: 0.3,
+                            g: 0.2,
+                            b: 0.1,
+                            a: 1.0,
+                        },
+                    },
+                ],
                 depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachmentDescriptor {
                     attachment: &self.forward_depth,
                     depth_load_op: wgpu::LoadOp::Clear,
@@ -464,8 +549,8 @@ impl framework::App for App {
             let ui = self.imgui_wrap.imgui.frame();
 
             {
-                let mut_fps = &mut self.game_state.fps;
-                let debug_i1 = &mut self.game_state.debug_i1;
+                let mut_fps = &mut self.input_state.fps;
+                let debug_i1 = &mut self.input_state.debug_i1;
                 let mut rebuild_heightmap = false;
                 let window = imgui::Window::new(im_str!("Statistics"));
                 window
@@ -533,17 +618,46 @@ impl framework::App for App {
                     }
 
                     self.cube_gpu
-                        .update_instance(&positions[..], &mut encoder, device);
+                        .update_instance(&positions[..], &mut encoder_render, device);
                 }
             }
             self.imgui_wrap.platform.prepare_render(&ui, window);
             self.imgui_wrap
                 .renderer
-                .render(ui, device, &mut encoder, &frame.view)
+                .render(ui, device, &mut encoder_render, &frame.view)
                 .expect("Rendering failed");
         }
 
-        encoder.finish()
+        let mut encoder_lookup =
+            device.create_command_encoder(&wgpu::CommandEncoderDescriptor { todo: 0 });
+
+        //Error if less when submitting encoder to queue
+        if self.frame_count > 100 {
+            encoder_lookup.copy_texture_to_buffer(
+                wgpu::TextureCopyView {
+                    texture: &self.position_att,
+                    mip_level: 0,
+                    array_layer: 0,
+                    origin: wgpu::Origin3d {
+                        x: (self.input_state.cursor_pos.0) as f32,
+                        y: (self.input_state.cursor_pos.1) as f32,
+                        z: 0.0,
+                    },
+                },
+                wgpu::BufferCopyView {
+                    buffer: &self.cursor_sample_position,
+                    offset: 0,
+                    row_pitch: 4 * 4,
+                    image_height: 1,
+                },
+                Extent3d {
+                    width: 1,
+                    height: 1,
+                    depth: 1,
+                },
+            );
+        }
+        vec![encoder_render.finish(), encoder_lookup.finish()]
     }
 }
 

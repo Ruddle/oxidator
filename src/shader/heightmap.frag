@@ -3,6 +3,7 @@
 layout(location = 0) in vec2 v_TexCoord;
 layout(location = 1) in vec3 color;
 layout(location = 0) out vec4 o_Target;
+layout(location = 1) out vec4 position_att;
 layout(set = 0, binding = 1) uniform texture2D t_Color;
 layout(set = 0, binding = 2) uniform sampler s_Color;
 
@@ -30,6 +31,8 @@ void main() {
                                 v_TexCoord* vec2(width/2.0,height/2.0));
 
     vec2 pos_xy = v_TexCoord* vec2(width,height);
+
+    vec2 tex_coord_floor =vec2(floor(pos_xy.x),floor(pos_xy.y)) / vec2(width,height);
     vec3 pos = vec3(pos_xy, texture(sampler2D(height_tex, height_sampler),v_TexCoord ).r );
 
     vec2 a_xy=  pos_xy+vec2(1,0) ;
@@ -66,6 +69,6 @@ void main() {
     specular*specColor);
 
 
-
+    position_att = vec4(pos, 1.0);
     o_Target =   vec4(phong,1.0);
 }

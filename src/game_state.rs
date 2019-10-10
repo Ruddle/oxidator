@@ -1,6 +1,5 @@
 extern crate nalgebra as na;
 use na::{Matrix4, Point3, Rotation3, Vector3};
-use std::collections::HashSet;
 use std::time::Instant;
 
 pub struct State {
@@ -10,12 +9,10 @@ pub struct State {
     pub position_smooth: Point3<f32>,
     pub dir_smooth: Vector3<f32>,
 
-    pub key_pressed: HashSet<winit::event::VirtualKeyCode>,
-    pub last_scroll: f32,
-    pub fps: u64,
+    pub mouse_world_pos: Vector3<f32>,
+
     pub start_time: Instant,
     pub last_frame: Instant,
-    pub debug_i1: i32,
 }
 
 impl State {
@@ -27,12 +24,10 @@ impl State {
             position_smooth: Point3::new(0.0, 0.0, 30000.0),
             dir_smooth: Vector3::new(0.0, 0.01, -1.0),
 
-            key_pressed: HashSet::new(),
-            last_scroll: 0.0,
-            fps: 144,
+            mouse_world_pos: Vector3::new(0.0, 0.0, 0.0),
+
             start_time: Instant::now(),
             last_frame: Instant::now(),
-            debug_i1: 1,
         }
     }
 }

@@ -33,10 +33,10 @@ void main() {
 
 
     vec2 pos_xy = clamp(
-    a_Pos.xy+cam_pos
+    a_Pos.xy+cam_pos + vec2(0.5)
     , vec2(0.0), dim);
 
-    vec2 heightCoord=  pos_xy / vec2(width,height);
+    vec2 heightCoord=  ( pos_xy )/ vec2(width,height);
     v_TexCoord =heightCoord;// a_Pos.xy / dim;
 
 

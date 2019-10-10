@@ -27,7 +27,7 @@ pub trait App: 'static + Sized {
         frame: &wgpu::SwapChainOutput,
         device: &mut wgpu::Device,
         window: &winit::window::Window,
-    ) -> wgpu::CommandBuffer;
+    ) -> Vec<wgpu::CommandBuffer>;
 }
 
 pub fn run<E: App>(title: &str) {
@@ -126,7 +126,9 @@ pub fn run<E: App>(title: &str) {
             event::Event::EventsCleared => {
                 let frame = swap_chain.get_next_texture();
                 let command_buf = example.render(&frame, &mut device, &window);
-                device.get_queue().submit(&[command_buf]);
+                for (index, cb) in command_buf.into_iter().enumerate() {
+                    device.get_queue().submit(&[cb]);
+                }
             }
             _ => (),
         }
