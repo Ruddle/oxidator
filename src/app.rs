@@ -575,13 +575,15 @@ impl App {
             }
             Err(_) => {}
         };
-        self.cursor_sample_position.map_read_async(0, 4 * 4, c);
 
         let initial: &[f32; 4] = &[0.0, 0.0, 0.0, 0.0];
         let cursor_sample_position = self
             .device
-            .create_buffer_mapped(4, wgpu::BufferUsage::COPY_DST | wgpu::BufferUsage::MAP_READ)
-            .fill_from_slice(initial);
+            .create_buffer_mapped::<f32>(
+                4,
+                wgpu::BufferUsage::COPY_DST | wgpu::BufferUsage::MAP_READ,
+            )
+            .finish(); //.fill_from_slice(initial);
 
         if self.frame_count > 100 {
             encoder_render.copy_texture_to_buffer(
@@ -608,8 +610,6 @@ impl App {
                 },
             );
         }
-
-        self.cursor_sample_position = cursor_sample_position;
 
         self.heightmap_gpu.update_uniform(
             &self.device,
@@ -733,6 +733,9 @@ impl App {
         }
 
         self.device.get_queue().submit(&[encoder_render.finish()]);
+
+        self.cursor_sample_position.map_read_async(0, 4 * 4, c);
+        self.cursor_sample_position = cursor_sample_position;
     }
 
     pub fn map_read_async_msg(&mut self, vec: Vec<f32>) {

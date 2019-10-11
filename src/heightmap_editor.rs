@@ -24,8 +24,8 @@ pub struct State {
 impl State {
     pub fn new() -> Self {
         State {
-            pen_radius: 50,
-            pen_strength: 1.0,
+            pen_radius: 100,
+            pen_strength: 5.0,
             mode: Mode::Raise,
             noise: noise::Perlin::new(),
             noise_scale: 10.0,
