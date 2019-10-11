@@ -27,6 +27,7 @@ imgui-wgpu = "0.1.0"
 shaderc = "0.6"
 actix = "0.7"
 futures = "0.1.29"
+noise = "0.6.0"
 
 [dependencies.imgui-winit-support]
 version = "0.2.0"

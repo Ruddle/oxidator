@@ -39,6 +39,7 @@ pub struct App {
     bind_group: wgpu::BindGroup,
     format: TextureFormat,
     uniform_buf: wgpu::Buffer,
+    cursor_sample_position: wgpu::Buffer,
 
     frame_count: u32,
     game_state: game_state::State,
@@ -290,6 +291,11 @@ impl App {
 
         device.get_queue().submit(&[init_encoder.finish()]);
 
+        let initial: &[f32; 4] = &[0.0, 0.0, 0.0, 0.0];
+        let cursor_sample_position = device
+            .create_buffer_mapped(4, wgpu::BufferUsage::COPY_DST | wgpu::BufferUsage::MAP_READ)
+            .fill_from_slice(initial);
+
         // Done
         let this = App {
             sc_desc,
@@ -308,6 +314,7 @@ impl App {
             forward_depth: depth_texture.create_default_view(),
             position_att_view: position_att.create_default_view(),
             position_att,
+            cursor_sample_position,
 
             game_state: game_state::State::new(),
             input_state: input_state::InputState::new(),
@@ -437,10 +444,12 @@ impl App {
                     modifiers,
                     ..
                 } => {
-                    if let &winit::event::ElementState::Pressed = state {
-                        self.input_state.mouse_pressed.insert(*button);
-                    } else {
-                        self.input_state.mouse_pressed.remove(button);
+                    if !self.imgui_wrap.imgui.io().want_capture_mouse {
+                        if let &winit::event::ElementState::Pressed = state {
+                            self.input_state.mouse_pressed.insert(*button);
+                        } else {
+                            self.input_state.mouse_pressed.remove(button);
+                        }
                     }
                 }
 
@@ -549,74 +558,24 @@ impl App {
             .create_command_encoder(&wgpu::CommandEncoderDescriptor { todo: 0 });
 
         //Action
-        {
-            let pen_strength = self.game_state.heightmap_editor.pen_strength
-                * if self
-                    .input_state
-                    .mouse_pressed
-                    .contains(&winit::event::MouseButton::Left)
-                {
-                    1.0
-                } else if self
-                    .input_state
-                    .mouse_pressed
-                    .contains(&winit::event::MouseButton::Right)
-                {
-                    -1.0
-                } else {
-                    0.0
-                };
 
-            if pen_strength != 0.0 {
-                let x = self.game_state.mouse_world_pos.x;
-                let y = self.game_state.mouse_world_pos.y;
-                let z = self.game_state.mouse_world_pos.z;
+        self.game_state.heightmap_editor.handle_user_input(
+            &self.input_state.mouse_pressed,
+            &self.game_state.mouse_world_pos,
+            &mut self.heightmap_gpu,
+            &self.device,
+            &mut encoder_render,
+        );
 
-                let middle_i = x.floor() as i32;
-                let middle_j = y.floor() as i32;
-
-                let pen_size = self.game_state.heightmap_editor.pen_radius as i32;
-
-                let min_i = (middle_i - pen_size).max(0);
-                let min_j = (middle_j - pen_size).max(0);
-
-                let max_i = (middle_i + pen_size).min(self.heightmap_gpu.width as i32 - 1);
-                let max_j = (middle_j + pen_size).min(self.heightmap_gpu.height as i32 - 1);
-
-                let size_i = max_i - min_i;
-                let size_j = max_j - min_j;
-
-                if size_i > 0 && size_j > 0 {
-                    let mut new_texels = Vec::new();
-                    for j in min_j..max_j {
-                        for i in min_i..max_i {
-                            //                        let index = (i + j * self.heightmap_gpu.width) as usize;
-
-                            let distance2 =
-                                (i32::pow(i - middle_i, 2) + i32::pow(j - middle_j, 2)) as f32;
-                            let distance = distance2.sqrt();
-
-                            let power = pen_strength * (pen_size as f32 - distance).max(0.0)
-                                / (pen_size as f32);
-
-                            let z = self.heightmap_gpu.texels
-                                [(i + j * self.heightmap_gpu.width as i32) as usize]
-                                + power;
-                            new_texels.push(z);
-                        }
-                    }
-                    self.heightmap_gpu.update(
-                        min_i as u32,
-                        min_j as u32,
-                        size_i as u32,
-                        size_j as u32,
-                        new_texels,
-                        &self.device,
-                        &mut encoder_render,
-                    );
-                }
+        let mut c = move |e: BufferMapAsyncResult<&[f32]>| match e {
+            Ok(e) => {
+                let r = addr.do_send(MapReadAsyncMessage {
+                    vec: e.data.to_vec(),
+                });
             }
-        }
+            Err(_) => {}
+        };
+        self.cursor_sample_position.map_read_async(0, 4 * 4, c);
 
         let initial: &[f32; 4] = &[0.0, 0.0, 0.0, 0.0];
         let cursor_sample_position = self
@@ -624,7 +583,7 @@ impl App {
             .create_buffer_mapped(4, wgpu::BufferUsage::COPY_DST | wgpu::BufferUsage::MAP_READ)
             .fill_from_slice(initial);
 
-        if self.frame_count > 10 {
+        if self.frame_count > 100 {
             encoder_render.copy_texture_to_buffer(
                 wgpu::TextureCopyView {
                     texture: &self.position_att,
@@ -650,6 +609,8 @@ impl App {
             );
         }
 
+        self.cursor_sample_position = cursor_sample_position;
+
         self.heightmap_gpu.update_uniform(
             &self.device,
             &mut encoder_render,
@@ -666,6 +627,7 @@ impl App {
             &mut encoder_render,
         );
 
+        //Pass
         {
             let mut rpass = encoder_render.begin_render_pass(&wgpu::RenderPassDescriptor {
                 color_attachments: &[
@@ -710,7 +672,6 @@ impl App {
         }
 
         //Imgui
-
         {
             self.imgui_wrap
                 .platform
@@ -772,17 +733,6 @@ impl App {
         }
 
         self.device.get_queue().submit(&[encoder_render.finish()]);
-
-        let mut c = move |e: BufferMapAsyncResult<&[f32]>| match e {
-            Ok(e) => {
-                let r = addr.do_send(MapReadAsyncMessage {
-                    vec: e.data.to_vec(),
-                });
-            }
-            Err(_) => {}
-        };
-
-        cursor_sample_position.map_read_async(0, 4 * 4, c);
     }
 
     pub fn map_read_async_msg(&mut self, vec: Vec<f32>) {
