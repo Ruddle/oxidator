@@ -88,7 +88,7 @@ impl ModelGpu {
                     format: wgpu::TextureFormat::Rgba32Float,
                     color_blend: wgpu::BlendDescriptor::REPLACE,
                     alpha_blend: wgpu::BlendDescriptor::REPLACE,
-                    write_mask: wgpu::ColorWrite::ALL,
+                    write_mask: wgpu::ColorWrite::ALPHA,
                 },
             ],
             depth_stencil_state: Some(wgpu::DepthStencilStateDescriptor {

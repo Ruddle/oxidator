@@ -16,7 +16,7 @@ use winit::event::{Event, WindowEvent};
 use winit::event_loop::{ControlFlow, EventLoop};
 
 struct ImguiWrap {
-    imgui: Context,
+    imgui: imgui::Context,
     platform: WinitPlatform,
     renderer: Renderer,
 }
@@ -39,7 +39,6 @@ pub struct App {
     bind_group: wgpu::BindGroup,
     format: TextureFormat,
     uniform_buf: wgpu::Buffer,
-    cursor_sample_position: wgpu::Buffer,
 
     frame_count: u32,
     game_state: game_state::State,
@@ -48,7 +47,7 @@ pub struct App {
 }
 
 impl App {
-    pub fn init(event_loop: &EventLoop<()>) -> (Self) {
+    pub fn init(window: winit::window::Window) -> (Self) {
         use std::mem;
         use winit::{
             event,
@@ -58,10 +57,11 @@ impl App {
         env_logger::init();
         info!("Initializing the window...");
 
-        let (window, instance, hidpi_factor, size, surface) = {
+        let (instance, hidpi_factor, size, surface) = {
             let instance = wgpu::Instance::new();
 
-            let window = winit::window::Window::new(&event_loop).unwrap();
+            //            let window = winit::window::Window::new(&event_loop).unwrap();
+
             window.set_inner_size(winit::dpi::LogicalSize {
                 width: 1280.0,
                 height: 720.0,
@@ -73,7 +73,7 @@ impl App {
             use raw_window_handle::HasRawWindowHandle as _;
             let surface = instance.create_surface(window.raw_window_handle());
 
-            (window, instance, hidpi_factor, size, surface)
+            (instance, hidpi_factor, size, surface)
         };
 
         let adapter = instance.request_adapter(&wgpu::RequestAdapterOptions {
@@ -288,11 +288,6 @@ impl App {
             usage: wgpu::TextureUsage::OUTPUT_ATTACHMENT | wgpu::TextureUsage::SAMPLED,
         });
 
-        let initial: &[f32; 4] = &[0.0, 0.0, 0.0, 0.0];
-        let cursor_sample_position = device
-            .create_buffer_mapped(4, wgpu::BufferUsage::COPY_DST)
-            .fill_from_slice(initial);
-
         device.get_queue().submit(&[init_encoder.finish()]);
 
         // Done
@@ -313,7 +308,6 @@ impl App {
             forward_depth: depth_texture.create_default_view(),
             position_att_view: position_att.create_default_view(),
             position_att,
-            cursor_sample_position,
 
             game_state: game_state::State::new(),
             input_state: input_state::InputState::new(),
@@ -360,57 +354,16 @@ impl App {
         None
     }
 
-    pub fn update(&mut self, _event: &winit::event::Event<()>, control_flow: &mut ControlFlow) {
+    pub fn update(
+        &mut self,
+        _event: &winit::event::Event<()>,
+        addr: actix::prelude::Addr<AppActor>,
+    ) {
         use winit::event;
         use winit::event::WindowEvent;
         self.imgui_wrap
             .platform
             .handle_event(self.imgui_wrap.imgui.io_mut(), &self.window, _event);
-
-        match _event {
-            event::Event::WindowEvent { event, .. } => {
-                match event {
-                    WindowEvent::KeyboardInput {
-                        input:
-                            event::KeyboardInput {
-                                virtual_keycode: Some(vkc),
-                                state: event::ElementState::Pressed,
-                                ..
-                            },
-                        ..
-                    } => {
-                        self.input_state.key_pressed.insert(vkc.clone());
-                    }
-                    WindowEvent::KeyboardInput {
-                        input:
-                            event::KeyboardInput {
-                                virtual_keycode: Some(vkc),
-                                state: event::ElementState::Released,
-                                ..
-                            },
-                        ..
-                    } => {
-                        self.input_state.key_pressed.remove(vkc);
-                    }
-
-                    WindowEvent::MouseWheel {
-                        delta: event::MouseScrollDelta::LineDelta(dx, dy),
-                        ..
-                    } => {
-                        self.input_state.last_scroll = *dy;
-                    }
-
-                    WindowEvent::CursorMoved {
-                        position,
-                        modifiers,
-                        ..
-                    } => self.input_state.cursor_pos = (position.x as u32, position.y as u32),
-
-                    _ => {}
-                };
-            }
-            _ => {}
-        }
 
         //Low level
         match _event {
@@ -440,18 +393,67 @@ impl App {
                 }
                 | WindowEvent::CloseRequested => {
                     //TODO Exit app
-                    *control_flow = ControlFlow::Exit;
+                    //                    *control_flow = ControlFlow::Exit;
                 }
+                WindowEvent::KeyboardInput {
+                    input:
+                        event::KeyboardInput {
+                            virtual_keycode: Some(vkc),
+                            state: event::ElementState::Pressed,
+                            ..
+                        },
+                    ..
+                } => {
+                    self.input_state.key_pressed.insert(vkc.clone());
+                }
+                WindowEvent::KeyboardInput {
+                    input:
+                        event::KeyboardInput {
+                            virtual_keycode: Some(vkc),
+                            state: event::ElementState::Released,
+                            ..
+                        },
+                    ..
+                } => {
+                    self.input_state.key_pressed.remove(vkc);
+                }
+
+                WindowEvent::MouseWheel {
+                    delta: event::MouseScrollDelta::LineDelta(dx, dy),
+                    ..
+                } => {
+                    self.input_state.last_scroll = *dy;
+                }
+
+                WindowEvent::CursorMoved {
+                    position,
+                    modifiers,
+                    ..
+                } => self.input_state.cursor_pos = (position.x as u32, position.y as u32),
+
+                WindowEvent::MouseInput {
+                    state,
+                    button,
+                    modifiers,
+                    ..
+                } => {
+                    if let &winit::event::ElementState::Pressed = state {
+                        self.input_state.mouse_pressed.insert(*button);
+                    } else {
+                        self.input_state.mouse_pressed.remove(button);
+                    }
+                }
+
                 _ => {}
             },
             event::Event::EventsCleared => {
-                self.render();
+                self.render(addr);
             }
             _ => (),
         }
     }
 
-    fn render(&mut self) {
+    fn render(&mut self, addr: actix::prelude::Addr<AppActor>) {
         let frame = &self.swap_chain.get_next_texture();
 
         let mut now = Instant::now();
@@ -546,18 +548,107 @@ impl App {
             .device
             .create_command_encoder(&wgpu::CommandEncoderDescriptor { todo: 0 });
 
-        let mut c = |e: BufferMapAsyncResult<&[f32]>| match e {
-            Ok(e) => {
-                //                    println!("debug cursor {:?}", e.data.to_vec());
-                let data = e.data.to_vec();
-                let pos = Vector3::new(data[0], data[1], data[2]);
-                //TODO
-                //                self.game_state.mouse_world_pos = pos;
-            }
-            Err(_) => {}
-        };
+        //Action
+        {
+            let pen_strength = self.game_state.heightmap_editor.pen_strength
+                * if self
+                    .input_state
+                    .mouse_pressed
+                    .contains(&winit::event::MouseButton::Left)
+                {
+                    1.0
+                } else if self
+                    .input_state
+                    .mouse_pressed
+                    .contains(&winit::event::MouseButton::Right)
+                {
+                    -1.0
+                } else {
+                    0.0
+                };
 
-        self.cursor_sample_position.map_read_async(0, 4 * 4, c);
+            if pen_strength != 0.0 {
+                let x = self.game_state.mouse_world_pos.x;
+                let y = self.game_state.mouse_world_pos.y;
+                let z = self.game_state.mouse_world_pos.z;
+
+                let middle_i = x.floor() as i32;
+                let middle_j = y.floor() as i32;
+
+                let pen_size = self.game_state.heightmap_editor.pen_radius as i32;
+
+                let min_i = (middle_i - pen_size).max(0);
+                let min_j = (middle_j - pen_size).max(0);
+
+                let max_i = (middle_i + pen_size).min(self.heightmap_gpu.width as i32 - 1);
+                let max_j = (middle_j + pen_size).min(self.heightmap_gpu.height as i32 - 1);
+
+                let size_i = max_i - min_i;
+                let size_j = max_j - min_j;
+
+                if size_i > 0 && size_j > 0 {
+                    let mut new_texels = Vec::new();
+                    for j in min_j..max_j {
+                        for i in min_i..max_i {
+                            //                        let index = (i + j * self.heightmap_gpu.width) as usize;
+
+                            let distance2 =
+                                (i32::pow(i - middle_i, 2) + i32::pow(j - middle_j, 2)) as f32;
+                            let distance = distance2.sqrt();
+
+                            let power = pen_strength * (pen_size as f32 - distance).max(0.0)
+                                / (pen_size as f32);
+
+                            let z = self.heightmap_gpu.texels
+                                [(i + j * self.heightmap_gpu.width as i32) as usize]
+                                + power;
+                            new_texels.push(z);
+                        }
+                    }
+                    self.heightmap_gpu.update(
+                        min_i as u32,
+                        min_j as u32,
+                        size_i as u32,
+                        size_j as u32,
+                        new_texels,
+                        &self.device,
+                        &mut encoder_render,
+                    );
+                }
+            }
+        }
+
+        let initial: &[f32; 4] = &[0.0, 0.0, 0.0, 0.0];
+        let cursor_sample_position = self
+            .device
+            .create_buffer_mapped(4, wgpu::BufferUsage::COPY_DST | wgpu::BufferUsage::MAP_READ)
+            .fill_from_slice(initial);
+
+        if self.frame_count > 10 {
+            encoder_render.copy_texture_to_buffer(
+                wgpu::TextureCopyView {
+                    texture: &self.position_att,
+                    mip_level: 0,
+                    array_layer: 0,
+                    origin: wgpu::Origin3d {
+                        x: (self.input_state.cursor_pos.0) as f32,
+                        y: (self.input_state.cursor_pos.1) as f32,
+                        z: 0.0,
+                    },
+                },
+                wgpu::BufferCopyView {
+                    buffer: &cursor_sample_position,
+                    offset: 0,
+                    row_pitch: 4 * 4,
+                    image_height: 1,
+                },
+                Extent3d {
+                    width: 1,
+                    height: 1,
+                    depth: 1,
+                },
+            );
+        }
 
         self.heightmap_gpu.update_uniform(
             &self.device,
@@ -626,16 +717,16 @@ impl App {
                 .prepare_frame(self.imgui_wrap.imgui.io_mut(), &self.window)
                 .expect("Failed to prepare frame");
 
-            let ui = self.imgui_wrap.imgui.frame();
+            let ui: Ui = self.imgui_wrap.imgui.frame();
 
             {
                 let mut_fps = &mut self.input_state.fps;
                 let debug_i1 = &mut self.input_state.debug_i1;
                 let mut rebuild_heightmap = false;
-                let window = imgui::Window::new(im_str!("Statistics"));
-                window
-                    .size([400.0, 200.0], Condition::FirstUseEver)
-                    .position([3.0, 3.0], Condition::FirstUseEver)
+                let stats_window = imgui::Window::new(im_str!("Statistics"));
+                stats_window
+                    .size([400.0, 200.0], imgui::Condition::FirstUseEver)
+                    .position([3.0, 3.0], imgui::Condition::FirstUseEver)
                     .build(&ui, || {
                         imgui::Slider::new(im_str!("fps"), 1..=480).build(&ui, mut_fps);
                         ui.text(im_str!("Frametime: {}us", last_compute_time.as_micros()));
@@ -650,50 +741,19 @@ impl App {
                         }
                     });
 
+                self.game_state.heightmap_editor.draw(&ui);
+
                 if true || rebuild_heightmap {
                     let t = self.game_state.start_time.elapsed().as_secs_f32();
-
-                    //                    let mut new_texels = Vec::new();
-                    //                    let size_to_update = 100;
-                    //                    for j in 0..size_to_update {
-                    //                        for i in 0..size_to_update {
-                    //                            let index = (i + j * self.heightmap_gpu.width) as usize;
-                    //                            let z = heightmap::z(i as f32 + t, j as f32 + t * 3.0);
-                    //                            new_texels.push(z);
-                    //                        }
-                    //                    }
-                    //                    self.heightmap_gpu.update(
-                    //                        0,
-                    //                        0,
-                    //                        size_to_update,
-                    //                        size_to_update,
-                    //                        new_texels,
-                    //                        &device,
-                    //                        &mut encoder,
-                    //                    );
 
                     let mut positions = Vec::with_capacity((*debug_i1 * *debug_i1 * 3) as usize);
                     for i in 0..*debug_i1 {
                         for j in 0..*debug_i1 {
-                            let x = 0.5 + (2 * i) as f32;
-                            let y = 0.5 + (2 * j) as f32;
+                            let x = 0.0 + (2 * i) as f32 + self.game_state.mouse_world_pos.x;
+                            let y = 0.0 + (2 * j) as f32 + self.game_state.mouse_world_pos.y;
                             positions.push(x);
                             positions.push(y);
-                            positions.push(
-                                self.heightmap_gpu.get_z(x, y)
-                                    + 0.5
-                                    + 5.0
-                                        * f32::powi(
-                                            0.5 + 0.5
-                                                * f32::sin(
-                                                    5.0 * (x / (*debug_i1 as f32))
-                                                        * 5.0
-                                                        * (y / (*debug_i1 as f32))
-                                                        + t * 4.0,
-                                                ),
-                                            2,
-                                        ),
-                            );
+                            positions.push(self.game_state.mouse_world_pos.z);
                         }
                     }
 
@@ -711,39 +771,21 @@ impl App {
                 .expect("Rendering failed");
         }
 
-        let mut encoder_lookup = self
-            .device
-            .create_command_encoder(&wgpu::CommandEncoderDescriptor { todo: 0 });
-
-        //Error if less when submitting encoder to queue
-        if self.frame_count > 100 {
-            encoder_lookup.copy_texture_to_buffer(
-                wgpu::TextureCopyView {
-                    texture: &self.position_att,
-                    mip_level: 0,
-                    array_layer: 0,
-                    origin: wgpu::Origin3d {
-                        x: (self.input_state.cursor_pos.0) as f32,
-                        y: (self.input_state.cursor_pos.1) as f32,
-                        z: 0.0,
-                    },
-                },
-                wgpu::BufferCopyView {
-                    buffer: &self.cursor_sample_position,
-                    offset: 0,
-                    row_pitch: 4 * 4,
-                    image_height: 1,
-                },
-                Extent3d {
-                    width: 1,
-                    height: 1,
-                    depth: 1,
-                },
-            );
-        }
-
-        println!("Render");
         self.device.get_queue().submit(&[encoder_render.finish()]);
-        self.device.get_queue().submit(&[encoder_lookup.finish()]);
+
+        let mut c = move |e: BufferMapAsyncResult<&[f32]>| match e {
+            Ok(e) => {
+                let r = addr.do_send(MapReadAsyncMessage {
+                    vec: e.data.to_vec(),
+                });
+            }
+            Err(_) => {}
+        };
+
+        cursor_sample_position.map_read_async(0, 4 * 4, c);
+    }
+
+    pub fn map_read_async_msg(&mut self, vec: Vec<f32>) {
+        self.game_state.mouse_world_pos = Vector3::new(vec[0], vec[1], vec[2]);
     }
 }
