@@ -3,7 +3,7 @@ use na::Vector3;
 use std::collections::HashSet;
 
 use crate::heightmap_gpu;
-use noise::NoiseFn;
+use noise::{NoiseFn, Seedable};
 use wgpu::{CommandEncoder, Device};
 
 #[derive(PartialEq, Clone, Copy)]
@@ -18,7 +18,7 @@ pub struct State {
     pub pen_strength: f32,
     pub mode: Mode,
     noise: noise::Perlin,
-    noise_scale: f64,
+    noise_freq: f64,
 }
 
 impl State {
@@ -27,8 +27,8 @@ impl State {
             pen_radius: 100,
             pen_strength: 5.0,
             mode: Mode::Raise,
-            noise: noise::Perlin::new(),
-            noise_scale: 10.0,
+            noise: noise::Perlin::new().set_seed(0),
+            noise_freq: 10.0,
         }
     }
 
@@ -36,7 +36,9 @@ impl State {
         let pen_radius = &mut self.pen_radius;
         let pen_strength = &mut self.pen_strength;
         let mode = &mut self.mode;
-        let noise_scale = &mut self.noise_scale;
+        let noise_freq = &mut self.noise_freq;
+        let noise_seed: &mut i32 = &mut (self.noise.seed() as i32);
+        let mut update_noise = false;
         let edit_height_window = imgui::Window::new(im_str!("Heightmap editor"));
         edit_height_window
             .size([400.0, 200.0], imgui::Condition::FirstUseEver)
@@ -47,13 +49,23 @@ impl State {
                 ui.radio_button(im_str!("Noise"), mode, Mode::Noise);
 
                 if mode == &mut Mode::Noise {
-                    imgui::Slider::new(im_str!("noise scale"), 0.0_f64..=100.0)
-                        .build(&ui, noise_scale);
+                    imgui::Slider::new(im_str!("noise frequency"), 0.0_f64..=100.0)
+                        .power(2.0)
+                        .build(&ui, noise_freq);
+
+                    update_noise = ui
+                        .drag_int(im_str!("noise seed"), noise_seed)
+                        .min(0)
+                        .build();
                 }
 
                 imgui::Slider::new(im_str!("pen radius"), 1..=1000).build(&ui, pen_radius);
                 imgui::Slider::new(im_str!("pen strength"), 0.0..=10.0).build(&ui, pen_strength);
             });
+
+        if update_noise {
+            self.noise = self.noise.set_seed(*noise_seed as u32);
+        }
     }
 
     pub fn handle_user_input(
@@ -149,8 +161,8 @@ impl State {
                                     [(i + j * heightmap_gpu.width as i32) as usize]
                                     + power
                                         * self.noise.get([
-                                            0.0005 * self.noise_scale * i as f64,
-                                            0.0005 * self.noise_scale * j as f64,
+                                            (0.001 * self.noise_freq) * i as f64,
+                                            (0.001 * self.noise_freq) * j as f64,
                                         ]) as f32;
 
                                 new_texels.push(z);
