@@ -3,104 +3,66 @@ mod camera;
 mod fake_texels;
 mod game_state;
 mod glsl_compiler;
-mod heightmap_editor;
 mod heightmap;
+mod heightmap_editor;
 mod heightmap_gpu;
 mod input_state;
 mod model;
 mod model_gpu;
+
 extern crate nalgebra as na;
 extern crate shaderc;
 
-use actix::prelude::*;
-use actix::Recipient;
-
 use winit::event::Event;
 use winit::event_loop::{ControlFlow, EventLoop};
-use winit::window::Window;
 
-#[derive(Message)]
-struct EventMessage {
-    event: Event<()>,
+#[derive(Debug)]
+pub enum AppMsg {
+    EventMessage { event: Event<()> },
+    MapReadAsyncMessage { vec: Vec<f32> },
+    Render,
 }
 
-#[derive(Message)]
-struct WindowMessage {
-    window: Window,
-}
-
-#[derive(Message)]
-struct MapReadAsyncMessage {
-    vec: Vec<f32>,
-}
-
-pub struct AppActor {
-    app: Option<app::App>,
-}
-impl Actor for AppActor {
-    type Context = Context<AppActor>;
-    fn started(&mut self, ctx: &mut Self::Context) {}
-}
-impl Handler<EventMessage> for AppActor {
-    type Result = ();
-    fn handle(&mut self, msg: EventMessage, ctx: &mut Context<Self>) {
-        if let Some(app) = &mut self.app {
-            match msg.event {
-                Event::EventsCleared => {
-                    ctx.notify(EventMessage {
-                        event: Event::EventsCleared,
-                    });
-                }
-                _ => {}
-            }
-
-            app.update(&msg.event, ctx.address());
-        }
-    }
-}
-
-impl Handler<WindowMessage> for AppActor {
-    type Result = ();
-    fn handle(&mut self, msg: WindowMessage, ctx: &mut Context<Self>) {
-        self.app = Some(app::App::init(msg.window));
-    }
-}
-
-impl Handler<MapReadAsyncMessage> for AppActor {
-    type Result = ();
-    fn handle(&mut self, msg: MapReadAsyncMessage, ctx: &mut Context<Self>) {
-        if let Some(app) = &mut self.app {
-            app.map_read_async_msg(msg.vec)
-        }
-    }
+pub enum EventLoopMsg {
+    Stop,
 }
 
 fn main() {
-    let system = System::new("system");
+    env_logger::init();
+    log::trace!("Starting actix system");
 
-    let app = AppActor { app: None }.start();
+    let event_loop = winit::event_loop::EventLoop::new();
+
+    let window = winit::window::Window::new(&event_loop).unwrap();
+
+    let (tx_app, rx_app) = std::sync::mpsc::channel();
+    let tx_app_for_event_loop = std::sync::mpsc::Sender::clone(&tx_app);
+
+    let (tx_event_loop, rx_event_loop) = std::sync::mpsc::channel::<EventLoopMsg>();
 
     std::thread::spawn(move || {
-        let event_loop = winit::event_loop::EventLoop::new();
-        let window = winit::window::Window::new(&event_loop).unwrap();
-        let m = WindowMessage { window };
-        app.do_send(m);
-        app.do_send(EventMessage {
-            event: Event::EventsCleared,
-        });
+        let _ = tx_app.send(AppMsg::Render);
+        let mut app = app::App::init(window, tx_app, rx_app, tx_event_loop);
+        loop {
+            app.receive();
+        }
+    });
 
-        event_loop.run(move |event, _, control_flow| {
-            if let Event::EventsCleared = event {
-                std::thread::sleep(std::time::Duration::from_millis(4));
-            }
-            match event {
-                Event::WindowEvent { .. } => {
-                    app.do_send(EventMessage { event });
+    event_loop.run(move |event, _, control_flow| match event {
+        Event::WindowEvent { .. } => {
+            tx_app_for_event_loop
+                .send(AppMsg::EventMessage { event })
+                .unwrap();
+        }
+        Event::EventsCleared => {
+            match rx_event_loop.try_recv() {
+                Ok(EventLoopMsg::Stop) => {
+                    *control_flow = ControlFlow::Exit;
                 }
                 _ => {}
             }
-        });
+            std::thread::sleep(std::time::Duration::from_millis(4));
+        }
+        _ => {}
     });
-
-    system.run();
 }

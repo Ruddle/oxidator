@@ -1,6 +1,6 @@
 use crate::glsl_compiler;
 use crate::model;
-use wgpu::{BindGroup, BindGroupLayout, RenderPass, RenderPipeline, TextureFormat};
+use wgpu::{BindGroup, BindGroupLayout, RenderPass, TextureFormat};
 use wgpu::{CommandEncoder, Device};
 
 pub struct ModelGpu {
@@ -20,12 +20,13 @@ impl ModelGpu {
         format: TextureFormat,
         main_bind_group_layout: &BindGroupLayout,
     ) -> Self {
+        log::trace!("ModelGpu new");
         // Create the vertex and index buffers
         let vertex_size = std::mem::size_of::<model::Vertex>();
         let model::TriangleList {
             vertex_data,
             index_data,
-        } = model::create_cube();
+        } = triangle_list;
         let vertex_buf = device
             .create_buffer_mapped(vertex_data.len(), wgpu::BufferUsage::VERTEX)
             .fill_from_slice(&vertex_data);
@@ -34,7 +35,7 @@ impl ModelGpu {
             .create_buffer_mapped(index_data.len(), wgpu::BufferUsage::INDEX)
             .fill_from_slice(&index_data);
 
-        let mut positions: Vec<f32> = Vec::new();
+        let positions: Vec<f32> = Vec::new();
 
         let instance_buf = device
             .create_buffer_mapped(
@@ -144,6 +145,7 @@ impl ModelGpu {
     }
 
     pub fn render(&self, rpass: &mut RenderPass, main_bind_group: &BindGroup) {
+        log::trace!("ModelGpu render");
         rpass.set_pipeline(&self.pipeline);
         rpass.set_bind_group(0, main_bind_group, &[]);
         rpass.set_index_buffer(&self.index_buf, 0);
@@ -157,6 +159,7 @@ impl ModelGpu {
         encoder: &mut wgpu::CommandEncoder,
         device: &wgpu::Device,
     ) {
+        log::trace!("ModelGpu update_instance");
         let temp_buf = device
             .create_buffer_mapped(
                 positions.len(),

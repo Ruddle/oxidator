@@ -28,7 +28,7 @@ const vec3 specColor = vec3(0.8);
 void main() {
     vec4 tex = texture(sampler2D(t_Color, s_Color), v_TexCoord);
     vec4 tex_checker = texture(sampler2D(t_Color_checker, s_Color_checker),
-                                v_TexCoord* vec2(width/2.0,height/2.0));
+    (v_TexCoord) * vec2(width/2.0,height/2.0) + vec2(0.5/2.0));
 
     vec2 pos_xy = v_TexCoord* vec2(width,height);
 

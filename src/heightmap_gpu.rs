@@ -27,6 +27,7 @@ impl HeightmapGpu {
         width: u32,
         height: u32,
     ) -> Self {
+        log::trace!("HeightmapGpu new");
         let texture_view_checker = {
             let size = 2u32;
             let texels = crate::fake_texels::checker(size as usize);
@@ -315,6 +316,7 @@ impl HeightmapGpu {
     }
 
     pub fn render(&self, rpass: &mut RenderPass, main_bind_group: &BindGroup) {
+        log::trace!("HeightmapGpu render");
         rpass.set_pipeline(&self.pipeline);
         rpass.set_bind_group(0, main_bind_group, &[]);
         rpass.set_bind_group(1, &self.bind_group, &[]);
@@ -330,7 +332,7 @@ impl HeightmapGpu {
         camera_x: f32,
         camera_y: f32,
     ) {
-        let half_ring = self.ring_size as f32 / 2.0_f32;
+        log::trace!("HeightmapGpu update_uniform");
         //Map size
         let map_size_cam_pos = [
             self.width as f32,

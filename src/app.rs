@@ -1,6 +1,6 @@
 use crate::*;
 
-use na::{Matrix4, Point3, Rotation3, Vector3};
+use na::{Point3, Vector3};
 
 use heightmap_gpu::HeightmapGpu;
 use imgui::*;
@@ -12,7 +12,8 @@ use std::time::Instant;
 use wgpu::{BufferMapAsyncResult, Extent3d, SwapChain, TextureFormat};
 
 use log::info;
-use winit::event::{Event, WindowEvent};
+use std::sync::mpsc::{Receiver, Sender};
+use winit::event::WindowEvent;
 use winit::event_loop::{ControlFlow, EventLoop};
 
 struct ImguiWrap {
@@ -45,23 +46,24 @@ pub struct App {
     game_state: game_state::State,
     input_state: input_state::InputState,
     imgui_wrap: ImguiWrap,
+
+    tx: Sender<AppMsg>,
+    rx: Receiver<AppMsg>,
+
+    tx_event_loop: Sender<EventLoopMsg>,
 }
 
 impl App {
-    pub fn init(window: winit::window::Window) -> (Self) {
-        use std::mem;
-        use winit::{
-            event,
-            event_loop::{ControlFlow, EventLoop},
-        };
-
-        env_logger::init();
-        info!("Initializing the window...");
+    pub fn init(
+        window: winit::window::Window,
+        tx: Sender<AppMsg>,
+        rx: Receiver<AppMsg>,
+        tx_event_loop: Sender<EventLoopMsg>,
+    ) -> (Self) {
+        log::trace!("App init");
 
         let (instance, hidpi_factor, size, surface) = {
             let instance = wgpu::Instance::new();
-
-            //            let window = winit::window::Window::new(&event_loop).unwrap();
 
             window.set_inner_size(winit::dpi::LogicalSize {
                 width: 1280.0,
@@ -88,14 +90,14 @@ impl App {
             limits: wgpu::Limits::default(),
         });
 
-        let mut sc_desc = wgpu::SwapChainDescriptor {
+        let sc_desc = wgpu::SwapChainDescriptor {
             usage: wgpu::TextureUsage::OUTPUT_ATTACHMENT,
             format: wgpu::TextureFormat::Bgra8UnormSrgb,
             width: size.width.round() as u32,
             height: size.height.round() as u32,
             present_mode: wgpu::PresentMode::NoVsync,
         };
-        let mut swap_chain = device.create_swap_chain(&surface, &sc_desc);
+        let swap_chain = device.create_swap_chain(&surface, &sc_desc);
 
         let mut init_encoder =
             device.create_command_encoder(&wgpu::CommandEncoderDescriptor { todo: 0 });
@@ -209,6 +211,7 @@ impl App {
             ],
         });
 
+        log::trace!("   imgui_wrap init");
         let imgui_wrap = {
             // imgui
             let mut imgui = imgui::Context::create();
@@ -320,12 +323,17 @@ impl App {
             input_state: input_state::InputState::new(),
             imgui_wrap,
             frame_count: 0,
+
+            tx,
+            rx,
+            tx_event_loop,
         };
 
-        this
+        (this)
     }
 
     fn resize(&mut self) -> Option<wgpu::CommandBuffer> {
+        log::trace!("resize");
         let depth_texture = self.device.create_texture(&wgpu::TextureDescriptor {
             size: wgpu::Extent3d {
                 width: self.sc_desc.width,
@@ -361,13 +369,10 @@ impl App {
         None
     }
 
-    pub fn update(
-        &mut self,
-        _event: &winit::event::Event<()>,
-        addr: actix::prelude::Addr<AppActor>,
-    ) {
+    pub fn update(&mut self, _event: &winit::event::Event<()>) {
+        log::trace!("[app.rs] update {:?}", _event);
         use winit::event;
-        use winit::event::WindowEvent;
+
         self.imgui_wrap
             .platform
             .handle_event(self.imgui_wrap.imgui.io_mut(), &self.window, _event);
@@ -401,6 +406,8 @@ impl App {
                 | WindowEvent::CloseRequested => {
                     //TODO Exit app
                     //                    *control_flow = ControlFlow::Exit;
+
+                    self.tx_event_loop.send(EventLoopMsg::Stop).unwrap();
                 }
                 WindowEvent::KeyboardInput {
                     input:
@@ -426,24 +433,17 @@ impl App {
                 }
 
                 WindowEvent::MouseWheel {
-                    delta: event::MouseScrollDelta::LineDelta(dx, dy),
+                    delta: event::MouseScrollDelta::LineDelta(_, dy),
                     ..
                 } => {
                     self.input_state.last_scroll = *dy;
                 }
 
-                WindowEvent::CursorMoved {
-                    position,
-                    modifiers,
-                    ..
-                } => self.input_state.cursor_pos = (position.x as u32, position.y as u32),
+                WindowEvent::CursorMoved { position, .. } => {
+                    self.input_state.cursor_pos = (position.x as u32, position.y as u32)
+                }
 
-                WindowEvent::MouseInput {
-                    state,
-                    button,
-                    modifiers,
-                    ..
-                } => {
+                WindowEvent::MouseInput { state, button, .. } => {
                     if !self.imgui_wrap.imgui.io().want_capture_mouse {
                         if let &winit::event::ElementState::Pressed = state {
                             self.input_state.mouse_pressed.insert(*button);
@@ -456,13 +456,14 @@ impl App {
                 _ => {}
             },
             event::Event::EventsCleared => {
-                self.render(addr);
+                self.render();
             }
             _ => (),
         }
     }
 
-    fn render(&mut self, addr: actix::prelude::Addr<AppActor>) {
+    fn render(&mut self) {
+        log::trace!("render");
         let frame = &self.swap_chain.get_next_texture();
 
         let mut now = Instant::now();
@@ -559,24 +560,18 @@ impl App {
 
         //Action
 
-        self.game_state.heightmap_editor.handle_user_input(
-            &self.input_state.mouse_pressed,
-            &self.game_state.mouse_world_pos,
-            &mut self.heightmap_gpu,
-            &self.device,
-            &mut encoder_render,
-        );
+        if let Some(mouse_world_pos) = self.game_state.mouse_world_pos {
+            self.game_state.heightmap_editor.handle_user_input(
+                &self.input_state.mouse_pressed,
+                &mouse_world_pos,
+                &mut self.heightmap_gpu,
+                &self.device,
+                &mut encoder_render,
+            );
+        }
 
-        let mut c = move |e: BufferMapAsyncResult<&[f32]>| match e {
-            Ok(e) => {
-                let r = addr.do_send(MapReadAsyncMessage {
-                    vec: e.data.to_vec(),
-                });
-            }
-            Err(_) => {}
-        };
+        self.cursor_sample_position.unmap();
 
-        let initial: &[f32; 4] = &[0.0, 0.0, 0.0, 0.0];
         let cursor_sample_position = self
             .device
             .create_buffer_mapped::<f32>(
@@ -585,6 +580,16 @@ impl App {
             )
             .finish(); //.fill_from_slice(initial);
 
+        fn clamp(a: u32, min: u32, max: u32) -> u32 {
+            if a < min {
+                min
+            } else if a > max {
+                max
+            } else {
+                a
+            }
+        }
+
         if self.frame_count > 100 {
             encoder_render.copy_texture_to_buffer(
                 wgpu::TextureCopyView {
@@ -592,8 +597,8 @@ impl App {
                     mip_level: 0,
                     array_layer: 0,
                     origin: wgpu::Origin3d {
-                        x: (self.input_state.cursor_pos.0) as f32,
-                        y: (self.input_state.cursor_pos.1) as f32,
+                        x: clamp(self.input_state.cursor_pos.0, 0, self.sc_desc.width - 1) as f32,
+                        y: clamp(self.input_state.cursor_pos.1, 0, self.sc_desc.height - 1) as f32,
                         z: 0.0,
                     },
                 },
@@ -629,6 +634,7 @@ impl App {
 
         //Pass
         {
+            log::trace!("begin_render_pass");
             let mut rpass = encoder_render.begin_render_pass(&wgpu::RenderPassDescriptor {
                 color_attachments: &[
                     wgpu::RenderPassColorAttachmentDescriptor {
@@ -649,10 +655,10 @@ impl App {
                         load_op: wgpu::LoadOp::Clear,
                         store_op: wgpu::StoreOp::Store,
                         clear_color: wgpu::Color {
-                            r: 0.3,
-                            g: 0.2,
-                            b: 0.1,
-                            a: 1.0,
+                            r: 0.0,
+                            g: 0.0,
+                            b: 0.0,
+                            a: 0.0,
                         },
                     },
                 ],
@@ -673,6 +679,7 @@ impl App {
 
         //Imgui
         {
+            log::trace!("imgui render");
             self.imgui_wrap
                 .platform
                 .prepare_frame(self.imgui_wrap.imgui.io_mut(), &self.window)
@@ -696,8 +703,7 @@ impl App {
                             last_compute_time_total.as_micros()
                         ));
 
-                        if imgui::Slider::new(im_str!("debug_i1"), (1..=1000)).build(&ui, debug_i1)
-                        {
+                        if imgui::Slider::new(im_str!("debug_i1"), 1..=1000).build(&ui, debug_i1) {
                             rebuild_heightmap = true;
                         }
                     });
@@ -705,24 +711,27 @@ impl App {
                 self.game_state.heightmap_editor.draw(&ui);
 
                 if true || rebuild_heightmap {
-                    let t = self.game_state.start_time.elapsed().as_secs_f32();
+                    //                    let t = self.game_state.start_time.elapsed().as_secs_f32();
 
-                    let mut positions = Vec::with_capacity((*debug_i1 * *debug_i1 * 3) as usize);
-                    for i in 0..*debug_i1 {
-                        for j in 0..*debug_i1 {
-                            let x = 0.0 + (2 * i) as f32 + self.game_state.mouse_world_pos.x;
-                            let y = 0.0 + (2 * j) as f32 + self.game_state.mouse_world_pos.y;
-                            positions.push(x);
-                            positions.push(y);
-                            positions.push(self.game_state.mouse_world_pos.z);
+                    if let Some(mouse_world_pos) = self.game_state.mouse_world_pos {
+                        let mut positions =
+                            Vec::with_capacity((*debug_i1 * *debug_i1 * 3) as usize);
+                        for i in 0..*debug_i1 {
+                            for j in 0..*debug_i1 {
+                                let x = 0.0 + (2 * i) as f32 + mouse_world_pos.x;
+                                let y = 0.0 + (2 * j) as f32 + mouse_world_pos.y;
+                                positions.push(x);
+                                positions.push(y);
+                                positions.push(mouse_world_pos.z);
+                            }
                         }
-                    }
 
-                    self.cube_gpu.update_instance(
-                        &positions[..],
-                        &mut encoder_render,
-                        &self.device,
-                    );
+                        self.cube_gpu.update_instance(
+                            &positions[..],
+                            &mut encoder_render,
+                            &self.device,
+                        );
+                    }
                 }
             }
             self.imgui_wrap.platform.prepare_render(&ui, &self.window);
@@ -734,11 +743,52 @@ impl App {
 
         self.device.get_queue().submit(&[encoder_render.finish()]);
 
+        let tx2 = std::sync::mpsc::Sender::clone(&self.tx);
+        let c = move |e: BufferMapAsyncResult<&[f32]>| match e {
+            Ok(e) => {
+                log::trace!("BufferMapAsyncResult callback");
+                let _ = tx2.send(AppMsg::MapReadAsyncMessage {
+                    vec: e.data.to_vec(),
+                });
+            }
+            Err(_) => {}
+        };
+
         self.cursor_sample_position.map_read_async(0, 4 * 4, c);
         self.cursor_sample_position = cursor_sample_position;
+
+        let _ = self.tx.send(AppMsg::Render);
     }
 
     pub fn map_read_async_msg(&mut self, vec: Vec<f32>) {
-        self.game_state.mouse_world_pos = Vector3::new(vec[0], vec[1], vec[2]);
+        if vec.len() == 4 && vec[3] != 0.0 {
+            self.game_state.mouse_world_pos = Some(Vector3::new(vec[0], vec[1], vec[2]));
+        } else {
+            self.game_state.mouse_world_pos = None;
+        }
+    }
+
+    pub fn receive(&mut self) {
+        match self.rx.try_recv() {
+            Ok(x) => {
+                log::trace!("receive: {:?}", x);
+
+                match x {
+                    AppMsg::EventMessage { event } => {
+                        self.update(&event);
+                    }
+                    AppMsg::MapReadAsyncMessage { vec } => {
+                        self.map_read_async_msg(vec);
+                    }
+                    AppMsg::Render => {
+                        self.render();
+                    }
+                }
+            }
+            _ => {
+                log::trace!("No message yo");
+                std::thread::sleep(std::time::Duration::from_millis(1000));
+            }
+        }
     }
 }

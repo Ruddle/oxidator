@@ -7,6 +7,7 @@ pub enum ShaderStage {
     Compute,
 }
 
+#[allow(dead_code)]
 pub fn load_old(glsl_code: &str, stage: ShaderStage) -> Vec<u32> {
     let ty = match stage {
         ShaderStage::Vertex => glsl_to_spirv::ShaderType::Vertex,

@@ -1,15 +1,9 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::hash::Hash;
 use std::hash::Hasher;
 #[derive(Clone, Copy, Debug)]
 pub struct Vertex {
     _pos: [f32; 2],
-}
-
-impl Vertex {
-    fn is_same(&self, other: &Self) -> bool {
-        self._pos[0] == other._pos[0] && self._pos[1] == other._pos[1]
-    }
 }
 
 impl PartialEq for Vertex {
@@ -63,15 +57,15 @@ pub fn create_vertex_index_rings(hsize: u32) -> (Vec<Vertex>, Vec<u32>) {
     let mut vertex_data = Vec::with_capacity(nb_square * 4);
     let mut index_data = Vec::with_capacity(nb_square * 4);
 
-    let vertex = |x: f32, y: f32, bx: f32, by: f32| -> Vertex { Vertex { _pos: [x, y] } };
+    let vertex = |x: f32, y: f32| -> Vertex { Vertex { _pos: [x, y] } };
 
     for i in 0_u32..hsize {
         for j in 0_u32..hsize {
             let index_a: u32 = vertex_data.len() as u32;
-            let a = vertex(i as f32, j as f32, 0.0, 0.0);
-            let b = vertex(i as f32 + 1.0, j as f32, 0.1, 0.0);
-            let c = vertex(i as f32 + 1.0, j as f32 + 1.0, 1.0, 1.0);
-            let d = vertex(i as f32, j as f32 + 1.0, 0.0, 1.0);
+            let a = vertex(i as f32, j as f32);
+            let b = vertex(i as f32 + 1.0, j as f32);
+            let c = vertex(i as f32 + 1.0, j as f32 + 1.0);
+            let d = vertex(i as f32, j as f32 + 1.0);
             vertex_data.push(a);
             vertex_data.push(b);
             vertex_data.push(c);
@@ -95,13 +89,13 @@ pub fn create_vertex_index_rings(hsize: u32) -> (Vec<Vertex>, Vec<u32>) {
 
     let mut passes = vec![];
     passes.push(Pass::Trans { from: 1, to: 2 });
-    passes.extend((0..63).into_iter().map(|e| Pass::Step(2)));
+    passes.extend((0..63).into_iter().map(|_| Pass::Step(2)));
     passes.push(Pass::Trans { from: 2, to: 4 });
-    passes.extend((0..63).into_iter().map(|e| Pass::Step(4)));
+    passes.extend((0..63).into_iter().map(|_| Pass::Step(4)));
     passes.push(Pass::Trans { from: 4, to: 8 });
-    passes.extend((0..31).into_iter().map(|e| Pass::Step(8)));
+    passes.extend((0..31).into_iter().map(|_| Pass::Step(8)));
     passes.push(Pass::Trans { from: 8, to: 16 });
-    passes.extend((0..80).into_iter().map(|e| Pass::Step(16)));
+    passes.extend((0..80).into_iter().map(|_| Pass::Step(16)));
     //    passes.push(Pass::Trans { from: 16, to: 32 });
     //    passes.extend((0..50).into_iter().map(|e| Pass::Step(32)));
 
@@ -115,10 +109,10 @@ pub fn create_vertex_index_rings(hsize: u32) -> (Vec<Vertex>, Vec<u32>) {
                 let j = start_min;
                 {
                     let index_a: u32 = vertex_data.len() as u32;
-                    let a = vertex(i as f32, j as f32, 0.0, 0.0);
-                    let b = vertex(i as f32 + *to as f32, j as f32, 0.1, 0.0);
-                    let c = vertex(i as f32 + *to as f32, j as f32 + *to as f32, 1.0, 1.0);
-                    let d = vertex(i as f32, j as f32 + *to as f32, 0.0, 1.0);
+                    let a = vertex(i as f32, j as f32);
+                    let b = vertex(i as f32 + *to as f32, j as f32);
+                    let c = vertex(i as f32 + *to as f32, j as f32 + *to as f32);
+                    let d = vertex(i as f32, j as f32 + *to as f32);
                     vertex_data.push(a);
                     vertex_data.push(b);
                     vertex_data.push(c);
@@ -134,11 +128,11 @@ pub fn create_vertex_index_rings(hsize: u32) -> (Vec<Vertex>, Vec<u32>) {
                 let i = start_min;
                 for j in (0..=start_min - *to).step_by(*to as usize) {
                     let index_a: u32 = vertex_data.len() as u32;
-                    let a = vertex(i as f32, j as f32, 0.0, 0.0);
-                    let b = vertex(i as f32 + *to as f32, j as f32, 0.1, 0.0);
-                    let c = vertex(i as f32 + *to as f32, j as f32 + *to as f32, 1.0, 1.0);
-                    let d = vertex(i as f32, j as f32 + *to as f32, 0.0, 1.0);
-                    let e = vertex(i as f32, j as f32 + *from as f32, 0.0, 0.5);
+                    let a = vertex(i as f32, j as f32);
+                    let b = vertex(i as f32 + *to as f32, j as f32);
+                    let c = vertex(i as f32 + *to as f32, j as f32 + *to as f32);
+                    let d = vertex(i as f32, j as f32 + *to as f32);
+                    let e = vertex(i as f32, j as f32 + *from as f32);
                     vertex_data.push(a);
                     vertex_data.push(b);
                     vertex_data.push(c);
@@ -158,11 +152,11 @@ pub fn create_vertex_index_rings(hsize: u32) -> (Vec<Vertex>, Vec<u32>) {
                 let j = start_min;
                 for i in (0..=start_min - *to).step_by(*to as usize) {
                     let index_a: u32 = vertex_data.len() as u32;
-                    let a = vertex(i as f32, j as f32, 0.0, 0.0);
-                    let b = vertex(i as f32 + *to as f32, j as f32, 0.1, 0.0);
-                    let c = vertex(i as f32 + *to as f32, j as f32 + *to as f32, 1.0, 1.0);
-                    let d = vertex(i as f32, j as f32 + *to as f32, 0.0, 1.0);
-                    let e = vertex(i as f32 + *from as f32, j as f32, 0.5, 0.0);
+                    let a = vertex(i as f32, j as f32);
+                    let b = vertex(i as f32 + *to as f32, j as f32);
+                    let c = vertex(i as f32 + *to as f32, j as f32 + *to as f32);
+                    let d = vertex(i as f32, j as f32 + *to as f32);
+                    let e = vertex(i as f32 + *from as f32, j as f32);
                     vertex_data.push(a);
                     vertex_data.push(b);
                     vertex_data.push(c);
@@ -185,10 +179,10 @@ pub fn create_vertex_index_rings(hsize: u32) -> (Vec<Vertex>, Vec<u32>) {
             Pass::Step(step) => {
                 let mut make_square = |i, j, step| {
                     let index_a: u32 = vertex_data.len() as u32;
-                    let a = vertex(i as f32, j as f32, 0.0, 0.0);
-                    let b = vertex(i as f32 + step as f32, j as f32, 0.1, 0.0);
-                    let c = vertex(i as f32 + step as f32, j as f32 + step as f32, 1.0, 1.0);
-                    let d = vertex(i as f32, j as f32 + step as f32, 0.0, 1.0);
+                    let a = vertex(i as f32, j as f32);
+                    let b = vertex(i as f32 + step as f32, j as f32);
+                    let c = vertex(i as f32 + step as f32, j as f32 + step as f32);
+                    let d = vertex(i as f32, j as f32 + step as f32);
                     {
                         vertex_data.push(a);
                         vertex_data.push(b);
@@ -279,7 +273,7 @@ pub fn create_vertex_index_rings(hsize: u32) -> (Vec<Vertex>, Vec<u32>) {
         }
 
         let copie: Vec<u32> = index_data.iter().copied().collect();
-        let mut symmetry_index_data_down_and_left: Vec<u32> = copie
+        let symmetry_index_data_down_and_left: Vec<u32> = copie
             .into_iter()
             .map(|i| i + 3 * vertex_data.len() as u32)
             .collect();
@@ -296,7 +290,7 @@ pub fn create_vertex_index_rings(hsize: u32) -> (Vec<Vertex>, Vec<u32>) {
     println!("index_data size  {}", index_data.len());
     println!("vertex_data size {}", vertex_data.len());
 
-    let (mut vertex_data, mut index_data) = optimize_vertex_index(vertex_data, index_data);
+    let (vertex_data, index_data) = optimize_vertex_index(vertex_data, index_data);
 
     (vertex_data, index_data)
 }

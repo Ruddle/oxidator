@@ -1,5 +1,5 @@
 extern crate nalgebra as na;
-use na::{Matrix4, Point3, Rotation3, Vector3};
+use na::{Matrix4, Point3, Vector3};
 
 pub fn create_view_proj(aspect_ratio: f32, pos: &Point3<f32>, dir: &Vector3<f32>) -> Matrix4<f32> {
     let mx_projection = Matrix4::new_perspective(aspect_ratio, 45f32, 1.0, 10.0);

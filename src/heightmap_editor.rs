@@ -76,6 +76,7 @@ impl State {
         device: &Device,
         encoder: &mut CommandEncoder,
     ) {
+        log::trace!("heightmap_editor handle_user_input");
         {
             let pen_strength = self.pen_strength
                 * if mouse_pressed.contains(&winit::event::MouseButton::Left) {
