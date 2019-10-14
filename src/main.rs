@@ -42,7 +42,7 @@ fn main() {
 
     std::thread::spawn(move || {
         let _ = tx_app.send(AppMsg::Render);
-        let mut app = app::App::init(window, tx_app, rx_app, tx_event_loop);
+        let mut app = app::App::new(window, tx_app, rx_app, tx_event_loop);
         loop {
             app.receive();
         }

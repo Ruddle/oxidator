@@ -40,7 +40,6 @@ pub struct App {
     bind_group: wgpu::BindGroup,
     format: TextureFormat,
     uniform_buf: wgpu::Buffer,
-    cursor_sample_position: wgpu::Buffer,
 
     frame_count: u32,
     game_state: game_state::State,
@@ -54,7 +53,7 @@ pub struct App {
 }
 
 impl App {
-    pub fn init(
+    pub fn new(
         window: winit::window::Window,
         tx: Sender<AppMsg>,
         rx: Receiver<AppMsg>,
@@ -294,11 +293,6 @@ impl App {
 
         device.get_queue().submit(&[init_encoder.finish()]);
 
-        let initial: &[f32; 4] = &[0.0, 0.0, 0.0, 0.0];
-        let cursor_sample_position = device
-            .create_buffer_mapped(4, wgpu::BufferUsage::COPY_DST | wgpu::BufferUsage::MAP_READ)
-            .fill_from_slice(initial);
-
         // Done
         let this = App {
             sc_desc,
@@ -317,7 +311,6 @@ impl App {
             forward_depth: depth_texture.create_default_view(),
             position_att_view: position_att.create_default_view(),
             position_att,
-            cursor_sample_position,
 
             game_state: game_state::State::new(),
             input_state: input_state::InputState::new(),
@@ -570,8 +563,6 @@ impl App {
             );
         }
 
-        self.cursor_sample_position.unmap();
-
         let cursor_sample_position = self
             .device
             .create_buffer_mapped::<f32>(
@@ -590,7 +581,7 @@ impl App {
             }
         }
 
-        if self.frame_count > 100 {
+        if true || self.frame_count > 100 {
             encoder_render.copy_texture_to_buffer(
                 wgpu::TextureCopyView {
                     texture: &self.position_att,
@@ -754,8 +745,7 @@ impl App {
             Err(_) => {}
         };
 
-        self.cursor_sample_position.map_read_async(0, 4 * 4, c);
-        self.cursor_sample_position = cursor_sample_position;
+        cursor_sample_position.map_read_async(0, 4 * 4, c);
 
         let _ = self.tx.send(AppMsg::Render);
     }
