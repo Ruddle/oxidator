@@ -563,6 +563,8 @@ impl App {
             );
         }
 
+        self.heightmap_gpu.step(&self.device, &mut encoder_render);
+
         let cursor_sample_position = self
             .device
             .create_buffer_mapped::<f32>(
@@ -699,7 +701,9 @@ impl App {
                         }
                     });
 
-                self.game_state.heightmap_editor.draw(&ui);
+                self.game_state
+                    .heightmap_editor
+                    .draw(&ui, &self.heightmap_gpu);
 
                 if true || rebuild_heightmap {
                     //                    let t = self.game_state.start_time.elapsed().as_secs_f32();

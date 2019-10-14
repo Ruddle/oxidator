@@ -3,6 +3,10 @@ use crate::heightmap;
 
 use wgpu::{BindGroup, BindGroupLayout, RenderPass, RenderPipeline, Texture, TextureFormat};
 use wgpu::{CommandEncoder, Device};
+use winit::window::CursorIcon::ZoomOut;
+
+const ZONE_SIZE: usize = 32;
+const UPDATE_PER_STEP: usize = 300;
 
 pub struct HeightmapGpu {
     pipeline: RenderPipeline,
@@ -16,6 +20,8 @@ pub struct HeightmapGpu {
     ring_size: u32,
     texture: Texture,
     uniform_buf: wgpu::Buffer,
+    zone_to_update: Vec<i32>,
+    last_updated: usize,
 }
 
 impl HeightmapGpu {
@@ -300,6 +306,14 @@ impl HeightmapGpu {
 
         let index_count = height_index_data.len();
 
+        let mut zone_to_update = Vec::new();
+
+        for _ in (0..=width).step_by(ZONE_SIZE) {
+            for _ in (0..=height).step_by(ZONE_SIZE) {
+                zone_to_update.push(0);
+            }
+        }
+
         HeightmapGpu {
             pipeline,
             bind_group,
@@ -312,6 +326,8 @@ impl HeightmapGpu {
             ring_size,
             texture,
             uniform_buf,
+            zone_to_update,
+            last_updated: 0,
         }
     }
 
@@ -354,53 +370,103 @@ impl HeightmapGpu {
         self.texels[i]
     }
 
-    pub fn update(
+    pub fn step(&mut self, device: &Device, encoder: &mut CommandEncoder) {
+        let mut zone_to_update = self
+            .zone_to_update
+            .iter()
+            .enumerate()
+            .filter(|(i, b)| **b != 0)
+            .collect::<Vec<(usize, &i32)>>();
+
+        zone_to_update.sort_by_key(|(index, i)| **i);
+
+        let indices: Vec<usize> = zone_to_update.iter().map(|(index, i)| *index).collect();
+
+        for (index) in indices.iter().skip(UPDATE_PER_STEP) {
+            self.zone_to_update[*index] -= 1;
+        }
+
+        for (index) in indices.iter().take(UPDATE_PER_STEP) {
+            self.zone_to_update[*index] = 0;
+
+            let i = *index as u32 % (self.width / ZONE_SIZE as u32);
+            let j = *index as u32 / (self.width / ZONE_SIZE as u32);
+            let min_x = i * ZONE_SIZE as u32;
+            let min_y = j * ZONE_SIZE as u32;
+
+            if min_x < self.width && min_y < self.height {
+                let width = (ZONE_SIZE as u32).min(self.width - min_x);
+                let height = (ZONE_SIZE as u32).min(self.height - min_y);
+
+                let mut editions = Vec::with_capacity((width * height) as usize);
+
+                for _ in 0..(width * height) {
+                    editions.push(0.0);
+                }
+
+                for i in min_x..min_x + width {
+                    for j in min_y..min_y + height {
+                        let ind_local = (i - min_x) + (j - min_y) * width;
+
+                        let ind_global = i + j * self.width;
+
+                        self.texels[ind_global as usize] =
+                            self.texels[ind_global as usize].min(511.0).max(0.0);
+
+                        editions[ind_local as usize] = self.texels[ind_global as usize];
+                    }
+                }
+
+                let temp_buf = device
+                    .create_buffer_mapped(editions.len(), wgpu::BufferUsage::COPY_SRC)
+                    .fill_from_slice(&editions);
+
+                let texture_extent = wgpu::Extent3d {
+                    width,
+                    height,
+                    depth: 1,
+                };
+
+                encoder.copy_buffer_to_texture(
+                    wgpu::BufferCopyView {
+                        buffer: &temp_buf,
+                        offset: 0,
+                        row_pitch: 4 * width,
+                        image_height: height,
+                    },
+                    wgpu::TextureCopyView {
+                        texture: &self.texture,
+                        mip_level: 0,
+                        array_layer: 0,
+                        origin: wgpu::Origin3d {
+                            x: min_x as f32,
+                            y: min_y as f32,
+                            z: 0.0,
+                        },
+                    },
+                    texture_extent,
+                );
+            }
+        }
+    }
+
+    pub fn update_rect(
         &mut self,
         min_x: u32,
         min_y: u32,
         width: u32,
         height: u32,
-        editions: Vec<f32>,
         device: &Device,
         encoder: &mut CommandEncoder,
     ) {
-        for i in min_x..min_x + width {
-            for j in min_y..min_y + height {
-                let ind_local = (i - min_x) + (j - min_y) * width;
-
-                let ind_global = i + j * self.width;
-                self.texels[ind_global as usize] = editions[ind_local as usize];
+        for i in (min_x / ZONE_SIZE as u32)..=(min_x + width) / ZONE_SIZE as u32 {
+            for j in (min_y / ZONE_SIZE as u32)..=(min_y + height) / ZONE_SIZE as u32 {
+                let index = (i + j * (self.width / ZONE_SIZE as u32) as u32) as usize;
+                let rank = &mut self.zone_to_update[index];
+                if *rank == 0 {
+                    *rank = -1;
+                }
             }
         }
-
-        let temp_buf = device
-            .create_buffer_mapped(editions.len(), wgpu::BufferUsage::COPY_SRC)
-            .fill_from_slice(&editions);
-
-        let texture_extent = wgpu::Extent3d {
-            width,
-            height,
-            depth: 1,
-        };
-
-        encoder.copy_buffer_to_texture(
-            wgpu::BufferCopyView {
-                buffer: &temp_buf,
-                offset: 0,
-                row_pitch: 4 * width,
-                image_height: height,
-            },
-            wgpu::TextureCopyView {
-                texture: &self.texture,
-                mip_level: 0,
-                array_layer: 0,
-                origin: wgpu::Origin3d {
-                    x: min_x as f32,
-                    y: min_y as f32,
-                    z: 0.0,
-                },
-            },
-            texture_extent,
-        );
     }
 }

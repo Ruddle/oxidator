@@ -9,7 +9,8 @@ use wgpu::{CommandEncoder, Device};
 #[derive(PartialEq, Clone, Copy)]
 pub enum Mode {
     Raise,
-    Smooth,
+    Flatten,
+    Median,
     Noise,
 }
 
@@ -32,21 +33,23 @@ impl State {
         }
     }
 
-    pub fn draw(&mut self, ui: &Ui) {
+    pub fn draw(&mut self, ui: &Ui, heightmap_gpu: &heightmap_gpu::HeightmapGpu) {
         let pen_radius = &mut self.pen_radius;
         let pen_strength = &mut self.pen_strength;
         let mode = &mut self.mode;
         let noise_freq = &mut self.noise_freq;
         let noise_seed: &mut i32 = &mut (self.noise.seed() as i32);
         let mut update_noise = false;
+        let mut save = false;
         let edit_height_window = imgui::Window::new(im_str!("Heightmap editor"));
         edit_height_window
             .size([400.0, 200.0], imgui::Condition::FirstUseEver)
             .position([3.0, 206.0], imgui::Condition::FirstUseEver)
             .build(&ui, || {
                 ui.radio_button(im_str!("Raise/Lower"), mode, Mode::Raise);
-                ui.radio_button(im_str!("Smooth/Sharpen"), mode, Mode::Smooth);
+                ui.radio_button(im_str!("Flatten/Unflatten"), mode, Mode::Flatten);
                 ui.radio_button(im_str!("Noise"), mode, Mode::Noise);
+                ui.radio_button(im_str!("Median"), mode, Mode::Median);
 
                 if mode == &mut Mode::Noise {
                     imgui::Slider::new(im_str!("noise frequency"), 0.0_f64..=100.0)
@@ -61,10 +64,16 @@ impl State {
 
                 imgui::Slider::new(im_str!("pen radius"), 1..=1000).build(&ui, pen_radius);
                 imgui::Slider::new(im_str!("pen strength"), 0.0..=10.0).build(&ui, pen_strength);
+
+                save = ui.small_button(im_str!("Save"));
             });
 
         if update_noise {
             self.noise = self.noise.set_seed(*noise_seed as u32);
+        }
+
+        if save {
+            self.save(heightmap_gpu);
         }
     }
 
@@ -106,82 +115,129 @@ impl State {
                 let size_j = max_j - min_j + 1;
 
                 if size_i > 0 && size_j > 0 {
-                    let mut new_texels = Vec::new();
-                    let pixels: Vec<(i32, i32)> = (min_j..=max_j)
-                        .flat_map(|j| (min_i..=max_i).map(move |i| (i, j)))
-                        .collect();
+                    //                    let start = std::time::Instant::now();
+
+                    let mut pixels = Vec::with_capacity((size_i * size_j) as usize);
+                    for j in min_j..=max_j {
+                        for i in min_i..=max_i {
+                            let falloff = 1.0
+                                - (i32::pow(i - middle_i, 2) + i32::pow(j - middle_j, 2)) as f32
+                                    / pen_size2 as f32;
+
+                            pixels.push((
+                                i,
+                                j,
+                                (i + j * heightmap_gpu.width as i32) as usize,
+                                falloff.max(0.0),
+                            ));
+                        }
+                    }
+
+                    //                    println!("pixels took {}", start.elapsed().as_micros());
 
                     match self.mode {
                         Mode::Raise => {
-                            for (i, j) in pixels {
-                                let distance2 =
-                                    (i32::pow(i - middle_i, 2) + i32::pow(j - middle_j, 2)) as f32;
-
-                                let power = pen_strength * (pen_size2 as f32 - distance2).max(0.0)
-                                    / (pen_size2 as f32);
-
-                                let z = heightmap_gpu.texels
-                                    [(i + j * heightmap_gpu.width as i32) as usize]
-                                    + power;
-                                new_texels.push(z);
+                            for (i, j, index, falloff) in pixels {
+                                let power = pen_strength * falloff;
+                                heightmap_gpu.texels[index] += power;
                             }
                         }
-                        Mode::Smooth => {
+                        Mode::Flatten => {
                             let mut average = 0.0;
-                            for (i, j) in &pixels {
-                                let z = heightmap_gpu.texels
-                                    [(i + j * heightmap_gpu.width as i32) as usize];
+                            for (i, j, index, falloff) in &pixels {
+                                let z = heightmap_gpu.texels[*index];
                                 average += z;
                             }
                             average /= (size_i * size_j) as f32;
-                            for (i, j) in pixels {
-                                let distance2 =
-                                    (i32::pow(i - middle_i, 2) + i32::pow(j - middle_j, 2)) as f32;
-
-                                let power = (pen_strength
-                                    * (pen_size2 as f32 - distance2).max(0.0)
-                                    / (pen_size2 as f32))
-                                    / 50.0;
-
-                                let z = heightmap_gpu.texels
-                                    [(i + j * heightmap_gpu.width as i32) as usize]
-                                    * (1.0 - power)
-                                    + average * power;
-                                new_texels.push(z);
+                            for (i, j, index, falloff) in pixels {
+                                let power = (pen_strength * falloff) / 50.0;
+                                let z =
+                                    heightmap_gpu.texels[index] * (1.0 - power) + average * power;
+                                heightmap_gpu.texels[index] = z;
                             }
                         }
                         Mode::Noise => {
-                            for (i, j) in pixels {
-                                let distance2 =
-                                    (i32::pow(i - middle_i, 2) + i32::pow(j - middle_j, 2)) as f32;
+                            for (i, j, index, falloff) in pixels {
+                                let power = pen_strength
+                                    * falloff
+                                    * self.noise.get([
+                                        (0.001 * self.noise_freq) * i as f64,
+                                        (0.001 * self.noise_freq) * j as f64,
+                                    ]) as f32;
 
-                                let power = pen_strength * (pen_size2 as f32 - distance2).max(0.0)
-                                    / (pen_size2 as f32);
+                                heightmap_gpu.texels[index] += power;
+                            }
+                        }
+                        Mode::Median => {
+                            let mut new_pix = Vec::new();
+                            for (i, j, index, falloff) in pixels {
+                                let power = pen_strength / 10.0;
 
-                                let z = heightmap_gpu.texels
-                                    [(i + j * heightmap_gpu.width as i32) as usize]
-                                    + power
-                                        * self.noise.get([
-                                            (0.001 * self.noise_freq) * i as f64,
-                                            (0.001 * self.noise_freq) * j as f64,
-                                        ]) as f32;
+                                let kernel = 4;
+                                let mut acc = Vec::new();
 
-                                new_texels.push(z);
+                                for ti in (-kernel + i).max(0)
+                                    ..=(kernel + i).min(heightmap_gpu.width as i32)
+                                {
+                                    for tj in (-kernel + j).max(0)
+                                        ..=(kernel + j).min(heightmap_gpu.height as i32)
+                                    {
+                                        let tindex =
+                                            (ti + tj * heightmap_gpu.width as i32) as usize;
+                                        acc.push(
+                                            (heightmap_gpu.texels[tindex] * 1000.0 * 1000.0).floor()
+                                                as i128,
+                                        );
+                                    }
+                                }
+                                acc.sort();
+                                new_pix.push((
+                                    index,
+                                    heightmap_gpu.texels[index] * (1.0 - power)
+                                        + power * (acc[acc.len() / 2] as f64 / 1000000.0) as f32,
+                                ));
+                            }
+                            for (index, z) in new_pix {
+                                heightmap_gpu.texels[index] = z;
                             }
                         }
                     }
 
-                    heightmap_gpu.update(
+                    heightmap_gpu.update_rect(
                         min_i as u32,
                         min_j as u32,
                         size_i as u32,
                         size_j as u32,
-                        new_texels,
                         device,
                         encoder,
                     );
                 }
             }
         }
+    }
+
+    pub fn save(&self, heightmap_gpu: &heightmap_gpu::HeightmapGpu) {
+        //         For reading and opening files
+        use std::fs::File;
+        use std::io::BufWriter;
+        use std::path::Path;
+
+        let path = Path::new(r"heightmap.png");
+        let file = File::create(path).unwrap();
+        let ref mut w = BufWriter::new(file);
+
+        let mut encoder = png::Encoder::new(w, heightmap_gpu.width, heightmap_gpu.height); // Width is 2 pixels and height is 1.
+        encoder.set_color(png::ColorType::Grayscale);
+        encoder.set_depth(png::BitDepth::Sixteen);
+        let mut writer = encoder.write_header().unwrap();
+
+        let data: Vec<u8> = heightmap_gpu
+            .texels
+            .iter()
+            .map(|e| ((e / 511.0).min(1.0).max(0.0) * 256.0 * 256.0) as u16)
+            .flat_map(|e| vec![(e >> 8) as u8, e as u8])
+            .collect();
+        //        let data = &data[..] ;//[255, 0, 0, 255, 0, 0, 0, 255]; // An array containing a RGBA sequence. First pixel is red and second pixel is black.
+        writer.write_image_data(&data).unwrap(); // Save
     }
 }
