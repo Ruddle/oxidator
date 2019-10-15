@@ -177,10 +177,10 @@ impl State {
                                 let mut acc = Vec::new();
 
                                 for ti in (-kernel + i).max(0)
-                                    ..=(kernel + i).min(heightmap_gpu.width as i32)
+                                    ..=(kernel + i).min(heightmap_gpu.width as i32 - 1)
                                 {
                                     for tj in (-kernel + j).max(0)
-                                        ..=(kernel + j).min(heightmap_gpu.height as i32)
+                                        ..=(kernel + j).min(heightmap_gpu.height as i32 - 1)
                                     {
                                         let tindex =
                                             (ti + tj * heightmap_gpu.width as i32) as usize;
