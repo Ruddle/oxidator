@@ -116,10 +116,10 @@ pub fn create_vertex_index_rings(hsize: u32) -> (Vec<Vertex>, Vec<u32>) {
     fn power_to_exp(i: i32) -> f32 {
         match i {
             1 => 0.0,
-            2 => 2.0,
-            4 => 3.0,
-            8 => 4.0,
-            16 => 5.0,
+            2 => 1.0,
+            4 => 2.0,
+            8 => 3.0,
+            16 => 4.0,
             _ => 4.0,
         }
     }

@@ -115,7 +115,7 @@ impl State {
                 let size_j = max_j - min_j + 1;
 
                 if size_i > 0 && size_j > 0 {
-                    //                    let start = std::time::Instant::now();
+                    let start = std::time::Instant::now();
 
                     let mut pixels = Vec::with_capacity((size_i * size_j) as usize);
                     for j in min_j..=max_j {
@@ -132,8 +132,6 @@ impl State {
                             ));
                         }
                     }
-
-                    //                    println!("pixels took {}", start.elapsed().as_micros());
 
                     match self.mode {
                         Mode::Raise => {
@@ -211,6 +209,7 @@ impl State {
                         device,
                         encoder,
                     );
+                    //                    println!("handle hei took {}", start.elapsed().as_micros());
                 }
             }
         }

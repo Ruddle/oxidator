@@ -21,11 +21,15 @@ log = "0.4"
 png = "0.15"
 winit = "0.20.0-alpha3"
 raw-window-handle = "0.1"
-nalgebra = "0.18"
+
 imgui = "0.2.0"
 imgui-wgpu = "0.1.0"
 shaderc = "0.6"
 noise = "0.6.0"
+
+nalgebra = "0.18"
+ncollide3d = "0.20"
+nphysics3d = "0.12"
 
 [dependencies.imgui-winit-support]
 version = "0.2.0"

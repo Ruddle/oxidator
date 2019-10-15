@@ -3,7 +3,6 @@ use crate::heightmap;
 
 use wgpu::{BindGroup, BindGroupLayout, RenderPass, RenderPipeline, Texture, TextureFormat};
 use wgpu::{CommandEncoder, Device};
-use winit::window::CursorIcon::ZoomOut;
 
 const ZONE_SIZE: usize = 32;
 const UPDATE_PER_STEP: usize = 300;

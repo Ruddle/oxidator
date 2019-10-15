@@ -397,9 +397,6 @@ impl App {
                     ..
                 }
                 | WindowEvent::CloseRequested => {
-                    //TODO Exit app
-                    //                    *control_flow = ControlFlow::Exit;
-
                     self.tx_event_loop.send(EventLoopMsg::Stop).unwrap();
                 }
                 WindowEvent::KeyboardInput {
@@ -738,18 +735,18 @@ impl App {
 
         self.device.get_queue().submit(&[encoder_render.finish()]);
 
-        let tx2 = std::sync::mpsc::Sender::clone(&self.tx);
-        let c = move |e: BufferMapAsyncResult<&[f32]>| match e {
+        let tx = std::sync::mpsc::Sender::clone(&self.tx);
+        let callback = move |e: BufferMapAsyncResult<&[f32]>| match e {
             Ok(e) => {
                 log::trace!("BufferMapAsyncResult callback");
-                let _ = tx2.send(AppMsg::MapReadAsyncMessage {
+                let _ = tx.send(AppMsg::MapReadAsyncMessage {
                     vec: e.data.to_vec(),
                 });
             }
             Err(_) => {}
         };
 
-        cursor_sample_position.map_read_async(0, 4 * 4, c);
+        cursor_sample_position.map_read_async(0, 4 * 4, callback);
 
         let _ = self.tx.send(AppMsg::Render);
     }
