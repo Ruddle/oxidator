@@ -9,6 +9,7 @@ mod heightmap_gpu;
 mod input_state;
 mod model;
 mod model_gpu;
+mod phy_state;
 
 extern crate nalgebra as na;
 extern crate shaderc;
@@ -27,7 +28,10 @@ pub enum EventLoopMsg {
     Stop,
 }
 
+//mod test;
 fn main() {
+    //    test::main();
+
     env_logger::init();
     log::trace!("Starting actix system");
 

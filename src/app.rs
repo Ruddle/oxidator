@@ -23,13 +23,15 @@ struct ImguiWrap {
 }
 
 pub struct App {
-    //Vulkan
+    //Wgpu
     sc_desc: wgpu::SwapChainDescriptor,
     device: wgpu::Device,
     window: winit::window::Window,
     hidpi_factor: f64,
     swap_chain: SwapChain,
     surface: wgpu::Surface,
+    //Physics
+    phy_state: phy_state::State,
 
     forward_depth: wgpu::TextureView,
     position_att: wgpu::Texture,
@@ -79,7 +81,7 @@ impl App {
         };
 
         let adapter = instance.request_adapter(&wgpu::RequestAdapterOptions {
-            power_preference: wgpu::PowerPreference::LowPower,
+            power_preference: wgpu::PowerPreference::HighPerformance,
         });
 
         let mut device: wgpu::Device = adapter.request_device(&wgpu::DeviceDescriptor {
@@ -302,6 +304,8 @@ impl App {
             swap_chain,
             surface,
 
+            phy_state: phy_state::State::new(),
+
             bind_group_layout,
             bind_group,
             uniform_buf,
@@ -446,7 +450,7 @@ impl App {
                 _ => {}
             },
             event::Event::EventsCleared => {
-                self.render();
+                //                self.render();
             }
             _ => (),
         }
@@ -454,6 +458,9 @@ impl App {
 
     fn render(&mut self) {
         log::trace!("render");
+
+        self.phy_state.step();
+
         let frame = &self.swap_chain.get_next_texture();
 
         let mut now = Instant::now();
@@ -547,6 +554,20 @@ impl App {
         let mut encoder_render = self
             .device
             .create_command_encoder(&wgpu::CommandEncoderDescriptor { todo: 0 });
+
+        //Phy Drawing
+        {
+            let balls = self.phy_state.balls_positions();
+            let mut positions = Vec::with_capacity(balls.len() * 3);
+            for pos in balls {
+                positions.push(pos.x);
+                positions.push(pos.z);
+                positions.push(pos.y);
+            }
+
+            self.cube_gpu
+                .update_instance(&positions[..], &mut encoder_render, &self.device);
+        }
 
         //Action
 
@@ -704,26 +725,6 @@ impl App {
 
                 if true || rebuild_heightmap {
                     //                    let t = self.game_state.start_time.elapsed().as_secs_f32();
-
-                    if let Some(mouse_world_pos) = self.game_state.mouse_world_pos {
-                        let mut positions =
-                            Vec::with_capacity((*debug_i1 * *debug_i1 * 3) as usize);
-                        for i in 0..*debug_i1 {
-                            for j in 0..*debug_i1 {
-                                let x = 0.0 + (2 * i) as f32 + mouse_world_pos.x;
-                                let y = 0.0 + (2 * j) as f32 + mouse_world_pos.y;
-                                positions.push(x);
-                                positions.push(y);
-                                positions.push(mouse_world_pos.z);
-                            }
-                        }
-
-                        self.cube_gpu.update_instance(
-                            &positions[..],
-                            &mut encoder_render,
-                            &self.device,
-                        );
-                    }
                 }
             }
             self.imgui_wrap.platform.prepare_render(&ui, &self.window);

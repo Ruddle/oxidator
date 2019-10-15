@@ -6,7 +6,7 @@ use wgpu::{CommandEncoder, Device};
 
 const ZONE_SIZE: usize = 32;
 const UPDATE_PER_STEP: usize = 300;
-const MIP_COUNT: u32 = 1;
+const MIP_COUNT: u32 = 5;
 
 pub struct HeightmapGpu {
     pipeline: RenderPipeline,
