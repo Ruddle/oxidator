@@ -1,6 +1,6 @@
 use crate::*;
 
-use na::{Point3, Vector3};
+use na::{Matrix4, Point3, Vector3};
 
 use heightmap_gpu::HeightmapGpu;
 use imgui::*;
@@ -557,12 +557,16 @@ impl App {
 
         //Phy Drawing
         {
-            let balls = self.phy_state.balls_positions();
-            let mut positions = Vec::with_capacity(balls.len() * 3);
-            for pos in balls {
-                positions.push(pos.x);
-                positions.push(pos.z);
-                positions.push(pos.y);
+            let balls = self.phy_state.balls_transform();
+            let mut positions = Vec::with_capacity(balls.len() * 16);
+            for mat in balls {
+                let mx_correction: Matrix4<f32> = Matrix4::new(
+                    1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0,
+                );
+
+                let r = mx_correction * mat;
+
+                positions.extend_from_slice(r.as_slice())
             }
 
             self.cube_gpu
@@ -571,15 +575,15 @@ impl App {
 
         //Action
 
-        if let Some(mouse_world_pos) = self.game_state.mouse_world_pos {
-            self.game_state.heightmap_editor.handle_user_input(
-                &self.input_state.mouse_pressed,
-                &mouse_world_pos,
-                &mut self.heightmap_gpu,
-                &self.device,
-                &mut encoder_render,
-            );
-        }
+        //        if let Some(mouse_world_pos) = self.game_state.mouse_world_pos {
+        //            self.game_state.heightmap_editor.handle_user_input(
+        //                &self.input_state.mouse_pressed,
+        //                &mouse_world_pos,
+        //                &mut self.heightmap_gpu,
+        //                &self.device,
+        //                &mut encoder_render,
+        //            );
+        //        }
 
         self.heightmap_gpu.step(&self.device, &mut encoder_render);
 

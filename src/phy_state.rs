@@ -68,8 +68,8 @@ impl State {
         }
 
         let mut balls = Vec::new();
-        for i in (0..512).step_by(40) {
-            for j in (0..512).step_by(20) {
+        for i in (100..200).step_by(3) {
+            for j in (100..200).step_by(4) {
                 let ball_rb = RigidBodyDesc::new()
                     .translation(Vector3::y() * 5.0)
                     .rotation(Vector3::y() * 5.0)

@@ -45,6 +45,7 @@ impl State {
         edit_height_window
             .size([400.0, 200.0], imgui::Condition::FirstUseEver)
             .position([3.0, 206.0], imgui::Condition::FirstUseEver)
+            .collapsed(true, imgui::Condition::FirstUseEver)
             .build(&ui, || {
                 ui.radio_button(im_str!("Raise/Lower"), mode, Mode::Raise);
                 ui.radio_button(im_str!("Flatten/Unflatten"), mode, Mode::Flatten);

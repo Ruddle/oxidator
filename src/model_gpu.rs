@@ -71,7 +71,7 @@ impl ModelGpu {
                 entry_point: "main",
             }),
             rasterization_state: Some(wgpu::RasterizationStateDescriptor {
-                front_face: wgpu::FrontFace::Ccw,
+                front_face: wgpu::FrontFace::Cw,
                 cull_mode: wgpu::CullMode::Back,
                 depth_bias: 0,
                 depth_bias_slope_scale: 0.0,
@@ -120,13 +120,30 @@ impl ModelGpu {
                     ],
                 },
                 wgpu::VertexBufferDescriptor {
-                    stride: (4 * 3) as wgpu::BufferAddress,
+                    stride: (4 * 16) as wgpu::BufferAddress,
                     step_mode: wgpu::InputStepMode::Instance,
-                    attributes: &[wgpu::VertexAttributeDescriptor {
-                        format: wgpu::VertexFormat::Float3,
-                        offset: 0,
-                        shader_location: 2,
-                    }],
+                    attributes: &[
+                        wgpu::VertexAttributeDescriptor {
+                            format: wgpu::VertexFormat::Float4,
+                            offset: 0,
+                            shader_location: 2,
+                        },
+                        wgpu::VertexAttributeDescriptor {
+                            format: wgpu::VertexFormat::Float4,
+                            offset: 4 * 4,
+                            shader_location: 3,
+                        },
+                        wgpu::VertexAttributeDescriptor {
+                            format: wgpu::VertexFormat::Float4,
+                            offset: 4 * 8,
+                            shader_location: 4,
+                        },
+                        wgpu::VertexAttributeDescriptor {
+                            format: wgpu::VertexFormat::Float4,
+                            offset: 4 * 12,
+                            shader_location: 5,
+                        },
+                    ],
                 },
             ],
             sample_count: 1,
@@ -155,20 +172,20 @@ impl ModelGpu {
 
     pub fn update_instance(
         &mut self,
-        positions: &[f32],
+        transforms: &[f32],
         encoder: &mut wgpu::CommandEncoder,
         device: &wgpu::Device,
     ) {
         log::trace!("ModelGpu update_instance");
         let temp_buf = device
             .create_buffer_mapped(
-                positions.len(),
+                transforms.len(),
                 wgpu::BufferUsage::VERTEX, // | wgpu::BufferUsage::COPY_SRC,
             )
-            .fill_from_slice(positions);
+            .fill_from_slice(transforms);
 
         std::mem::replace(&mut self.instance_buf, temp_buf);
-        self.instance_count = positions.len() as u32 / 3;
+        self.instance_count = transforms.len() as u32 / 16;
         //        encoder.copy_buffer_to_buffer(
         //            &temp_buf,
         //            0,

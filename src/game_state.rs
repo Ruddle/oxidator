@@ -21,7 +21,9 @@ pub struct State {
 impl State {
     pub fn new() -> Self {
         State {
-            position: Point3::new(1024.0 - 450.0, 1024.0 - 600.0, 1200.0),
+            position: Point3::new(150.0, 100.0, 150.0),
+
+            //            position: Point3::new(1024.0 - 450.0, 1024.0 - 600.0, 1200.0),
             dir: Vector3::new(0.0, 0.3, -1.0),
 
             position_smooth: Point3::new(0.0, 0.0, 30000.0),
