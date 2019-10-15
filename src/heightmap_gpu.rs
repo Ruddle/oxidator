@@ -7,6 +7,7 @@ use winit::window::CursorIcon::ZoomOut;
 
 const ZONE_SIZE: usize = 32;
 const UPDATE_PER_STEP: usize = 300;
+const MIP_COUNT: u32 = 1;
 
 pub struct HeightmapGpu {
     pipeline: RenderPipeline,
@@ -45,7 +46,7 @@ impl HeightmapGpu {
             let texture = device.create_texture(&wgpu::TextureDescriptor {
                 size: texture_extent,
                 array_layer_count: 1,
-                mip_level_count: 1,
+                mip_level_count: 2,
                 sample_count: 1,
                 dimension: wgpu::TextureDimension::D2,
                 format: wgpu::TextureFormat::Rgba8UnormSrgb,
@@ -74,6 +75,37 @@ impl HeightmapGpu {
                 },
                 texture_extent,
             );
+
+            {
+                let texture_extent = wgpu::Extent3d {
+                    width: 1,
+                    height: 1,
+                    depth: 1,
+                };
+                let temp_buf = device
+                    .create_buffer_mapped(4, wgpu::BufferUsage::COPY_SRC)
+                    .fill_from_slice(&[123, 123, 123, 255]);
+                init_encoder.copy_buffer_to_texture(
+                    wgpu::BufferCopyView {
+                        buffer: &temp_buf,
+                        offset: 0,
+                        row_pitch: 4 * 1,
+                        image_height: 1,
+                    },
+                    wgpu::TextureCopyView {
+                        texture: &texture,
+                        mip_level: 1,
+                        array_layer: 0,
+                        origin: wgpu::Origin3d {
+                            x: 0.0,
+                            y: 0.0,
+                            z: 0.0,
+                        },
+                    },
+                    texture_extent,
+                );
+            }
+
             texture.create_default_view()
         };
 
@@ -83,7 +115,7 @@ impl HeightmapGpu {
             address_mode_w: wgpu::AddressMode::Repeat,
             mag_filter: wgpu::FilterMode::Nearest,
             min_filter: wgpu::FilterMode::Nearest,
-            mipmap_filter: wgpu::FilterMode::Nearest,
+            mipmap_filter: wgpu::FilterMode::Linear,
             lod_min_clamp: -100.0,
             lod_max_clamp: 100.0,
             compare_function: wgpu::CompareFunction::Always,
@@ -102,7 +134,7 @@ impl HeightmapGpu {
         let texture = device.create_texture(&wgpu::TextureDescriptor {
             size: texture_extent,
             array_layer_count: 1,
-            mip_level_count: 1,
+            mip_level_count: MIP_COUNT,
             sample_count: 1,
             dimension: wgpu::TextureDimension::D2,
             format: wgpu::TextureFormat::R32Float,
@@ -132,6 +164,52 @@ impl HeightmapGpu {
             },
             texture_extent,
         );
+
+        let mut mipmaper = |mip: u32| {
+            let m = 2_u32.pow(mip);
+
+            let width = width / m;
+            let height = height / m;
+            let texture_extent = wgpu::Extent3d {
+                width,
+                height,
+                depth: 1,
+            };
+            let mut texels2 = Vec::new();
+            for j in 0..height {
+                for i in 0..width {
+                    texels2.push(texels[(i * m + (j * m) * width * m) as usize]);
+                }
+            }
+
+            let temp_buf = device
+                .create_buffer_mapped(texels2.len(), wgpu::BufferUsage::COPY_SRC)
+                .fill_from_slice(&texels2);
+
+            init_encoder.copy_buffer_to_texture(
+                wgpu::BufferCopyView {
+                    buffer: &temp_buf,
+                    offset: 0,
+                    row_pitch: 4 * width,
+                    image_height: height,
+                },
+                wgpu::TextureCopyView {
+                    texture: &texture,
+                    mip_level: mip,
+                    array_layer: 0,
+                    origin: wgpu::Origin3d {
+                        x: 0.0,
+                        y: 0.0,
+                        z: 0.0,
+                    },
+                },
+                texture_extent,
+            );
+        };
+
+        for i in 1..MIP_COUNT {
+            mipmaper(i);
+        }
 
         let texture_view_height = texture.create_default_view();
 
@@ -283,11 +361,18 @@ impl HeightmapGpu {
             vertex_buffers: &[wgpu::VertexBufferDescriptor {
                 stride: std::mem::size_of::<heightmap::Vertex>() as wgpu::BufferAddress,
                 step_mode: wgpu::InputStepMode::Vertex,
-                attributes: &[wgpu::VertexAttributeDescriptor {
-                    format: wgpu::VertexFormat::Float2,
-                    offset: 0,
-                    shader_location: 0,
-                }],
+                attributes: &[
+                    wgpu::VertexAttributeDescriptor {
+                        format: wgpu::VertexFormat::Float2,
+                        offset: 0,
+                        shader_location: 0,
+                    },
+                    wgpu::VertexAttributeDescriptor {
+                        format: wgpu::VertexFormat::Float,
+                        offset: 4 * 2,
+                        shader_location: 1,
+                    },
+                ],
             }],
             sample_count: 1,
             sample_mask: !0,

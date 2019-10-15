@@ -1,7 +1,8 @@
 #version 450
 
+
 layout(location = 0) in vec2 a_Pos;
-layout(location = 1) in vec2 buf;
+layout(location = 1) in float mip;
 
 layout(location = 0) out vec2 v_TexCoord;
 
@@ -41,7 +42,7 @@ void main() {
 
 
 
-    float z =  texture(sampler2D(height_tex, height_sampler),v_TexCoord ).r;
+    float z =  textureLod(sampler2D(height_tex, height_sampler),v_TexCoord,mip).r;
     vec3 pos = vec3(pos_xy,z);
 
     vec2 a_xy=  pos_xy+vec2(1,0) ;
@@ -51,7 +52,7 @@ void main() {
     vec3 normal = cross(a-pos, b-pos);
 
 
-    color = normal;// vec3(buf,0.0);
+    color = vec3(mip/10.0,0.5,0.5);
 
     gl_Position = u_Transform * ( vec4(pos,1.0) );
 }

@@ -69,6 +69,8 @@ void main() {
     specular*specColor);
 
 
+    float mipmapLevel = textureQueryLod(sampler2D(height_tex, height_sampler), v_TexCoord).x;
+
     position_att = vec4(pos, 1.0);
     o_Target =   vec4(phong,1.0);
 }
