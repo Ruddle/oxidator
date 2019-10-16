@@ -7,25 +7,97 @@ use nphysics3d::object::{
 };
 use nphysics3d::world::{DefaultGeometricalWorld, DefaultMechanicalWorld};
 
+use crossbeam_channel::{Receiver, Sender};
 use na::{Isometry3, Matrix3, Matrix4, Point3};
 use nalgebra::DMatrix;
 use ncollide3d::shape::{Ball, HeightField, ShapeHandle};
 use nphysics3d::math::{Inertia, Velocity};
 use nphysics3d::object::{BodyStatus, RigidBodyDesc};
 
-pub struct State {
+pub struct InnerState {
     mechanical_world: DefaultMechanicalWorld<f32>,
     geometrical_world: DefaultGeometricalWorld<f32>,
     bodies: DefaultBodySet<f32>,
     colliders: DefaultColliderSet<f32>,
     joint_constraints: DefaultJointConstraintSet<f32>,
     force_generators: DefaultForceGeneratorSet<f32>,
-    balls: Vec<(DefaultBodyHandle, DefaultColliderHandle)>,
+    cubes: Vec<(DefaultBodyHandle, DefaultColliderHandle)>,
+
+    s_outer: Sender<ToOuter>,
+    r_inner: Receiver<ToInner>,
+}
+
+pub struct State {
+    balls: Vec<Matrix4<f32>>,
+    perf: String,
+
+    s_inner: Sender<ToInner>,
+    r_outer: Receiver<ToOuter>,
+}
+
+pub enum ToInner {
+    Step,
+}
+
+pub enum ToOuter {
+    Isos(Vec<Isometry3<f32>>),
+    Perf(String),
 }
 
 impl State {
     pub fn new() -> Self {
-        let mut mechanical_world = DefaultMechanicalWorld::new(Vector3::new(0.0, -9.81, 0.0));
+        let (s_inner, r_inner) = crossbeam_channel::bounded::<ToInner>(1);
+        let (s_outer, r_outer) = crossbeam_channel::unbounded::<ToOuter>();
+
+        std::thread::spawn(move || {
+            let inner = InnerState::new(r_inner, s_outer);
+            inner.do_loop();
+        });
+
+        State {
+            balls: Vec::new(),
+            perf: "".to_string(),
+            s_inner,
+            r_outer,
+        }
+    }
+
+    pub fn step(&mut self) {
+        for msg in self.r_outer.try_iter() {
+            match msg {
+                ToOuter::Perf(s) => {
+                    self.perf = s;
+                }
+                ToOuter::Isos(isos) => {
+                    self.balls = isos.iter().map(|iso| iso.to_homogeneous()).collect();
+                }
+            }
+        }
+
+        let _ = self.s_inner.try_send(ToInner::Step);
+    }
+
+    pub fn draw_ui(&self, ui: &imgui::Ui) {
+        use imgui::*;
+
+        let edit_height_window = imgui::Window::new(im_str!("Physic statistics"));
+        edit_height_window
+            .size([400.0, 230.0], imgui::Condition::FirstUseEver)
+            .position([3.0, 412.0], imgui::Condition::FirstUseEver)
+            .collapsed(false, imgui::Condition::FirstUseEver)
+            .build(&ui, || {
+                ui.text(im_str!("{}", self.perf));
+            });
+    }
+
+    pub fn balls_transform(&self) -> &Vec<Matrix4<f32>> {
+        &self.balls
+    }
+}
+
+impl InnerState {
+    pub fn new(r_inner: Receiver<ToInner>, s_outer: Sender<ToOuter>) -> Self {
+        let mut mechanical_world = DefaultMechanicalWorld::new(Vector3::new(0.0, -10.0, 0.0));
         let mut geometrical_world = DefaultGeometricalWorld::new();
 
         let mut bodies = DefaultBodySet::new();
@@ -85,9 +157,9 @@ impl State {
             }
         }
 
-        let mut balls = Vec::new();
-        for i in (100..2000).step_by(50) {
-            for j in (100..2000).step_by(50) {
+        let mut cubes = Vec::new();
+        for i in (100..200).step_by(4) {
+            for j in (100..200).step_by(4) {
                 let ball_rb = RigidBodyDesc::new()
                     .translation(Vector3::y() * 5.0)
                     .rotation(Vector3::y() * 5.0)
@@ -115,21 +187,35 @@ impl State {
 
                 let ball_col_handle = colliders.insert(ball_col);
 
-                balls.push((ball_rb_handle, ball_col_handle));
+                cubes.push((ball_rb_handle, ball_col_handle));
             }
         }
 
-        println!("Number of cubes {}", balls.len());
+        println!("Number of cubes {}", cubes.len());
 
-        State {
+        InnerState {
             mechanical_world,
             geometrical_world,
             bodies,
             colliders,
             joint_constraints,
             force_generators,
+            cubes,
 
-            balls,
+            r_inner,
+            s_outer,
+        }
+    }
+
+    pub fn do_loop(mut self) {
+        loop {
+            match self.r_inner.recv().unwrap() {
+                Step => {
+                    self.step();
+                    let _ = self.s_outer.try_send(ToOuter::Perf(self.get_perf_string()));
+                    let _ = self.s_outer.try_send(ToOuter::Isos(self.balls_isos()));
+                }
+            }
         }
     }
 
@@ -143,8 +229,7 @@ impl State {
         );
     }
 
-    pub fn draw_ui(&self, ui: &imgui::Ui) {
-        use imgui::*;
+    pub fn get_perf_string(&self) -> String {
         let counters = self.mechanical_world.counters;
         let profile = format!(
             r#"Total: {:.2}ms
@@ -178,23 +263,15 @@ CCD: {:.2}ms
             counters.ccd.narrow_phase_time.time() * 1000.0,
             counters.ccd.solver_time.time() * 1000.0
         );
-
-        let edit_height_window = imgui::Window::new(im_str!("Physic statistics"));
-        edit_height_window
-            .size([400.0, 230.0], imgui::Condition::FirstUseEver)
-            .position([3.0, 412.0], imgui::Condition::FirstUseEver)
-            .collapsed(false, imgui::Condition::FirstUseEver)
-            .build(&ui, || {
-                ui.text(im_str!("{}", profile));
-            });
+        profile
     }
 
-    pub fn balls_transform(&self) -> Vec<Matrix4<f32>> {
-        self.balls
+    pub fn balls_isos(&self) -> Vec<Isometry3<f32>> {
+        self.cubes
             .iter()
             .map(|(bh, ch)| {
                 let rigid_body = self.bodies.rigid_body(*bh).unwrap();
-                rigid_body.position().to_homogeneous()
+                *rigid_body.position()
             })
             .collect()
     }
