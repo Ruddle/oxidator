@@ -33,7 +33,7 @@ impl State {
         }
     }
 
-    pub fn draw(&mut self, ui: &Ui, heightmap_gpu: &heightmap_gpu::HeightmapGpu) {
+    pub fn draw_ui(&mut self, ui: &Ui, heightmap_gpu: &heightmap_gpu::HeightmapGpu) {
         let pen_radius = &mut self.pen_radius;
         let pen_strength = &mut self.pen_strength;
         let mode = &mut self.mode;

@@ -725,7 +725,9 @@ impl App {
 
                 self.game_state
                     .heightmap_editor
-                    .draw(&ui, &self.heightmap_gpu);
+                    .draw_ui(&ui, &self.heightmap_gpu);
+
+                self.phy_state.draw_ui(&ui);
 
                 if true || rebuild_heightmap {
                     //                    let t = self.game_state.start_time.elapsed().as_secs_f32();

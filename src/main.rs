@@ -11,6 +11,8 @@ mod model;
 mod model_gpu;
 mod phy_state;
 
+#[macro_use]
+extern crate crossbeam_channel;
 extern crate nalgebra as na;
 extern crate shaderc;
 
@@ -38,6 +40,9 @@ fn main() {
     let event_loop = winit::event_loop::EventLoop::new();
 
     let window = winit::window::Window::new(&event_loop).unwrap();
+
+    use crossbeam_channel::unbounded;
+    let (s, r) = unbounded::<AppMsg>();
 
     let (tx_app, rx_app) = std::sync::mpsc::channel();
     let tx_app_for_event_loop = std::sync::mpsc::Sender::clone(&tx_app);
