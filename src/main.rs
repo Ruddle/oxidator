@@ -42,16 +42,14 @@ fn main() {
     let window = winit::window::Window::new(&event_loop).unwrap();
 
     use crossbeam_channel::unbounded;
-    let (s, r) = unbounded::<AppMsg>();
+    let (s_app, r_app) = unbounded::<AppMsg>();
+    let s_app_for_event_loop = s_app.clone();
 
-    let (tx_app, rx_app) = std::sync::mpsc::channel();
-    let tx_app_for_event_loop = std::sync::mpsc::Sender::clone(&tx_app);
-
-    let (tx_event_loop, rx_event_loop) = std::sync::mpsc::channel::<EventLoopMsg>();
+    let (s_event_loop, r_event_loop) = unbounded::<EventLoopMsg>();
 
     std::thread::spawn(move || {
-        let _ = tx_app.send(AppMsg::Render);
-        let mut app = app::App::new(window, tx_app, rx_app, tx_event_loop);
+        let _ = s_app.send(AppMsg::Render);
+        let mut app = app::App::new(window, s_app, r_app, s_event_loop);
         loop {
             app.receive();
         }
@@ -59,12 +57,12 @@ fn main() {
 
     event_loop.run(move |event, _, control_flow| match event {
         Event::WindowEvent { .. } => {
-            tx_app_for_event_loop
+            s_app_for_event_loop
                 .send(AppMsg::EventMessage { event })
                 .unwrap();
         }
         Event::EventsCleared => {
-            match rx_event_loop.try_recv() {
+            match r_event_loop.try_recv() {
                 Ok(EventLoopMsg::Stop) => {
                     *control_flow = ControlFlow::Exit;
                 }

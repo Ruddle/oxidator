@@ -12,7 +12,7 @@ use std::time::Instant;
 use wgpu::{BufferMapAsyncResult, Extent3d, SwapChain, TextureFormat};
 
 use log::info;
-use std::sync::mpsc::{Receiver, Sender};
+
 use winit::event::WindowEvent;
 use winit::event_loop::{ControlFlow, EventLoop};
 
@@ -48,18 +48,18 @@ pub struct App {
     input_state: input_state::InputState,
     imgui_wrap: ImguiWrap,
 
-    tx: Sender<AppMsg>,
-    rx: Receiver<AppMsg>,
+    tx: crossbeam_channel::Sender<AppMsg>,
+    rx: crossbeam_channel::Receiver<AppMsg>,
 
-    tx_event_loop: Sender<EventLoopMsg>,
+    tx_event_loop: crossbeam_channel::Sender<EventLoopMsg>,
 }
 
 impl App {
     pub fn new(
         window: winit::window::Window,
-        tx: Sender<AppMsg>,
-        rx: Receiver<AppMsg>,
-        tx_event_loop: Sender<EventLoopMsg>,
+        tx: crossbeam_channel::Sender<AppMsg>,
+        rx: crossbeam_channel::Receiver<AppMsg>,
+        tx_event_loop: crossbeam_channel::Sender<EventLoopMsg>,
     ) -> (Self) {
         log::trace!("App init");
 
@@ -742,11 +742,11 @@ impl App {
 
         self.device.get_queue().submit(&[encoder_render.finish()]);
 
-        let tx = std::sync::mpsc::Sender::clone(&self.tx);
+        let tx = self.tx.clone();
         let callback = move |e: BufferMapAsyncResult<&[f32]>| match e {
             Ok(e) => {
                 log::trace!("BufferMapAsyncResult callback");
-                let _ = tx.send(AppMsg::MapReadAsyncMessage {
+                let _ = tx.try_send(AppMsg::MapReadAsyncMessage {
                     vec: e.data.to_vec(),
                 });
             }
@@ -755,7 +755,7 @@ impl App {
 
         cursor_sample_position.map_read_async(0, 4 * 4, callback);
 
-        let _ = self.tx.send(AppMsg::Render);
+        let _ = self.tx.try_send(AppMsg::Render);
     }
 
     pub fn map_read_async_msg(&mut self, vec: Vec<f32>) {
