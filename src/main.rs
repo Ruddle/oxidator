@@ -7,6 +7,7 @@ mod heightmap;
 mod heightmap_editor;
 mod heightmap_gpu;
 mod input_state;
+mod mobile;
 mod model;
 mod model_gpu;
 mod phy_state;

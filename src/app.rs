@@ -38,6 +38,7 @@ pub struct App {
     position_att_view: wgpu::TextureView,
     heightmap_gpu: HeightmapGpu,
     cube_gpu: ModelGpu,
+    mobile_gpu: ModelGpu,
     bind_group_layout: wgpu::BindGroupLayout,
     bind_group: wgpu::BindGroup,
     format: TextureFormat,
@@ -284,6 +285,14 @@ impl App {
             &bind_group_layout,
         );
 
+        let mobile_gpu = ModelGpu::new(
+            &model::create_cube(),
+            &device,
+            &mut init_encoder,
+            format,
+            &bind_group_layout,
+        );
+
         let depth_texture = device.create_texture(&wgpu::TextureDescriptor {
             size: wgpu::Extent3d {
                 width: sc_desc.width,
@@ -316,6 +325,19 @@ impl App {
 
         device.get_queue().submit(&[init_encoder.finish()]);
 
+        let mut game_state = game_state::State::new();
+
+        let mut mobiles = Vec::new();
+        for i in (100..2000).step_by(20) {
+            for j in (100..2000).step_by(10) {
+                mobiles.push(mobile::Mobile::new(Point3::new(i as f32, j as f32, 100.0)));
+            }
+        }
+
+        println!("Number of mobiles {}", mobiles.len());
+
+        game_state.mobiles = mobiles;
+
         // Done
         let this = App {
             sc_desc,
@@ -333,6 +355,7 @@ impl App {
             ub_misc,
             format,
             cube_gpu,
+            mobile_gpu,
             heightmap_gpu,
             forward_depth: depth_texture.create_default_view(),
             position_att_view: position_att.create_default_view(),
@@ -340,7 +363,7 @@ impl App {
 
             postfx,
 
-            game_state: game_state::State::new(),
+            game_state,
             input_state: input_state::InputState::new(),
             imgui_wrap,
             frame_count: 0,
@@ -591,6 +614,39 @@ impl App {
                 .update_instance(&positions[..], &mut encoder_render, &self.device);
         }
 
+        //Mobile update
+        {
+            if let Some(target) = self.game_state.mouse_world_pos {
+                for mobile in self.game_state.mobiles.iter_mut() {
+                    let dir = target - mobile.position.coords;
+
+                    mobile.position += dir.normalize() * 0.4;
+
+                    mobile.position.z = self
+                        .heightmap_gpu
+                        .get_z(mobile.position.x, mobile.position.y)
+                        + 0.5;
+                }
+            }
+        }
+        {
+            let cubes_t = &self.game_state.mobiles;
+            let mut positions = Vec::with_capacity(cubes_t.len() * 16);
+            for mobile in cubes_t {
+                let mat = Matrix4::face_towards(
+                    &mobile.position,
+                    &(mobile.position
+                        + Vector3::new(f32::cos(mobile.yaw), f32::sin(mobile.yaw), 0.0)),
+                    &Vector3::new(0.0, 0.0, 1.0),
+                );
+
+                positions.extend_from_slice(mat.as_slice());
+            }
+
+            self.mobile_gpu
+                .update_instance(&positions[..], &mut encoder_render, &self.device);
+        }
+
         //Action
 
         //        if let Some(mouse_world_pos) = self.game_state.mouse_world_pos {
@@ -718,6 +774,7 @@ impl App {
 
             self.heightmap_gpu.render(&mut rpass, &self.bind_group);
             self.cube_gpu.render(&mut rpass, &self.bind_group);
+            self.mobile_gpu.render(&mut rpass, &self.bind_group);
         }
 
         //Post pass

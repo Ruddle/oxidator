@@ -1,5 +1,6 @@
 extern crate nalgebra as na;
 use crate::heightmap_editor;
+use crate::mobile;
 use na::{Point3, Vector3};
 use std::time::Instant;
 
@@ -13,6 +14,8 @@ pub struct State {
     pub mouse_world_pos: Option<Vector3<f32>>,
 
     pub heightmap_editor: heightmap_editor::State,
+
+    pub mobiles: Vec<mobile::Mobile>,
 
     pub start_time: Instant,
     pub last_frame: Instant,
@@ -32,6 +35,8 @@ impl State {
             mouse_world_pos: None,
 
             heightmap_editor: heightmap_editor::State::new(),
+
+            mobiles: Vec::new(),
 
             start_time: Instant::now(),
             last_frame: Instant::now(),
