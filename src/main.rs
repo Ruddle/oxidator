@@ -10,6 +10,7 @@ mod input_state;
 mod model;
 mod model_gpu;
 mod phy_state;
+mod post_fx;
 
 #[macro_use]
 extern crate crossbeam_channel;

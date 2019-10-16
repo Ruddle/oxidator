@@ -69,7 +69,12 @@ impl State {
                     self.perf = s;
                 }
                 ToOuter::Isos(isos) => {
-                    self.balls = isos.iter().map(|iso| iso.to_homogeneous()).collect();
+                    let corr: Matrix4<f32> = Matrix4::new(
+                        1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+                        1.0,
+                    );
+
+                    self.balls = isos.iter().map(|iso| corr * iso.to_homogeneous()).collect();
                 }
             }
         }
@@ -90,7 +95,7 @@ impl State {
             });
     }
 
-    pub fn balls_transform(&self) -> &Vec<Matrix4<f32>> {
+    pub fn cubes_transform(&self) -> &Vec<Matrix4<f32>> {
         &self.balls
     }
 }

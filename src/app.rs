@@ -41,25 +41,28 @@ pub struct App {
     bind_group_layout: wgpu::BindGroupLayout,
     bind_group: wgpu::BindGroup,
     format: TextureFormat,
-    uniform_buf: wgpu::Buffer,
+    ub_camera_mat: wgpu::Buffer,
+    ub_misc: wgpu::Buffer,
+
+    postfx: post_fx::PostFx,
 
     frame_count: u32,
     game_state: game_state::State,
     input_state: input_state::InputState,
     imgui_wrap: ImguiWrap,
 
-    tx: crossbeam_channel::Sender<AppMsg>,
-    rx: crossbeam_channel::Receiver<AppMsg>,
+    sender_to_app: crossbeam_channel::Sender<AppMsg>,
+    receiver_to_app: crossbeam_channel::Receiver<AppMsg>,
 
-    tx_event_loop: crossbeam_channel::Sender<EventLoopMsg>,
+    sender_to_event_loop: crossbeam_channel::Sender<EventLoopMsg>,
 }
 
 impl App {
     pub fn new(
         window: winit::window::Window,
-        tx: crossbeam_channel::Sender<AppMsg>,
-        rx: crossbeam_channel::Receiver<AppMsg>,
-        tx_event_loop: crossbeam_channel::Sender<EventLoopMsg>,
+        sender_to_app: crossbeam_channel::Sender<AppMsg>,
+        receiver_to_app: crossbeam_channel::Receiver<AppMsg>,
+        sender_to_event_loop: crossbeam_channel::Sender<EventLoopMsg>,
     ) -> (Self) {
         log::trace!("App init");
 
@@ -122,6 +125,11 @@ impl App {
                     binding: 2,
                     visibility: wgpu::ShaderStage::FRAGMENT,
                     ty: wgpu::BindingType::Sampler,
+                },
+                wgpu::BindGroupLayoutBinding {
+                    binding: 3,
+                    visibility: wgpu::ShaderStage::FRAGMENT,
+                    ty: wgpu::BindingType::UniformBuffer { dynamic: false },
                 },
             ],
         });
@@ -186,9 +194,13 @@ impl App {
             &Vector3::new(0.0, 0.0, 0.0),
         );
         let mx_ref: &[f32] = mx_total.as_slice();
-        let uniform_buf = device
+        let ub_camera_mat = device
             .create_buffer_mapped(16, wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::COPY_DST)
             .fill_from_slice(mx_ref);
+
+        let ub_misc = device
+            .create_buffer_mapped(2, wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::COPY_DST)
+            .fill_from_slice(&[0.0_f32, 0.0]);
 
         // Create bind group
         let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
@@ -197,7 +209,7 @@ impl App {
                 wgpu::Binding {
                     binding: 0,
                     resource: wgpu::BindingResource::Buffer {
-                        buffer: &uniform_buf,
+                        buffer: &ub_camera_mat,
                         range: 0..64,
                     },
                 },
@@ -208,6 +220,13 @@ impl App {
                 wgpu::Binding {
                     binding: 2,
                     resource: wgpu::BindingResource::Sampler(&sampler),
+                },
+                wgpu::Binding {
+                    binding: 3,
+                    resource: wgpu::BindingResource::Buffer {
+                        buffer: &ub_misc,
+                        range: 0..8,
+                    },
                 },
             ],
         });
@@ -293,6 +312,8 @@ impl App {
             usage: wgpu::TextureUsage::OUTPUT_ATTACHMENT | wgpu::TextureUsage::SAMPLED,
         });
 
+        let postfx = post_fx::PostFx::new(&device, &bind_group_layout, format);
+
         device.get_queue().submit(&[init_encoder.finish()]);
 
         // Done
@@ -308,7 +329,8 @@ impl App {
 
             bind_group_layout,
             bind_group,
-            uniform_buf,
+            ub_camera_mat,
+            ub_misc,
             format,
             cube_gpu,
             heightmap_gpu,
@@ -316,14 +338,16 @@ impl App {
             position_att_view: position_att.create_default_view(),
             position_att,
 
+            postfx,
+
             game_state: game_state::State::new(),
             input_state: input_state::InputState::new(),
             imgui_wrap,
             frame_count: 0,
 
-            tx,
-            rx,
-            tx_event_loop,
+            sender_to_app,
+            receiver_to_app,
+            sender_to_event_loop,
         };
 
         (this)
@@ -401,7 +425,7 @@ impl App {
                     ..
                 }
                 | WindowEvent::CloseRequested => {
-                    self.tx_event_loop.send(EventLoopMsg::Stop).unwrap();
+                    self.sender_to_event_loop.send(EventLoopMsg::Stop).unwrap();
                 }
                 WindowEvent::KeyboardInput {
                     input:
@@ -557,16 +581,10 @@ impl App {
 
         //Phy Drawing
         {
-            let balls = self.phy_state.balls_transform();
-            let mut positions = Vec::with_capacity(balls.len() * 16);
-            for mat in balls {
-                let mx_correction: Matrix4<f32> = Matrix4::new(
-                    1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0,
-                );
-
-                let r = mx_correction * mat;
-
-                positions.extend_from_slice(r.as_slice())
+            let cubes_t = self.phy_state.cubes_transform();
+            let mut positions = Vec::with_capacity(cubes_t.len() * 16);
+            for mat in cubes_t {
+                positions.extend_from_slice(mat.as_slice())
             }
 
             self.cube_gpu
@@ -631,6 +649,16 @@ impl App {
             );
         }
 
+        let uniform_buf = self
+            .device
+            .create_buffer_mapped(2, wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::COPY_DST)
+            .fill_from_slice(&[
+                self.input_state.cursor_pos.0 as f32 / self.sc_desc.width as f32,
+                self.input_state.cursor_pos.1 as f32 / self.sc_desc.height as f32,
+            ]);
+
+        encoder_render.copy_buffer_to_buffer(&uniform_buf, 0, &self.ub_misc, 0, 8);
+
         self.heightmap_gpu.update_uniform(
             &self.device,
             &mut encoder_render,
@@ -642,7 +670,7 @@ impl App {
             (self.sc_desc.width, self.sc_desc.height),
             &self.game_state.position_smooth,
             &self.game_state.dir_smooth,
-            &self.uniform_buf,
+            &self.ub_camera_mat,
             &self.device,
             &mut encoder_render,
         );
@@ -690,6 +718,34 @@ impl App {
 
             self.heightmap_gpu.render(&mut rpass, &self.bind_group);
             self.cube_gpu.render(&mut rpass, &self.bind_group);
+        }
+
+        //Post pass
+        {
+            log::trace!("begin_post_render_pass");
+            let mut rpass = encoder_render.begin_render_pass(&wgpu::RenderPassDescriptor {
+                color_attachments: &[wgpu::RenderPassColorAttachmentDescriptor {
+                    attachment: &frame.view,
+                    resolve_target: None,
+                    load_op: wgpu::LoadOp::Load,
+                    store_op: wgpu::StoreOp::Store,
+                    clear_color: wgpu::Color {
+                        r: 0.1,
+                        g: 0.2,
+                        b: 0.3,
+                        a: 1.0,
+                    },
+                }],
+
+                depth_stencil_attachment: None,
+            });
+
+            self.postfx.render(
+                &mut rpass,
+                &self.device,
+                &self.bind_group,
+                &self.position_att_view,
+            );
         }
 
         //Imgui
@@ -742,7 +798,7 @@ impl App {
 
         self.device.get_queue().submit(&[encoder_render.finish()]);
 
-        let tx = self.tx.clone();
+        let tx = self.sender_to_app.clone();
         let callback = move |e: BufferMapAsyncResult<&[f32]>| match e {
             Ok(e) => {
                 log::trace!("BufferMapAsyncResult callback");
@@ -755,7 +811,7 @@ impl App {
 
         cursor_sample_position.map_read_async(0, 4 * 4, callback);
 
-        let _ = self.tx.try_send(AppMsg::Render);
+        let _ = self.sender_to_app.try_send(AppMsg::Render);
     }
 
     pub fn map_read_async_msg(&mut self, vec: Vec<f32>) {
@@ -767,7 +823,7 @@ impl App {
     }
 
     pub fn receive(&mut self) {
-        match self.rx.try_recv() {
+        match self.receiver_to_app.try_recv() {
             Ok(x) => {
                 log::trace!("receive: {:?}", x);
 
