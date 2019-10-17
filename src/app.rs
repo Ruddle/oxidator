@@ -599,10 +599,75 @@ impl App {
         }
 
         //Mobile update
+
+        let grid_w = (self.heightmap_gpu.width / 32) as usize;
+        let grid_h = (self.heightmap_gpu.height / 32) as usize;
+        let mut grid = vec![Vec::<usize>::new(); grid_w * grid_h];
+
+        let grid_pos = |mobile: &mobile::Mobile| -> usize {
+            let (x, y) = (mobile.position.x, mobile.position.y);
+            (x as usize / 32) as usize + (y as usize / 32) as usize * grid_w
+        };
+
+        let mut index_to_position = Vec::with_capacity(self.game_state.mobiles.len());
+
+        for (index, mobile) in self.game_state.mobiles.iter().enumerate() {
+            index_to_position.push(mobile.position);
+            grid[grid_pos(mobile)].push(index);
+        }
+
         {
             if let Some(target) = self.game_state.mouse_world_pos {
-                for mobile in self.game_state.mobiles.iter_mut() {
-                    let dir = (target - mobile.position.coords).normalize();
+                for (index, mobile) in self.game_state.mobiles.iter_mut().enumerate() {
+                    let grid_pos = grid_pos(mobile);
+
+                    let mut neighbors = grid[grid_pos].clone();
+                    for cell in &[
+                        -1_i32 - grid_w as i32,
+                        -(grid_w as i32),
+                        1 - grid_w as i32,
+                        -1,
+                        1,
+                        -1 + grid_w as i32,
+                        grid_w as i32,
+                        1 + grid_w as i32,
+                    ] {
+                        let cell_index = cell + grid_pos as i32;
+                        if cell_index >= 0 && (cell_index as usize) < grid_w * grid_h {
+                            neighbors.extend_from_slice(&grid[cell_index as usize]);
+                        }
+                    }
+
+                    let neighbors: Vec<Point3<f32>> = neighbors
+                        .iter()
+                        .filter(|e| **e != index)
+                        .map(|index| index_to_position[*index])
+                        .collect();
+
+                    let mut dir = Vector3::new(0.0, 0.0, 0.0);
+
+                    if neighbors.len() == 0 {
+                    } else {
+                        let mut nearest = neighbors.first().unwrap().clone();
+                        let mut dist_min = 100000.0;
+                        for neighbor in neighbors.iter() {
+                            let dist = na::distance(neighbor, &mobile.position);
+                            if dist_min > dist {
+                                dist_min = dist;
+                                nearest = neighbor.clone();
+                            }
+                        }
+
+                        if dist_min < 10.0 {
+                            dir = (mobile.position.coords - nearest.coords).normalize();
+                            if dist_min < 3.0 {
+                                dir *= 5.0;
+                            }
+                        }
+                    }
+
+                    let dir =
+                        (dir * 2.0 + (target - mobile.position.coords).normalize()).normalize();
 
                     mobile.dir = mobile.dir * 0.99 + dir * 0.01;
 
