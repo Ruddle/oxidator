@@ -172,8 +172,8 @@ impl InnerState {
         }
 
         let mut cubes = Vec::new();
-        for i in (100..2000).step_by(40) {
-            for j in (100..2000).step_by(40) {
+        for i in (1..1).step_by(10) {
+            for j in (1..1).step_by(10) {
                 let ball_rb = RigidBodyDesc::new()
                     .translation(Vector3::y() * 5.0)
                     .rotation(Vector3::y() * 5.0)
@@ -224,7 +224,7 @@ impl InnerState {
                 ToInner::Step => {
                     self.step();
                     let _ = self.s_outer.try_send(ToOuter::Perf(self.get_perf_string()));
-                    let _ = self.s_outer.try_send(ToOuter::Isos(self.balls_isos()));
+                    let _ = self.s_outer.try_send(ToOuter::Isos(self.cubes_isos()));
                 }
             }
         }
@@ -277,7 +277,7 @@ CCD: {:.2}ms
         profile
     }
 
-    pub fn balls_isos(&self) -> Vec<Isometry3<f32>> {
+    pub fn cubes_isos(&self) -> Vec<Isometry3<f32>> {
         self.cubes
             .iter()
             .map(|(bh, _)| {
