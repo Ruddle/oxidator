@@ -14,7 +14,6 @@ use wgpu::{BufferMapAsyncResult, Extent3d, SwapChain, TextureFormat};
 use log::info;
 
 use winit::event::WindowEvent;
-use winit::event_loop::{ControlFlow, EventLoop};
 
 struct ImguiWrap {
     imgui: imgui::Context,
@@ -39,9 +38,9 @@ pub struct App {
     heightmap_gpu: HeightmapGpu,
     cube_gpu: ModelGpu,
     mobile_gpu: ModelGpu,
-    bind_group_layout: wgpu::BindGroupLayout,
+
     bind_group: wgpu::BindGroup,
-    format: TextureFormat,
+
     ub_camera_mat: wgpu::Buffer,
     ub_misc: wgpu::Buffer,
 
@@ -277,21 +276,9 @@ impl App {
             2048,
         );
 
-        let cube_gpu = ModelGpu::new(
-            &model::create_cube(),
-            &device,
-            &mut init_encoder,
-            format,
-            &bind_group_layout,
-        );
+        let cube_gpu = ModelGpu::new(&model::create_cube(), &device, format, &bind_group_layout);
 
-        let mobile_gpu = ModelGpu::new(
-            &model::create_cube(),
-            &device,
-            &mut init_encoder,
-            format,
-            &bind_group_layout,
-        );
+        let mobile_gpu = ModelGpu::new(&model::create_cube(), &device, format, &bind_group_layout);
 
         let depth_texture = device.create_texture(&wgpu::TextureDescriptor {
             size: wgpu::Extent3d {
@@ -329,7 +316,7 @@ impl App {
 
         let mut mobiles = Vec::new();
         for i in (100..2000).step_by(20) {
-            for j in (100..2000).step_by(10) {
+            for j in (100..2000).step_by(20) {
                 mobiles.push(mobile::Mobile::new(Point3::new(i as f32, j as f32, 100.0)));
             }
         }
@@ -349,11 +336,9 @@ impl App {
 
             phy_state: phy_state::State::new(),
 
-            bind_group_layout,
             bind_group,
             ub_camera_mat,
             ub_misc,
-            format,
             cube_gpu,
             mobile_gpu,
             heightmap_gpu,
@@ -610,21 +595,23 @@ impl App {
                 positions.extend_from_slice(mat.as_slice())
             }
 
-            self.cube_gpu
-                .update_instance(&positions[..], &mut encoder_render, &self.device);
+            self.cube_gpu.update_instance(&positions[..], &self.device);
         }
 
         //Mobile update
         {
             if let Some(target) = self.game_state.mouse_world_pos {
                 for mobile in self.game_state.mobiles.iter_mut() {
-                    let dir = target - mobile.position.coords;
+                    let dir = (target - mobile.position.coords).normalize();
 
-                    mobile.position += dir.normalize() * 0.4;
+                    mobile.dir = mobile.dir * 0.99 + dir * 0.01;
+
+                    mobile.speed = (mobile.speed + mobile.dir * 0.004) * 0.95;
+                    mobile.position += mobile.speed;
 
                     mobile.position.z = self
                         .heightmap_gpu
-                        .get_z(mobile.position.x, mobile.position.y)
+                        .get_z_linear(mobile.position.x, mobile.position.y)
                         + 0.5;
                 }
             }
@@ -635,8 +622,7 @@ impl App {
             for mobile in cubes_t {
                 let mat = Matrix4::face_towards(
                     &mobile.position,
-                    &(mobile.position
-                        + Vector3::new(f32::cos(mobile.yaw), f32::sin(mobile.yaw), 0.0)),
+                    &(mobile.position + mobile.dir),
                     &Vector3::new(0.0, 0.0, 1.0),
                 );
 
@@ -644,7 +630,7 @@ impl App {
             }
 
             self.mobile_gpu
-                .update_instance(&positions[..], &mut encoder_render, &self.device);
+                .update_instance(&positions[..], &self.device);
         }
 
         //Action
@@ -654,8 +640,7 @@ impl App {
         //                &self.input_state.mouse_pressed,
         //                &mouse_world_pos,
         //                &mut self.heightmap_gpu,
-        //                &self.device,
-        //                &mut encoder_render,
+
         //            );
         //        }
 

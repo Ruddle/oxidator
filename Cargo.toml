@@ -15,14 +15,14 @@ vulkan = ["wgpu/vulkan"]
 
 [dependencies]
 wgpu = { version = "0.3.0" }
-env_logger = "0.6"
+env_logger = "0.7.1"
 glsl-to-spirv = "0.1"
 log = "0.4"
 png = "0.15"
 winit = "0.20.0-alpha3"
 raw-window-handle = "0.1"
 
-imgui = "0.2.0"
+imgui = "0.2.1"
 imgui-wgpu = "0.1.0"
 shaderc = "0.6"
 noise = "0.6.0"
@@ -34,7 +34,7 @@ nphysics3d = "0.12"
 crossbeam-channel = "0.3"
 
 [dependencies.imgui-winit-support]
-version = "0.2.0"
+version = "0.2.1"
 default-features = false
 features = ["winit-20"]
 

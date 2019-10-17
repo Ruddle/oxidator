@@ -1,7 +1,7 @@
 use crate::glsl_compiler;
 use crate::model;
+use wgpu::Device;
 use wgpu::{BindGroup, BindGroupLayout, RenderPass, TextureFormat};
-use wgpu::{CommandEncoder, Device};
 
 pub struct ModelGpu {
     vertex_buf: wgpu::Buffer,
@@ -16,7 +16,6 @@ impl ModelGpu {
     pub fn new(
         triangle_list: &model::TriangleList,
         device: &Device,
-        init_encoder: &mut CommandEncoder,
         format: TextureFormat,
         main_bind_group_layout: &BindGroupLayout,
     ) -> Self {
@@ -170,12 +169,7 @@ impl ModelGpu {
         rpass.draw_indexed(0..self.index_count as u32, 0, 0..self.instance_count as u32);
     }
 
-    pub fn update_instance(
-        &mut self,
-        transforms: &[f32],
-        encoder: &mut wgpu::CommandEncoder,
-        device: &wgpu::Device,
-    ) {
+    pub fn update_instance(&mut self, transforms: &[f32], device: &wgpu::Device) {
         log::trace!("ModelGpu update_instance");
         let temp_buf = device
             .create_buffer_mapped(

@@ -1,6 +1,6 @@
 use crate::glsl_compiler;
+use wgpu::Device;
 use wgpu::{BindGroup, BindGroupLayout, RenderPass, TextureFormat, TextureView};
-use wgpu::{CommandEncoder, Device};
 
 pub struct PostFx {
     pipeline: wgpu::RenderPipeline,

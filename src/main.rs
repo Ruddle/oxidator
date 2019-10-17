@@ -13,13 +13,12 @@ mod model_gpu;
 mod phy_state;
 mod post_fx;
 
-#[macro_use]
 extern crate crossbeam_channel;
 extern crate nalgebra as na;
 extern crate shaderc;
 
 use winit::event::Event;
-use winit::event_loop::{ControlFlow, EventLoop};
+use winit::event_loop::ControlFlow;
 
 #[derive(Debug)]
 pub enum AppMsg {

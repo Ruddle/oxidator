@@ -4,7 +4,6 @@ use std::collections::HashSet;
 
 use crate::heightmap_gpu;
 use noise::{NoiseFn, Seedable};
-use wgpu::{CommandEncoder, Device};
 
 #[derive(PartialEq, Clone, Copy)]
 pub enum Mode {
@@ -83,8 +82,6 @@ impl State {
         mouse_pressed: &HashSet<winit::event::MouseButton>,
         mouse_world_pos: &Vector3<f32>,
         heightmap_gpu: &mut heightmap_gpu::HeightmapGpu,
-        device: &Device,
-        encoder: &mut CommandEncoder,
     ) {
         log::trace!("heightmap_editor handle_user_input");
         {
@@ -116,7 +113,7 @@ impl State {
                 let size_j = max_j - min_j + 1;
 
                 if size_i > 0 && size_j > 0 {
-                    let start = std::time::Instant::now();
+                    //let start = std::time::Instant::now();
 
                     let mut pixels = Vec::with_capacity((size_i * size_j) as usize);
                     for j in min_j..=max_j {
@@ -136,19 +133,19 @@ impl State {
 
                     match self.mode {
                         Mode::Raise => {
-                            for (i, j, index, falloff) in pixels {
+                            for (_, _, index, falloff) in pixels {
                                 let power = pen_strength * falloff;
                                 heightmap_gpu.texels[index] += power;
                             }
                         }
                         Mode::Flatten => {
                             let mut average = 0.0;
-                            for (i, j, index, falloff) in &pixels {
+                            for (_, _, index, _) in &pixels {
                                 let z = heightmap_gpu.texels[*index];
                                 average += z;
                             }
                             average /= (size_i * size_j) as f32;
-                            for (i, j, index, falloff) in pixels {
+                            for (_, _, index, falloff) in pixels {
                                 let power = (pen_strength * falloff) / 50.0;
                                 let z =
                                     heightmap_gpu.texels[index] * (1.0 - power) + average * power;
@@ -169,7 +166,7 @@ impl State {
                         }
                         Mode::Median => {
                             let mut new_pix = Vec::new();
-                            for (i, j, index, falloff) in pixels {
+                            for (i, j, index, _) in pixels {
                                 let power = pen_strength / 10.0;
 
                                 let kernel = 4;
@@ -207,8 +204,6 @@ impl State {
                         min_j as u32,
                         size_i as u32,
                         size_j as u32,
-                        device,
-                        encoder,
                     );
                     //                    println!("handle hei took {}", start.elapsed().as_micros());
                 }

@@ -21,7 +21,6 @@ pub struct HeightmapGpu {
     texture: Texture,
     uniform_buf: wgpu::Buffer,
     zone_to_update: Vec<i32>,
-    last_updated: usize,
 }
 
 impl HeightmapGpu {
@@ -411,7 +410,6 @@ impl HeightmapGpu {
             texture,
             uniform_buf,
             zone_to_update,
-            last_updated: 0,
         }
     }
 
@@ -454,23 +452,43 @@ impl HeightmapGpu {
         self.texels[i]
     }
 
+    pub fn get_z_linear(&self, x: f32, y: f32) -> f32 {
+        let imin = x.trunc() as usize;
+        let imax = imin + 1;
+        let jmin = y.trunc() as usize;
+        let jmax = self.width as usize * (jmin + 1);
+        let jmin = self.width as usize * jmin;
+
+        let a = self.texels[imin + jmin];
+        let b = self.texels[imax + jmin];
+        let c = self.texels[imax + jmax];
+        let d = self.texels[imin + jmax];
+
+        let z = a * (1.0 - x.fract()) * (1.0 - y.fract())
+            + b * (x.fract()) * (1.0 - y.fract())
+            + c * (x.fract()) * (y.fract())
+            + d * (1.0 - x.fract()) * (y.fract());
+
+        z
+    }
+
     pub fn step(&mut self, device: &Device, encoder: &mut CommandEncoder) {
         let mut zone_to_update = self
             .zone_to_update
             .iter()
             .enumerate()
-            .filter(|(i, b)| **b != 0)
+            .filter(|(_, b)| **b != 0)
             .collect::<Vec<(usize, &i32)>>();
 
-        zone_to_update.sort_by_key(|(index, i)| **i);
+        zone_to_update.sort_by_key(|(_, i)| **i);
 
-        let indices: Vec<usize> = zone_to_update.iter().map(|(index, i)| *index).collect();
+        let indices: Vec<usize> = zone_to_update.iter().map(|(index, _)| *index).collect();
 
-        for (index) in indices.iter().skip(UPDATE_PER_STEP) {
+        for index in indices.iter().skip(UPDATE_PER_STEP) {
             self.zone_to_update[*index] -= 1;
         }
 
-        for (index) in indices.iter().take(UPDATE_PER_STEP) {
+        for index in indices.iter().take(UPDATE_PER_STEP) {
             self.zone_to_update[*index] = 0;
 
             let i = *index as u32 % (self.width / ZONE_SIZE as u32);
@@ -534,15 +552,7 @@ impl HeightmapGpu {
         }
     }
 
-    pub fn update_rect(
-        &mut self,
-        min_x: u32,
-        min_y: u32,
-        width: u32,
-        height: u32,
-        device: &Device,
-        encoder: &mut CommandEncoder,
-    ) {
+    pub fn update_rect(&mut self, min_x: u32, min_y: u32, width: u32, height: u32) {
         for i in (min_x / ZONE_SIZE as u32)..=(min_x + width) / ZONE_SIZE as u32 {
             for j in (min_y / ZONE_SIZE as u32)..=(min_y + height) / ZONE_SIZE as u32 {
                 let index = (i + j * (self.width / ZONE_SIZE as u32) as u32) as usize;

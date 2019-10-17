@@ -8,11 +8,11 @@ use nphysics3d::object::{
 use nphysics3d::world::{DefaultGeometricalWorld, DefaultMechanicalWorld};
 
 use crossbeam_channel::{Receiver, Sender};
-use na::{Isometry3, Matrix3, Matrix4, Point3};
+use na::{Isometry3, Matrix4};
 use nalgebra::DMatrix;
-use ncollide3d::shape::{Ball, HeightField, ShapeHandle};
-use nphysics3d::math::{Inertia, Velocity};
-use nphysics3d::object::{BodyStatus, Ground, RigidBodyDesc};
+use ncollide3d::shape::{HeightField, ShapeHandle};
+
+use nphysics3d::object::{Ground, RigidBodyDesc};
 
 pub struct InnerState {
     mechanical_world: DefaultMechanicalWorld<f32>,
@@ -103,12 +103,12 @@ impl State {
 impl InnerState {
     pub fn new(r_inner: Receiver<ToInner>, s_outer: Sender<ToOuter>) -> Self {
         let mut mechanical_world = DefaultMechanicalWorld::new(Vector3::new(0.0, -10.0, 0.0));
-        let mut geometrical_world = DefaultGeometricalWorld::new();
+        let geometrical_world = DefaultGeometricalWorld::new();
 
         let mut bodies = DefaultBodySet::new();
         let mut colliders = DefaultColliderSet::new();
-        let mut joint_constraints = DefaultJointConstraintSet::new();
-        let mut force_generators = DefaultForceGeneratorSet::new();
+        let joint_constraints = DefaultJointConstraintSet::new();
+        let force_generators = DefaultForceGeneratorSet::new();
 
         mechanical_world.set_timestep(1.0 / 60.0);
         mechanical_world.counters.enable();
@@ -167,7 +167,7 @@ impl InnerState {
                 let ground_col = ColliderDesc::new(shape)
                     .position(Isometry3::translation(1024.0, 0.0, 1024.0))
                     .build(BodyPartHandle(ground_handle, 0));
-                let ground_col_handle = colliders.insert(ground_col);
+                let _ = colliders.insert(ground_col);
             }
         }
 
@@ -221,7 +221,7 @@ impl InnerState {
     pub fn do_loop(mut self) {
         loop {
             match self.r_inner.recv().unwrap() {
-                Step => {
+                ToInner::Step => {
                     self.step();
                     let _ = self.s_outer.try_send(ToOuter::Perf(self.get_perf_string()));
                     let _ = self.s_outer.try_send(ToOuter::Isos(self.balls_isos()));
@@ -280,7 +280,7 @@ CCD: {:.2}ms
     pub fn balls_isos(&self) -> Vec<Isometry3<f32>> {
         self.cubes
             .iter()
-            .map(|(bh, ch)| {
+            .map(|(bh, _)| {
                 let rigid_body = self.bodies.rigid_body(*bh).unwrap();
                 *rigid_body.position()
             })
