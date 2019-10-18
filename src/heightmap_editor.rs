@@ -44,7 +44,7 @@ impl State {
         edit_height_window
             .size([400.0, 200.0], imgui::Condition::FirstUseEver)
             .position([3.0, 206.0], imgui::Condition::FirstUseEver)
-            .collapsed(true, imgui::Condition::FirstUseEver)
+            .collapsed(false, imgui::Condition::FirstUseEver)
             .build(&ui, || {
                 ui.radio_button(im_str!("Raise/Lower"), mode, Mode::Raise);
                 ui.radio_button(im_str!("Flatten/Unflatten"), mode, Mode::Flatten);
@@ -135,7 +135,9 @@ impl State {
                         Mode::Raise => {
                             for (_, _, index, falloff) in pixels {
                                 let power = pen_strength * falloff;
-                                heightmap_gpu.texels[index] += power;
+                                heightmap_gpu.texels[index] = (heightmap_gpu.texels[index] + power)
+                                    .min(heightmap_gpu::MAX_Z)
+                                    .max(0.0);
                             }
                         }
                         Mode::Flatten => {
@@ -149,7 +151,7 @@ impl State {
                                 let power = (pen_strength * falloff) / 50.0;
                                 let z =
                                     heightmap_gpu.texels[index] * (1.0 - power) + average * power;
-                                heightmap_gpu.texels[index] = z;
+                                heightmap_gpu.texels[index] = z.min(heightmap_gpu::MAX_Z).max(0.0);
                             }
                         }
                         Mode::Noise => {
@@ -161,7 +163,9 @@ impl State {
                                         (0.001 * self.noise_freq) * j as f64,
                                     ]) as f32;
 
-                                heightmap_gpu.texels[index] += power;
+                                heightmap_gpu.texels[index] = (heightmap_gpu.texels[index] + power)
+                                    .min(heightmap_gpu::MAX_Z)
+                                    .max(0.0);
                             }
                         }
                         Mode::Median => {
@@ -194,7 +198,7 @@ impl State {
                                 ));
                             }
                             for (index, z) in new_pix {
-                                heightmap_gpu.texels[index] = z;
+                                heightmap_gpu.texels[index] = z.min(heightmap_gpu::MAX_Z).max(0.0);
                             }
                         }
                     }

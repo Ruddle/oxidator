@@ -315,11 +315,11 @@ impl App {
         let mut game_state = game_state::State::new();
 
         let mut mobiles = Vec::new();
-        for i in (100..2000).step_by(20) {
-            for j in (100..2000).step_by(20) {
-                mobiles.push(mobile::Mobile::new(Point3::new(i as f32, j as f32, 100.0)));
-            }
-        }
+        // for i in (100..2000).step_by(20) {
+        //     for j in (100..2000).step_by(20) {
+        //         mobiles.push(mobile::Mobile::new(Point3::new(i as f32, j as f32, 100.0)));
+        //     }
+        // }
 
         println!("Number of mobiles {}", mobiles.len());
 
@@ -600,114 +600,135 @@ impl App {
 
         //Mobile update
 
-        let grid_w = (self.heightmap_gpu.width / 32) as usize;
-        let grid_h = (self.heightmap_gpu.height / 32) as usize;
-        let mut grid = vec![Vec::<usize>::new(); grid_w * grid_h];
+        // let cell_size = 4;
+        // let grid_w = (self.heightmap_gpu.width / cell_size) as usize;
+        // let grid_h = (self.heightmap_gpu.height / cell_size) as usize;
+        // let mut grid = vec![Vec::<usize>::new(); grid_w * grid_h];
 
-        let grid_pos = |mobile: &mobile::Mobile| -> usize {
-            let (x, y) = (mobile.position.x, mobile.position.y);
-            (x as usize / 32) as usize + (y as usize / 32) as usize * grid_w
-        };
+        // let grid_pos = |mobile: &mobile::Mobile| -> usize {
+        //     let (x, y) = (mobile.position.x, mobile.position.y);
+        //     (x as usize / cell_size as usize) as usize
+        //         + (y as usize / cell_size as usize) as usize * grid_w
+        // };
 
-        let mut index_to_position = Vec::with_capacity(self.game_state.mobiles.len());
+        // let mut index_to_position = Vec::with_capacity(self.game_state.mobiles.len());
 
-        for (index, mobile) in self.game_state.mobiles.iter().enumerate() {
-            index_to_position.push(mobile.position);
-            grid[grid_pos(mobile)].push(index);
-        }
+        // for (index, mobile) in self.game_state.mobiles.iter().enumerate() {
+        //     index_to_position.push((mobile.position, mobile.speed));
+        //     grid[grid_pos(mobile)].push(index);
+        // }
 
-        {
-            if let Some(target) = self.game_state.mouse_world_pos {
-                for (index, mobile) in self.game_state.mobiles.iter_mut().enumerate() {
-                    let grid_pos = grid_pos(mobile);
+        // let flock_w = (index_to_position.len() as f32).sqrt() as usize;
 
-                    let mut neighbors = grid[grid_pos].clone();
-                    for cell in &[
-                        -1_i32 - grid_w as i32,
-                        -(grid_w as i32),
-                        1 - grid_w as i32,
-                        -1,
-                        1,
-                        -1 + grid_w as i32,
-                        grid_w as i32,
-                        1 + grid_w as i32,
-                    ] {
-                        let cell_index = cell + grid_pos as i32;
-                        if cell_index >= 0 && (cell_index as usize) < grid_w * grid_h {
-                            neighbors.extend_from_slice(&grid[cell_index as usize]);
-                        }
-                    }
+        // {
+        //     if let Some(target) = self.game_state.mouse_world_pos {
+        //         for (index, mobile) in self.game_state.mobiles.iter_mut().enumerate() {
+        //             let target = target
+        //                 + Vector3::new(
+        //                     (index % flock_w) as f32 * 4.0,
+        //                     (index / flock_w) as f32 * 4.0,
+        //                     0.0,
+        //                 );
+        //             let grid_pos = grid_pos(mobile);
 
-                    let neighbors: Vec<Point3<f32>> = neighbors
-                        .iter()
-                        .filter(|e| **e != index)
-                        .map(|index| index_to_position[*index])
-                        .collect();
+        //             let mut neighbors_index = grid[grid_pos].clone();
+        //             for cell in &[
+        //                 -1_i32 - grid_w as i32,
+        //                 -(grid_w as i32),
+        //                 1 - grid_w as i32,
+        //                 -1,
+        //                 1,
+        //                 -1 + grid_w as i32,
+        //                 grid_w as i32,
+        //                 1 + grid_w as i32,
+        //             ] {
+        //                 let cell_index = cell + grid_pos as i32;
+        //                 if cell_index >= 0 && (cell_index as usize) < grid_w * grid_h {
+        //                     neighbors_index.extend_from_slice(&grid[cell_index as usize]);
+        //                 }
+        //             }
 
-                    let mut dir = Vector3::new(0.0, 0.0, 0.0);
+        //             let neighbors: Vec<(Point3<f32>, Vector3<f32>)> = neighbors_index
+        //                 .iter()
+        //                 .filter(|e| **e != index)
+        //                 .map(|index| index_to_position[*index])
+        //                 .collect();
 
-                    if neighbors.len() == 0 {
-                    } else {
-                        let mut nearest = neighbors.first().unwrap().clone();
-                        let mut dist_min = 100000.0;
-                        for neighbor in neighbors.iter() {
-                            let dist = na::distance(neighbor, &mobile.position);
-                            if dist_min > dist {
-                                dist_min = dist;
-                                nearest = neighbor.clone();
-                            }
-                        }
+        //             let mut dir = Vector3::new(0.0, 0.0, 0.0);
 
-                        if dist_min < 10.0 {
-                            dir = (mobile.position.coords - nearest.coords).normalize();
-                            if dist_min < 3.0 {
-                                dir *= 5.0;
-                            }
-                        }
-                    }
+        //             if neighbors.len() == 0 {
+        //             } else {
+        //                 let mut nearest = neighbors.first().unwrap().clone();
+        //                 let mut dist_min = 10000000.0;
+        //                 for neighbor in neighbors.iter() {
+        //                     let dist = (neighbor.0 - &mobile.position).norm_squared();
+        //                     if dist_min > dist {
+        //                         dist_min = dist;
+        //                         nearest = neighbor.clone();
+        //                     }
+        //                 }
 
-                    let dir =
-                        (dir * 2.0 + (target - mobile.position.coords).normalize()).normalize();
+        //                 dist_min = dist_min.sqrt();
 
-                    mobile.dir = mobile.dir * 0.99 + dir * 0.01;
+        //                 if dist_min < 10.0 {
+        //                     let opposite = (mobile.position.coords - nearest.0.coords).normalize();
+        //                     let same_target = (nearest.0.coords + nearest.1 * 100.0
+        //                         - mobile.position.coords)
+        //                         .normalize();
 
-                    mobile.speed = (mobile.speed + mobile.dir * 0.004) * 0.95;
-                    mobile.position += mobile.speed;
+        //                     dir = 0.1 * (10.0 - dist_min) * (opposite + same_target);
+        //                     if dist_min < 3.0 {
+        //                         dir = opposite;
+        //                     }
+        //                 }
+        //             }
 
-                    mobile.position.z = self
-                        .heightmap_gpu
-                        .get_z_linear(mobile.position.x, mobile.position.y)
-                        + 0.5;
-                }
-            }
-        }
-        {
-            let cubes_t = &self.game_state.mobiles;
-            let mut positions = Vec::with_capacity(cubes_t.len() * 16);
-            for mobile in cubes_t {
-                let mat = Matrix4::face_towards(
-                    &mobile.position,
-                    &(mobile.position + mobile.dir),
-                    &Vector3::new(0.0, 0.0, 1.0),
-                );
+        //             let mut to_target = target - mobile.position.coords;
+        //             let to_target_l = to_target.norm();
+        //             if to_target_l > 1.0 {
+        //                 to_target = to_target.normalize();
+        //             }
 
-                positions.extend_from_slice(mat.as_slice());
-            }
+        //             let dir = dir + to_target;
 
-            self.mobile_gpu
-                .update_instance(&positions[..], &self.device);
-        }
+        //             mobile.dir = mobile.dir * 0.99 + dir * 0.01;
+
+        //             mobile.speed = (mobile.speed + mobile.dir * 0.008) * 0.95;
+        //             mobile.position += mobile.speed;
+
+        //             mobile.position.z = self
+        //                 .heightmap_gpu
+        //                 .get_z_linear(mobile.position.x, mobile.position.y)
+        //                 + 0.5;
+        //         }
+        //     }
+        // }
+        // {
+        //     let cubes_t = &self.game_state.mobiles;
+        //     let mut positions = Vec::with_capacity(cubes_t.len() * 16);
+        //     for mobile in cubes_t {
+        //         let mat = Matrix4::face_towards(
+        //             &mobile.position,
+        //             &(mobile.position + mobile.dir),
+        //             &Vector3::new(0.0, 0.0, 1.0),
+        //         );
+
+        //         positions.extend_from_slice(mat.as_slice());
+        //     }
+
+        //     self.mobile_gpu
+        //         .update_instance(&positions[..], &self.device);
+        // }
 
         //Action
 
-        //        if let Some(mouse_world_pos) = self.game_state.mouse_world_pos {
-        //            self.game_state.heightmap_editor.handle_user_input(
-        //                &self.input_state.mouse_pressed,
-        //                &mouse_world_pos,
-        //                &mut self.heightmap_gpu,
-
-        //            );
-        //        }
+        if let Some(mouse_world_pos) = self.game_state.mouse_world_pos {
+            self.game_state.heightmap_editor.handle_user_input(
+                &self.input_state.mouse_pressed,
+                &mouse_world_pos,
+                &mut self.heightmap_gpu,
+            );
+        }
 
         self.heightmap_gpu.step(&self.device, &mut encoder_render);
 
