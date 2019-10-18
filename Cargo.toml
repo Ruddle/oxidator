@@ -32,6 +32,7 @@ ncollide3d = "0.20"
 nphysics3d = "0.12"
 
 crossbeam-channel = "0.3"
+rand = "0.7.2"
 
 [dependencies.imgui-winit-support]
 version = "0.2.1"

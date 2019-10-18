@@ -1,6 +1,6 @@
 use crate::*;
 
-use na::{Matrix4, Point3, Vector3};
+use na::{Isometry3, Matrix4, Point3, Vector2, Vector3, Vector4};
 
 use heightmap_gpu::HeightmapGpu;
 use imgui::*;
@@ -8,6 +8,7 @@ use imgui_wgpu::Renderer;
 use imgui_winit_support;
 use imgui_winit_support::WinitPlatform;
 use model_gpu::ModelGpu;
+use std::collections::{HashMap, HashSet};
 use std::time::Instant;
 use wgpu::{BufferMapAsyncResult, Extent3d, SwapChain, TextureFormat};
 
@@ -314,16 +315,15 @@ impl App {
 
         let mut game_state = game_state::State::new();
 
-        let mut mobiles = Vec::new();
-        // for i in (100..2000).step_by(20) {
-        //     for j in (100..2000).step_by(20) {
-        //         mobiles.push(mobile::Mobile::new(Point3::new(i as f32, j as f32, 100.0)));
-        //     }
-        // }
+        for i in (100..200).step_by(7) {
+            for j in (100..200).step_by(7) {
+                let m = mobile::Mobile::new(Point3::new(i as f32, j as f32, 100.0));
 
-        println!("Number of mobiles {}", mobiles.len());
+                game_state.mobiles.insert(m.id.clone(), m);
+            }
+        }
 
-        game_state.mobiles = mobiles;
+        println!("Number of mobiles {}", game_state.mobiles.len());
 
         // Done
         let this = App {
@@ -445,6 +445,7 @@ impl App {
                     ..
                 } => {
                     self.input_state.key_pressed.insert(vkc.clone());
+                    self.input_state.key_triggered.insert(vkc.clone());
                 }
                 WindowEvent::KeyboardInput {
                     input:
@@ -466,15 +467,51 @@ impl App {
                 }
 
                 WindowEvent::CursorMoved { position, .. } => {
-                    self.input_state.cursor_pos = (position.x as u32, position.y as u32)
+                    self.input_state.cursor_pos = (position.x as u32, position.y as u32);
+                    match self.input_state.drag {
+                        input_state::Drag::Start { x0, y0 }
+                        | input_state::Drag::Dragging { x0, y0, .. } => {
+                            self.input_state.drag = input_state::Drag::Dragging {
+                                x0,
+                                y0,
+                                x1: self.input_state.cursor_pos.0 as u32,
+                                y1: self.input_state.cursor_pos.1 as u32,
+                            };
+                        }
+                        _ => {}
+                    }
                 }
 
                 WindowEvent::MouseInput { state, button, .. } => {
                     if !self.imgui_wrap.imgui.io().want_capture_mouse {
                         if let &winit::event::ElementState::Pressed = state {
                             self.input_state.mouse_pressed.insert(*button);
+                            self.input_state.mouse_triggered.insert(*button);
+
+                            if let event::MouseButton::Left = button {
+                                self.input_state.drag = input_state::Drag::Start {
+                                    x0: self.input_state.cursor_pos.0 as u32,
+                                    y0: self.input_state.cursor_pos.1 as u32,
+                                }
+                            };
                         } else {
                             self.input_state.mouse_pressed.remove(button);
+
+                            if let event::MouseButton::Left = button {
+                                match self.input_state.drag {
+                                    input_state::Drag::Dragging { x0, y0, .. } => {
+                                        self.input_state.drag = input_state::Drag::End {
+                                            x0,
+                                            y0,
+                                            x1: self.input_state.cursor_pos.0 as u32,
+                                            y1: self.input_state.cursor_pos.1 as u32,
+                                        };
+                                    }
+                                    _ => {
+                                        self.input_state.drag = input_state::Drag::None;
+                                    }
+                                }
+                            }
                         }
                     }
                 }
@@ -598,127 +635,145 @@ impl App {
             self.cube_gpu.update_instance(&positions[..], &self.device);
         }
 
+        //Selection square
+        if let input_state::Drag::End { x0, y0, x1, y1 } = self.input_state.drag {
+            let min_x = (x0.min(x1) as f32 / self.sc_desc.width as f32) * 2.0 - 1.0;
+            let min_y = (y0.min(y1) as f32 / self.sc_desc.height as f32) * 2.0 - 1.0;
+            let max_x = (x0.max(x1) as f32 / self.sc_desc.width as f32) * 2.0 - 1.0;
+            let max_y = (y0.max(y1) as f32 / self.sc_desc.height as f32) * 2.0 - 1.0;
+
+            // Projecting on screen
+            let view_proj = camera::create_view_proj(
+                self.sc_desc.width as f32 / self.sc_desc.height as f32,
+                &self.game_state.position_smooth,
+                &self.game_state.dir_smooth,
+            );
+
+            let start_proj = std::time::Instant::now();
+            let projected = self.game_state.mobiles.iter().map(|(id, e)| {
+                let p = e.position.to_homogeneous();
+                let r = view_proj * p;
+                (id, Vector2::new(r.x / r.w, r.y / r.w))
+            });
+
+            println!("Projecting took {}", start_proj.elapsed().as_micros());
+
+            let selected: HashSet<String> = projected
+                .filter(|(_, e)| e.x > min_x && e.x < max_x && e.y < max_y && e.y > min_y)
+                .map(|(i, _)| i.clone())
+                .collect();
+
+            self.game_state.selected = selected;
+
+            for s in self.game_state.selected.iter() {
+                println!("{}", s)
+            }
+        }
+
+        //Mobile update target
+
+        match (
+            self.input_state
+                .mouse_triggered
+                .contains(&winit::event::MouseButton::Right),
+            self.game_state.mouse_world_pos,
+        ) {
+            (true, Some(mouse_pos_world)) => {
+                let selected_count = self.game_state.selected.len();
+                let formation_w = (selected_count as f32).sqrt().ceil() as i32;
+
+                let mut spot = Vec::<Vector3<f32>>::new();
+                for i in 0..formation_w {
+                    for j in 0..formation_w {
+                        spot.push(
+                            mouse_pos_world
+                                + Vector3::new(
+                                    i as f32 - formation_w as f32 / 2.0,
+                                    j as f32 - formation_w as f32 / 2.0,
+                                    0.0,
+                                ) * 4.0,
+                        )
+                    }
+                }
+
+                let mut center = Vector3::new(0.0, 0.0, 0.0);
+                let mut tap = 0.0;
+
+                let mut id_to_pos = Vec::new();
+                for s in self.game_state.selected.iter() {
+                    if let Some(mobile) = self.game_state.mobiles.get(s) {
+                        id_to_pos.push((mobile.id.clone(), mobile.position.coords));
+                        center += mobile.position.coords;
+                        tap += 1.0;
+                    }
+                }
+                center /= tap;
+
+                let axis = (mouse_pos_world - center).normalize();
+
+                let mut projected_spot: Vec<_> = spot
+                    .iter()
+                    .enumerate()
+                    .map(|(index, v)| (index, v.dot(&axis)))
+                    .collect();
+
+                projected_spot.sort_by(|(_, proj), (_, proj2)| {
+                    if proj > proj2 {
+                        std::cmp::Ordering::Greater
+                    } else {
+                        std::cmp::Ordering::Less
+                    }
+                });
+
+                let mut id_to_proj: Vec<_> = id_to_pos
+                    .iter()
+                    .map(|(index, v)| (index, v.dot(&axis)))
+                    .collect();
+
+                id_to_proj.sort_by(|(_, proj), (_, proj2)| {
+                    if proj > proj2 {
+                        std::cmp::Ordering::Greater
+                    } else {
+                        std::cmp::Ordering::Less
+                    }
+                });
+
+                for ((id, _), (spot_id, _)) in id_to_proj.iter().zip(&projected_spot[..]) {
+                    if let Some(mobile) = self.game_state.mobiles.get_mut(*id) {
+                        mobile.target = Some(Point3::<f32>::from(spot[*spot_id]));
+                    }
+                }
+
+                //      mobile.target = self
+                // .game_state
+                // .mouse_world_pos
+                // .clone()
+                // .map(|v| Point3::from(v));
+            }
+            _ => {}
+        }
+
         //Mobile update
+        group_behavior::Group::update_mobiles(
+            delta_sim_sec,
+            &mut self.game_state.mobiles,
+            &self.heightmap_gpu,
+        );
+        {
+            let mut positions = Vec::with_capacity(self.game_state.mobiles.len() * 16);
+            for mobile in self.game_state.mobiles.values() {
+                let mat = Matrix4::face_towards(
+                    &mobile.position,
+                    &(mobile.position + mobile.dir),
+                    &Vector3::new(0.0, 0.0, 1.0),
+                );
 
-        // let cell_size = 4;
-        // let grid_w = (self.heightmap_gpu.width / cell_size) as usize;
-        // let grid_h = (self.heightmap_gpu.height / cell_size) as usize;
-        // let mut grid = vec![Vec::<usize>::new(); grid_w * grid_h];
+                positions.extend_from_slice(mat.as_slice());
+            }
 
-        // let grid_pos = |mobile: &mobile::Mobile| -> usize {
-        //     let (x, y) = (mobile.position.x, mobile.position.y);
-        //     (x as usize / cell_size as usize) as usize
-        //         + (y as usize / cell_size as usize) as usize * grid_w
-        // };
-
-        // let mut index_to_position = Vec::with_capacity(self.game_state.mobiles.len());
-
-        // for (index, mobile) in self.game_state.mobiles.iter().enumerate() {
-        //     index_to_position.push((mobile.position, mobile.speed));
-        //     grid[grid_pos(mobile)].push(index);
-        // }
-
-        // let flock_w = (index_to_position.len() as f32).sqrt() as usize;
-
-        // {
-        //     if let Some(target) = self.game_state.mouse_world_pos {
-        //         for (index, mobile) in self.game_state.mobiles.iter_mut().enumerate() {
-        //             let target = target
-        //                 + Vector3::new(
-        //                     (index % flock_w) as f32 * 4.0,
-        //                     (index / flock_w) as f32 * 4.0,
-        //                     0.0,
-        //                 );
-        //             let grid_pos = grid_pos(mobile);
-
-        //             let mut neighbors_index = grid[grid_pos].clone();
-        //             for cell in &[
-        //                 -1_i32 - grid_w as i32,
-        //                 -(grid_w as i32),
-        //                 1 - grid_w as i32,
-        //                 -1,
-        //                 1,
-        //                 -1 + grid_w as i32,
-        //                 grid_w as i32,
-        //                 1 + grid_w as i32,
-        //             ] {
-        //                 let cell_index = cell + grid_pos as i32;
-        //                 if cell_index >= 0 && (cell_index as usize) < grid_w * grid_h {
-        //                     neighbors_index.extend_from_slice(&grid[cell_index as usize]);
-        //                 }
-        //             }
-
-        //             let neighbors: Vec<(Point3<f32>, Vector3<f32>)> = neighbors_index
-        //                 .iter()
-        //                 .filter(|e| **e != index)
-        //                 .map(|index| index_to_position[*index])
-        //                 .collect();
-
-        //             let mut dir = Vector3::new(0.0, 0.0, 0.0);
-
-        //             if neighbors.len() == 0 {
-        //             } else {
-        //                 let mut nearest = neighbors.first().unwrap().clone();
-        //                 let mut dist_min = 10000000.0;
-        //                 for neighbor in neighbors.iter() {
-        //                     let dist = (neighbor.0 - &mobile.position).norm_squared();
-        //                     if dist_min > dist {
-        //                         dist_min = dist;
-        //                         nearest = neighbor.clone();
-        //                     }
-        //                 }
-
-        //                 dist_min = dist_min.sqrt();
-
-        //                 if dist_min < 10.0 {
-        //                     let opposite = (mobile.position.coords - nearest.0.coords).normalize();
-        //                     let same_target = (nearest.0.coords + nearest.1 * 100.0
-        //                         - mobile.position.coords)
-        //                         .normalize();
-
-        //                     dir = 0.1 * (10.0 - dist_min) * (opposite + same_target);
-        //                     if dist_min < 3.0 {
-        //                         dir = opposite;
-        //                     }
-        //                 }
-        //             }
-
-        //             let mut to_target = target - mobile.position.coords;
-        //             let to_target_l = to_target.norm();
-        //             if to_target_l > 1.0 {
-        //                 to_target = to_target.normalize();
-        //             }
-
-        //             let dir = dir + to_target;
-
-        //             mobile.dir = mobile.dir * 0.99 + dir * 0.01;
-
-        //             mobile.speed = (mobile.speed + mobile.dir * 0.008) * 0.95;
-        //             mobile.position += mobile.speed;
-
-        //             mobile.position.z = self
-        //                 .heightmap_gpu
-        //                 .get_z_linear(mobile.position.x, mobile.position.y)
-        //                 + 0.5;
-        //         }
-        //     }
-        // }
-        // {
-        //     let cubes_t = &self.game_state.mobiles;
-        //     let mut positions = Vec::with_capacity(cubes_t.len() * 16);
-        //     for mobile in cubes_t {
-        //         let mat = Matrix4::face_towards(
-        //             &mobile.position,
-        //             &(mobile.position + mobile.dir),
-        //             &Vector3::new(0.0, 0.0, 1.0),
-        //         );
-
-        //         positions.extend_from_slice(mat.as_slice());
-        //     }
-
-        //     self.mobile_gpu
-        //         .update_instance(&positions[..], &self.device);
-        // }
+            self.mobile_gpu
+                .update_instance(&positions[..], &self.device);
+        }
 
         //Action
 
@@ -925,6 +980,8 @@ impl App {
         }
 
         self.device.get_queue().submit(&[encoder_render.finish()]);
+
+        self.input_state.update();
 
         let tx = self.sender_to_app.clone();
         let callback = move |e: BufferMapAsyncResult<&[f32]>| match e {

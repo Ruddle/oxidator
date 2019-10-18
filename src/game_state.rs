@@ -2,6 +2,7 @@ extern crate nalgebra as na;
 use crate::heightmap_editor;
 use crate::mobile;
 use na::{Point3, Vector3};
+use std::collections::{HashMap, HashSet};
 use std::time::Instant;
 
 pub struct State {
@@ -15,7 +16,8 @@ pub struct State {
 
     pub heightmap_editor: heightmap_editor::State,
 
-    pub mobiles: Vec<mobile::Mobile>,
+    pub mobiles: HashMap<String, mobile::Mobile>,
+    pub selected: HashSet<String>,
 
     pub start_time: Instant,
     pub last_frame: Instant,
@@ -36,7 +38,8 @@ impl State {
 
             heightmap_editor: heightmap_editor::State::new(),
 
-            mobiles: Vec::new(),
+            mobiles: HashMap::new(),
+            selected: HashSet::new(),
 
             start_time: Instant::now(),
             last_frame: Instant::now(),

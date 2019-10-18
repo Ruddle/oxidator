@@ -1537,6 +1537,7 @@ dependencies = [
  "noise 0.6.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "nphysics3d 0.12.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "png 0.15.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "rand 0.7.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "raw-window-handle 0.1.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "shaderc 0.6.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "wgpu 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",

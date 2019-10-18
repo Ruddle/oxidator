@@ -3,6 +3,7 @@ mod camera;
 mod fake_texels;
 mod game_state;
 mod glsl_compiler;
+mod group_behavior;
 mod heightmap;
 mod heightmap_editor;
 mod heightmap_gpu;
@@ -12,6 +13,7 @@ mod model;
 mod model_gpu;
 mod phy_state;
 mod post_fx;
+mod utils;
 
 extern crate crossbeam_channel;
 extern crate nalgebra as na;

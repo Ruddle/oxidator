@@ -28,7 +28,7 @@ impl State {
     pub fn new() -> Self {
         State {
             pen_radius: 100,
-            pen_strength: 5.0,
+            pen_strength: 0.0,
             mode: Mode::Raise,
             noise: noise::Perlin::new().set_seed(0),
             noise_freq: 10.0,
