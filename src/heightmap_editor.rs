@@ -11,6 +11,7 @@ pub enum Mode {
     Flatten,
     Median,
     Noise,
+    Blur,
 }
 
 pub struct State {
@@ -54,8 +55,9 @@ impl State {
             .build(&ui, || {
                 ui.radio_button(im_str!("Raise/Lower"), mode, Mode::Raise);
                 ui.radio_button(im_str!("Flatten/Unflatten"), mode, Mode::Flatten);
-                ui.radio_button(im_str!("Noise"), mode, Mode::Noise);
                 ui.radio_button(im_str!("Median"), mode, Mode::Median);
+                ui.radio_button(im_str!("Blur"), mode, Mode::Blur);
+                ui.radio_button(im_str!("Noise"), mode, Mode::Noise);
 
                 if mode == &mut Mode::Noise {
                     imgui::Slider::new(im_str!("noise frequency"), 0.0_f64..=100.0)
@@ -66,10 +68,14 @@ impl State {
                         .drag_int(im_str!("noise seed"), noise_seed)
                         .min(0)
                         .build();
+                    ui.separator();
+                } else {
+                    ui.separator();
                 }
 
                 imgui::Slider::new(im_str!("pen radius"), 1..=1000).build(&ui, pen_radius);
                 imgui::Slider::new(im_str!("pen strength"), 0.0..=10.0).build(&ui, pen_strength);
+                ui.separator();
 
                 imgui::Slider::new(im_str!("min height"), 0.0..=heightmap_gpu::MAX_Z)
                     .build(&ui, min_z);
@@ -208,6 +214,37 @@ impl State {
                                     heightmap_gpu.texels[index] * (1.0 - power)
                                         + power * (acc[acc.len() / 2] as f64 / 1000000.0) as f32,
                                 ));
+                            }
+                            for (index, z) in new_pix {
+                                heightmap_gpu.texels[index] = z.min(self.max_z).max(self.min_z);
+                            }
+                        }
+                        Mode::Blur => {
+                            let mut new_pix = Vec::new();
+                            for (i, j, index, falloff) in pixels {
+                                let power = pen_strength * falloff / 10.0;
+
+                                let kernel = 1;
+                                let mut acc = 0.0;
+                                let mut tap = 0;
+
+                                for ti in (-kernel + i).max(0)
+                                    ..=(kernel + i).min(heightmap_gpu.width as i32 - 1)
+                                {
+                                    for tj in (-kernel + j).max(0)
+                                        ..=(kernel + j).min(heightmap_gpu.height as i32 - 1)
+                                    {
+                                        tap += 1;
+                                        let tindex =
+                                            (ti + tj * heightmap_gpu.width as i32) as usize;
+                                        acc += heightmap_gpu.texels[tindex];
+                                    }
+                                }
+                                let z = heightmap_gpu.texels
+                                    [(i + j * heightmap_gpu.width as i32) as usize]
+                                    * (1.0 - power)
+                                    + power * (acc / tap as f32);
+                                new_pix.push((index, z));
                             }
                             for (index, z) in new_pix {
                                 heightmap_gpu.texels[index] = z.min(self.max_z).max(self.min_z);
