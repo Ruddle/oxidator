@@ -4,9 +4,9 @@ use crate::heightmap;
 use wgpu::{BindGroup, BindGroupLayout, RenderPass, RenderPipeline, Texture, TextureFormat};
 use wgpu::{CommandEncoder, Device};
 
-const ZONE_SIZE_MIP0: usize = 32;
+const ZONE_SIZE_MIP0: usize = 64;
 const UPDATE_PER_STEP: usize = 300;
-const MIP_COUNT: u32 = 7;
+const MIP_COUNT: u32 = 5;
 pub const MAX_Z: f32 = 511.0;
 
 pub struct HeightmapGpu {

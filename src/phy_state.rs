@@ -88,7 +88,7 @@ impl State {
         let edit_height_window = imgui::Window::new(im_str!("Physic statistics"));
         edit_height_window
             .size([400.0, 230.0], imgui::Condition::FirstUseEver)
-            .position([3.0, 412.0], imgui::Condition::FirstUseEver)
+            .position([3.0, 512.0], imgui::Condition::FirstUseEver)
             .collapsed(false, imgui::Condition::FirstUseEver)
             .build(&ui, || {
                 ui.text(im_str!("{}", self.perf));

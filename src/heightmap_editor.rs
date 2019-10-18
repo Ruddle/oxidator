@@ -19,6 +19,8 @@ pub struct State {
     pub mode: Mode,
     noise: noise::Perlin,
     noise_freq: f64,
+    min_z: f32,
+    max_z: f32,
 }
 
 impl State {
@@ -29,6 +31,8 @@ impl State {
             mode: Mode::Raise,
             noise: noise::Perlin::new().set_seed(0),
             noise_freq: 10.0,
+            min_z: 0.0,
+            max_z: heightmap_gpu::MAX_Z,
         }
     }
 
@@ -40,9 +44,11 @@ impl State {
         let noise_seed: &mut i32 = &mut (self.noise.seed() as i32);
         let mut update_noise = false;
         let mut save = false;
+        let min_z = &mut self.min_z;
+        let max_z = &mut self.max_z;
         let edit_height_window = imgui::Window::new(im_str!("Heightmap editor"));
         edit_height_window
-            .size([400.0, 200.0], imgui::Condition::FirstUseEver)
+            .size([400.0, 300.0], imgui::Condition::FirstUseEver)
             .position([3.0, 206.0], imgui::Condition::FirstUseEver)
             .collapsed(false, imgui::Condition::FirstUseEver)
             .build(&ui, || {
@@ -65,9 +71,15 @@ impl State {
                 imgui::Slider::new(im_str!("pen radius"), 1..=1000).build(&ui, pen_radius);
                 imgui::Slider::new(im_str!("pen strength"), 0.0..=10.0).build(&ui, pen_strength);
 
+                imgui::Slider::new(im_str!("min height"), 0.0..=heightmap_gpu::MAX_Z)
+                    .build(&ui, min_z);
+                imgui::Slider::new(im_str!("max height"), 0.0..=heightmap_gpu::MAX_Z)
+                    .build(&ui, max_z);
+
                 save = ui.small_button(im_str!("Save"));
             });
 
+        self.max_z = max_z.max(*min_z);
         if update_noise {
             self.noise = self.noise.set_seed(*noise_seed as u32);
         }
@@ -136,8 +148,8 @@ impl State {
                             for (_, _, index, falloff) in pixels {
                                 let power = pen_strength * falloff;
                                 heightmap_gpu.texels[index] = (heightmap_gpu.texels[index] + power)
-                                    .min(heightmap_gpu::MAX_Z)
-                                    .max(0.0);
+                                    .min(self.max_z)
+                                    .max(self.min_z);
                             }
                         }
                         Mode::Flatten => {
@@ -151,7 +163,7 @@ impl State {
                                 let power = (pen_strength * falloff) / 50.0;
                                 let z =
                                     heightmap_gpu.texels[index] * (1.0 - power) + average * power;
-                                heightmap_gpu.texels[index] = z.min(heightmap_gpu::MAX_Z).max(0.0);
+                                heightmap_gpu.texels[index] = z.min(self.max_z).max(self.min_z);
                             }
                         }
                         Mode::Noise => {
@@ -164,8 +176,8 @@ impl State {
                                     ]) as f32;
 
                                 heightmap_gpu.texels[index] = (heightmap_gpu.texels[index] + power)
-                                    .min(heightmap_gpu::MAX_Z)
-                                    .max(0.0);
+                                    .min(self.max_z)
+                                    .max(self.min_z);
                             }
                         }
                         Mode::Median => {
@@ -198,7 +210,7 @@ impl State {
                                 ));
                             }
                             for (index, z) in new_pix {
-                                heightmap_gpu.texels[index] = z.min(heightmap_gpu::MAX_Z).max(0.0);
+                                heightmap_gpu.texels[index] = z.min(self.max_z).max(self.min_z);
                             }
                         }
                     }
