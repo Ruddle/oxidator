@@ -92,7 +92,7 @@ impl Group {
                                 Vector3::new(0.0, 0.0, 0.0)
                             };
                             dir = 0.1 * (10.0 - dist_min) * (opposite + same_target);
-                            if dist_min < 2.0 {
+                            if dist_min < 3.0 {
                                 dir = opposite;
                             }
                         }
