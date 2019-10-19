@@ -7,15 +7,20 @@ layout(location = 2) in vec4 mata;
 layout(location = 3) in vec4 matb;
 layout(location = 4) in vec4 matc;
 layout(location = 5) in vec4 matd;
+layout(location = 6) in float param;
+
 
 layout(location = 0) out vec2 v_TexCoord;
 layout(location = 1) out vec3 world_pos;
+layout(location = 2) out float v_param;
+
 layout(set = 0, binding = 0) uniform Locals {
     mat4 u_Transform;
 };
 
 void main() {
     v_TexCoord = a_TexCoord;
+    v_param = param;
 
     mat4 t = mat4(mata,matb,matc,matd);
 

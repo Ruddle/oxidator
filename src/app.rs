@@ -2,6 +2,7 @@ use crate::*;
 
 use na::{Isometry3, Matrix4, Point3, Vector2, Vector3, Vector4};
 
+use gpu;
 use heightmap_gpu::HeightmapGpu;
 use imgui::*;
 use imgui_wgpu::Renderer;
@@ -24,12 +25,7 @@ struct ImguiWrap {
 
 pub struct App {
     //Wgpu
-    sc_desc: wgpu::SwapChainDescriptor,
-    device: wgpu::Device,
-    window: winit::window::Window,
-    hidpi_factor: f64,
-    swap_chain: SwapChain,
-    surface: wgpu::Surface,
+    gpu: gpu::WgpuState,
     //Physics
     phy_state: phy_state::State,
 
@@ -41,6 +37,7 @@ pub struct App {
     mobile_gpu: ModelGpu,
 
     bind_group: wgpu::BindGroup,
+    bind_group_layout: wgpu::BindGroupLayout,
 
     ub_camera_mat: wgpu::Buffer,
     ub_misc: wgpu::Buffer,
@@ -56,6 +53,9 @@ pub struct App {
     receiver_to_app: crossbeam_channel::Receiver<AppMsg>,
 
     sender_to_event_loop: crossbeam_channel::Sender<EventLoopMsg>,
+
+    receiver_notify: crossbeam_channel::Receiver<notify::Result<notify::event::Event>>,
+    watcher: notify::RecommendedWatcher,
 }
 
 impl App {
@@ -67,73 +67,41 @@ impl App {
     ) -> (Self) {
         log::trace!("App init");
 
-        let (instance, hidpi_factor, size, surface) = {
-            let instance = wgpu::Instance::new();
+        let mut gpu = gpu::WgpuState::new(window);
 
-            window.set_inner_size(winit::dpi::LogicalSize {
-                width: 1280.0,
-                height: 720.0,
-            });
-            window.set_title("Oxidator");
-            let hidpi_factor = window.hidpi_factor();
-            let size = window.inner_size().to_physical(hidpi_factor);
+        let mut init_encoder = gpu
+            .device
+            .create_command_encoder(&wgpu::CommandEncoderDescriptor { todo: 0 });
 
-            use raw_window_handle::HasRawWindowHandle as _;
-            let surface = instance.create_surface(window.raw_window_handle());
-
-            (instance, hidpi_factor, size, surface)
-        };
-
-        let adapter = instance.request_adapter(&wgpu::RequestAdapterOptions {
-            power_preference: wgpu::PowerPreference::HighPerformance,
-        });
-
-        let mut device: wgpu::Device = adapter.request_device(&wgpu::DeviceDescriptor {
-            extensions: wgpu::Extensions {
-                anisotropic_filtering: false,
-            },
-            limits: wgpu::Limits::default(),
-        });
-
-        let sc_desc = wgpu::SwapChainDescriptor {
-            usage: wgpu::TextureUsage::OUTPUT_ATTACHMENT,
-            format: wgpu::TextureFormat::Bgra8UnormSrgb,
-            width: size.width.round() as u32,
-            height: size.height.round() as u32,
-            present_mode: wgpu::PresentMode::NoVsync,
-        };
-        let swap_chain = device.create_swap_chain(&surface, &sc_desc);
-
-        let mut init_encoder =
-            device.create_command_encoder(&wgpu::CommandEncoderDescriptor { todo: 0 });
-
-        let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-            bindings: &[
-                wgpu::BindGroupLayoutBinding {
-                    binding: 0,
-                    visibility: wgpu::ShaderStage::VERTEX,
-                    ty: wgpu::BindingType::UniformBuffer { dynamic: false },
-                },
-                wgpu::BindGroupLayoutBinding {
-                    binding: 1,
-                    visibility: wgpu::ShaderStage::FRAGMENT,
-                    ty: wgpu::BindingType::SampledTexture {
-                        multisampled: false,
-                        dimension: wgpu::TextureViewDimension::D2,
-                    },
-                },
-                wgpu::BindGroupLayoutBinding {
-                    binding: 2,
-                    visibility: wgpu::ShaderStage::FRAGMENT,
-                    ty: wgpu::BindingType::Sampler,
-                },
-                wgpu::BindGroupLayoutBinding {
-                    binding: 3,
-                    visibility: wgpu::ShaderStage::FRAGMENT,
-                    ty: wgpu::BindingType::UniformBuffer { dynamic: false },
-                },
-            ],
-        });
+        let bind_group_layout =
+            gpu.device
+                .create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+                    bindings: &[
+                        wgpu::BindGroupLayoutBinding {
+                            binding: 0,
+                            visibility: wgpu::ShaderStage::VERTEX,
+                            ty: wgpu::BindingType::UniformBuffer { dynamic: false },
+                        },
+                        wgpu::BindGroupLayoutBinding {
+                            binding: 1,
+                            visibility: wgpu::ShaderStage::FRAGMENT,
+                            ty: wgpu::BindingType::SampledTexture {
+                                multisampled: false,
+                                dimension: wgpu::TextureViewDimension::D2,
+                            },
+                        },
+                        wgpu::BindGroupLayoutBinding {
+                            binding: 2,
+                            visibility: wgpu::ShaderStage::FRAGMENT,
+                            ty: wgpu::BindingType::Sampler,
+                        },
+                        wgpu::BindGroupLayoutBinding {
+                            binding: 3,
+                            visibility: wgpu::ShaderStage::FRAGMENT,
+                            ty: wgpu::BindingType::UniformBuffer { dynamic: false },
+                        },
+                    ],
+                });
 
         // Create the texture
         let size = 256u32;
@@ -143,7 +111,7 @@ impl App {
             height: size,
             depth: 1,
         };
-        let texture = device.create_texture(&wgpu::TextureDescriptor {
+        let texture = gpu.device.create_texture(&wgpu::TextureDescriptor {
             size: texture_extent,
             array_layer_count: 1,
             mip_level_count: 1,
@@ -154,7 +122,8 @@ impl App {
         });
 
         let texture_view = texture.create_default_view();
-        let temp_buf = device
+        let temp_buf = gpu
+            .device
             .create_buffer_mapped(texels.len(), wgpu::BufferUsage::COPY_SRC)
             .fill_from_slice(&texels);
         init_encoder.copy_buffer_to_texture(
@@ -178,7 +147,7 @@ impl App {
         );
 
         // Create other resources
-        let sampler = device.create_sampler(&wgpu::SamplerDescriptor {
+        let sampler = gpu.device.create_sampler(&wgpu::SamplerDescriptor {
             address_mode_u: wgpu::AddressMode::MirrorRepeat,
             address_mode_v: wgpu::AddressMode::MirrorRepeat,
             address_mode_w: wgpu::AddressMode::MirrorRepeat,
@@ -190,21 +159,25 @@ impl App {
             compare_function: wgpu::CompareFunction::Always,
         });
         let mx_total = camera::create_view_proj(
-            sc_desc.width as f32 / sc_desc.height as f32,
+            gpu.sc_desc.width as f32 / gpu.sc_desc.height as f32,
             &Point3::new(0.0, 0.0, 0.0),
             &Vector3::new(0.0, 0.0, 0.0),
         );
         let mx_ref: &[f32] = mx_total.as_slice();
-        let ub_camera_mat = device
+        let ub_camera_mat = gpu
+            .device
             .create_buffer_mapped(16, wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::COPY_DST)
             .fill_from_slice(mx_ref);
 
-        let ub_misc = device
-            .create_buffer_mapped(2, wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::COPY_DST)
-            .fill_from_slice(&[0.0_f32, 0.0]);
+        //2 Mouse pos
+        //2 resolution
+        let ub_misc = gpu
+            .device
+            .create_buffer_mapped(6, wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::COPY_DST)
+            .fill_from_slice(&[0.0_f32, 0.0, 0.0, 0.0, 0.0, 0.0]);
 
         // Create bind group
-        let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+        let bind_group = gpu.device.create_bind_group(&wgpu::BindGroupDescriptor {
             layout: &bind_group_layout,
             bindings: &[
                 wgpu::Binding {
@@ -226,7 +199,7 @@ impl App {
                     binding: 3,
                     resource: wgpu::BindingResource::Buffer {
                         buffer: &ub_misc,
-                        range: 0..8,
+                        range: 0..(6 * 4),
                     },
                 },
             ],
@@ -239,13 +212,13 @@ impl App {
             let mut platform = imgui_winit_support::WinitPlatform::init(&mut imgui);
             platform.attach_window(
                 imgui.io_mut(),
-                &window,
+                &gpu.window,
                 imgui_winit_support::HiDpiMode::Default,
             );
             imgui.set_ini_filename(None);
 
-            let font_size = (13.0 * hidpi_factor) as f32;
-            imgui.io_mut().font_global_scale = (1.0 / hidpi_factor) as f32;
+            let font_size = (13.0 * gpu.hidpi_factor) as f32;
+            imgui.io_mut().font_global_scale = (1.0 / gpu.hidpi_factor) as f32;
 
             imgui.fonts().add_font(&[FontSource::DefaultFontData {
                 config: Some(imgui::FontConfig {
@@ -257,7 +230,7 @@ impl App {
             }]);
 
             // imgui <-> wgpu
-            let renderer = Renderer::new(&mut imgui, &mut device, sc_desc.format, None);
+            let renderer = Renderer::new(&mut imgui, &mut gpu.device, gpu.sc_desc.format, None);
 
             ImguiWrap {
                 imgui,
@@ -266,10 +239,10 @@ impl App {
             }
         };
 
-        let format: TextureFormat = sc_desc.format;
+        let format: TextureFormat = gpu.sc_desc.format;
 
         let heightmap_gpu = HeightmapGpu::new(
-            &device,
+            &gpu.device,
             &mut init_encoder,
             format,
             &bind_group_layout,
@@ -277,14 +250,24 @@ impl App {
             2048,
         );
 
-        let cube_gpu = ModelGpu::new(&model::create_cube(), &device, format, &bind_group_layout);
+        let cube_gpu = ModelGpu::new(
+            &model::create_cube(),
+            &gpu.device,
+            format,
+            &bind_group_layout,
+        );
 
-        let mobile_gpu = ModelGpu::new(&model::create_cube(), &device, format, &bind_group_layout);
+        let mobile_gpu = ModelGpu::new(
+            &model::create_cube(),
+            &gpu.device,
+            format,
+            &bind_group_layout,
+        );
 
-        let depth_texture = device.create_texture(&wgpu::TextureDescriptor {
+        let depth_texture = gpu.device.create_texture(&wgpu::TextureDescriptor {
             size: wgpu::Extent3d {
-                width: sc_desc.width,
-                height: sc_desc.height,
+                width: gpu.sc_desc.width,
+                height: gpu.sc_desc.height,
                 depth: 1,
             },
             array_layer_count: 1,
@@ -295,10 +278,10 @@ impl App {
             usage: wgpu::TextureUsage::OUTPUT_ATTACHMENT,
         });
 
-        let position_att = device.create_texture(&wgpu::TextureDescriptor {
+        let position_att = gpu.device.create_texture(&wgpu::TextureDescriptor {
             size: wgpu::Extent3d {
-                width: sc_desc.width,
-                height: sc_desc.height,
+                width: gpu.sc_desc.width,
+                height: gpu.sc_desc.height,
                 depth: 1,
             },
             array_layer_count: 1,
@@ -309,9 +292,9 @@ impl App {
             usage: wgpu::TextureUsage::OUTPUT_ATTACHMENT | wgpu::TextureUsage::SAMPLED,
         });
 
-        let postfx = post_fx::PostFx::new(&device, &bind_group_layout, format);
+        let postfx = post_fx::PostFx::new(&gpu.device, &bind_group_layout, format);
 
-        device.get_queue().submit(&[init_encoder.finish()]);
+        gpu.device.get_queue().submit(&[init_encoder.finish()]);
 
         let mut game_state = game_state::State::new();
 
@@ -325,18 +308,32 @@ impl App {
 
         println!("Number of mobiles {}", game_state.mobiles.len());
 
+        let (receiver_notify, watcher) = {
+            use crossbeam_channel::unbounded;
+            use notify::{watcher, RecursiveMode, Result};
+            use std::time::Duration;
+            let (tx, rx) = unbounded();
+            use notify::Watcher;
+
+            // Automatically select the best implementation for your platform.
+            // You can also access each implementation directly e.g. INotifyWatcher.
+            let mut watcher = watcher(tx, Duration::from_millis(500)).unwrap();
+
+            // Add a path to be watched. All files and directories at that path and
+            // below will be monitored for changes.
+            watcher
+                .watch(std::env::current_dir().unwrap(), RecursiveMode::Recursive)
+                .unwrap();
+            (rx, watcher)
+        };
+
         // Done
         let this = App {
-            sc_desc,
-            device,
-            window,
-            hidpi_factor,
-            swap_chain,
-            surface,
-
+            gpu,
             phy_state: phy_state::State::new(),
 
             bind_group,
+            bind_group_layout,
             ub_camera_mat,
             ub_misc,
             cube_gpu,
@@ -356,6 +353,8 @@ impl App {
             sender_to_app,
             receiver_to_app,
             sender_to_event_loop,
+            receiver_notify,
+            watcher,
         };
 
         (this)
@@ -363,10 +362,10 @@ impl App {
 
     fn resize(&mut self) -> Option<wgpu::CommandBuffer> {
         log::trace!("resize");
-        let depth_texture = self.device.create_texture(&wgpu::TextureDescriptor {
+        let depth_texture = self.gpu.device.create_texture(&wgpu::TextureDescriptor {
             size: wgpu::Extent3d {
-                width: self.sc_desc.width,
-                height: self.sc_desc.height,
+                width: self.gpu.sc_desc.width,
+                height: self.gpu.sc_desc.height,
                 depth: 1,
             },
             array_layer_count: 1,
@@ -378,10 +377,10 @@ impl App {
         });
         self.forward_depth = depth_texture.create_default_view();
 
-        let position_att = self.device.create_texture(&wgpu::TextureDescriptor {
+        let position_att = self.gpu.device.create_texture(&wgpu::TextureDescriptor {
             size: wgpu::Extent3d {
-                width: self.sc_desc.width,
-                height: self.sc_desc.height,
+                width: self.gpu.sc_desc.width,
+                height: self.gpu.sc_desc.height,
                 depth: 1,
             },
             array_layer_count: 1,
@@ -402,9 +401,11 @@ impl App {
         log::trace!("[app.rs] update {:?}", _event);
         use winit::event;
 
-        self.imgui_wrap
-            .platform
-            .handle_event(self.imgui_wrap.imgui.io_mut(), &self.window, _event);
+        self.imgui_wrap.platform.handle_event(
+            self.imgui_wrap.imgui.io_mut(),
+            &self.gpu.window,
+            _event,
+        );
 
         //Low level
         match _event {
@@ -412,14 +413,17 @@ impl App {
                 event: WindowEvent::Resized(size),
                 ..
             } => {
-                let physical = size.to_physical(self.hidpi_factor);
+                let physical = size.to_physical(self.gpu.hidpi_factor);
                 info!("Resizing to {:?}", physical);
-                self.sc_desc.width = physical.width.round() as u32;
-                self.sc_desc.height = physical.height.round() as u32;
-                self.swap_chain = self.device.create_swap_chain(&self.surface, &self.sc_desc);
+                self.gpu.sc_desc.width = physical.width.round() as u32;
+                self.gpu.sc_desc.height = physical.height.round() as u32;
+                self.gpu.swap_chain = self
+                    .gpu
+                    .device
+                    .create_swap_chain(&self.gpu.surface, &self.gpu.sc_desc);
                 let command_buf = self.resize();
                 if let Some(command_buf) = command_buf {
-                    self.device.get_queue().submit(&[command_buf]);
+                    self.gpu.device.get_queue().submit(&[command_buf]);
                 }
             }
             event::Event::WindowEvent { event, .. } => match event {
@@ -530,7 +534,7 @@ impl App {
 
         self.phy_state.step();
 
-        let frame = &self.swap_chain.get_next_texture();
+        let frame = &self.gpu.swap_chain.get_next_texture();
 
         let mut now = Instant::now();
         let mut delta = now - self.game_state.last_frame;
@@ -621,30 +625,32 @@ impl App {
 
         //Render
         let mut encoder_render = self
+            .gpu
             .device
             .create_command_encoder(&wgpu::CommandEncoderDescriptor { todo: 0 });
 
         //Phy Drawing
-        {
-            let cubes_t = self.phy_state.cubes_transform();
-            let mut positions = Vec::with_capacity(cubes_t.len() * 16);
-            for mat in cubes_t {
-                positions.extend_from_slice(mat.as_slice())
-            }
+        // {
+        //     let cubes_t = self.phy_state.cubes_transform();
+        //     let mut positions = Vec::with_capacity(cubes_t.len() * 16);
+        //     for mat in cubes_t {
+        //         positions.extend_from_slice(mat.as_slice())
+        //     }
 
-            self.cube_gpu.update_instance(&positions[..], &self.device);
-        }
+        //     self.cube_gpu
+        //         .update_instance(&positions[..], &self.gpu.device);
+        // }
 
         //Selection square
         if let input_state::Drag::End { x0, y0, x1, y1 } = self.input_state.drag {
-            let min_x = (x0.min(x1) as f32 / self.sc_desc.width as f32) * 2.0 - 1.0;
-            let min_y = (y0.min(y1) as f32 / self.sc_desc.height as f32) * 2.0 - 1.0;
-            let max_x = (x0.max(x1) as f32 / self.sc_desc.width as f32) * 2.0 - 1.0;
-            let max_y = (y0.max(y1) as f32 / self.sc_desc.height as f32) * 2.0 - 1.0;
+            let min_x = (x0.min(x1) as f32 / self.gpu.sc_desc.width as f32) * 2.0 - 1.0;
+            let min_y = (y0.min(y1) as f32 / self.gpu.sc_desc.height as f32) * 2.0 - 1.0;
+            let max_x = (x0.max(x1) as f32 / self.gpu.sc_desc.width as f32) * 2.0 - 1.0;
+            let max_y = (y0.max(y1) as f32 / self.gpu.sc_desc.height as f32) * 2.0 - 1.0;
 
             // Projecting on screen
             let view_proj = camera::create_view_proj(
-                self.sc_desc.width as f32 / self.sc_desc.height as f32,
+                self.gpu.sc_desc.width as f32 / self.gpu.sc_desc.height as f32,
                 &self.game_state.position_smooth,
                 &self.game_state.dir_smooth,
             );
@@ -671,87 +677,12 @@ impl App {
         }
 
         //Mobile update target
-
-        match (
-            self.input_state
-                .mouse_triggered
-                .contains(&winit::event::MouseButton::Right),
+        group_behavior::Group::update_mobile_target(
+            &self.input_state.mouse_triggered,
             self.game_state.mouse_world_pos,
-        ) {
-            (true, Some(mouse_pos_world)) => {
-                let selected_count = self.game_state.selected.len();
-                let formation_w = (selected_count as f32).sqrt().ceil() as i32;
-
-                let mut spot = Vec::<Vector3<f32>>::new();
-                for i in 0..formation_w {
-                    for j in 0..formation_w {
-                        spot.push(
-                            mouse_pos_world
-                                + Vector3::new(
-                                    i as f32 - formation_w as f32 / 2.0,
-                                    j as f32 - formation_w as f32 / 2.0,
-                                    0.0,
-                                ) * 4.0,
-                        )
-                    }
-                }
-
-                let mut center = Vector3::new(0.0, 0.0, 0.0);
-                let mut tap = 0.0;
-
-                let mut id_to_pos = Vec::new();
-                for s in self.game_state.selected.iter() {
-                    if let Some(mobile) = self.game_state.mobiles.get(s) {
-                        id_to_pos.push((mobile.id.clone(), mobile.position.coords));
-                        center += mobile.position.coords;
-                        tap += 1.0;
-                    }
-                }
-                center /= tap;
-
-                let axis = (mouse_pos_world - center).normalize();
-
-                let mut projected_spot: Vec<_> = spot
-                    .iter()
-                    .enumerate()
-                    .map(|(index, v)| (index, v.dot(&axis)))
-                    .collect();
-
-                projected_spot.sort_by(|(_, proj), (_, proj2)| {
-                    if proj > proj2 {
-                        std::cmp::Ordering::Greater
-                    } else {
-                        std::cmp::Ordering::Less
-                    }
-                });
-
-                let mut id_to_proj: Vec<_> = id_to_pos
-                    .iter()
-                    .map(|(index, v)| (index, v.dot(&axis)))
-                    .collect();
-
-                id_to_proj.sort_by(|(_, proj), (_, proj2)| {
-                    if proj > proj2 {
-                        std::cmp::Ordering::Greater
-                    } else {
-                        std::cmp::Ordering::Less
-                    }
-                });
-
-                for ((id, _), (spot_id, _)) in id_to_proj.iter().zip(&projected_spot[..]) {
-                    if let Some(mobile) = self.game_state.mobiles.get_mut(*id) {
-                        mobile.target = Some(Point3::<f32>::from(spot[*spot_id]));
-                    }
-                }
-
-                //      mobile.target = self
-                // .game_state
-                // .mouse_world_pos
-                // .clone()
-                // .map(|v| Point3::from(v));
-            }
-            _ => {}
-        }
+            &self.game_state.selected,
+            &mut self.game_state.mobiles,
+        );
 
         //Mobile update
         group_behavior::Group::update_mobiles(
@@ -760,7 +691,7 @@ impl App {
             &self.heightmap_gpu,
         );
         {
-            let mut positions = Vec::with_capacity(self.game_state.mobiles.len() * 16);
+            let mut positions = Vec::with_capacity(self.game_state.mobiles.len() * 17);
             for mobile in self.game_state.mobiles.values() {
                 let mat = Matrix4::face_towards(
                     &mobile.position,
@@ -768,11 +699,18 @@ impl App {
                     &Vector3::new(0.0, 0.0, 1.0),
                 );
 
+                let is_selected = if self.game_state.selected.contains(&mobile.id) {
+                    1.0
+                } else {
+                    0.0
+                };
+
                 positions.extend_from_slice(mat.as_slice());
+                positions.push(is_selected);
             }
 
             self.mobile_gpu
-                .update_instance(&positions[..], &self.device);
+                .update_instance(&positions[..], &self.gpu.device);
         }
 
         //Action
@@ -785,9 +723,11 @@ impl App {
             );
         }
 
-        self.heightmap_gpu.step(&self.device, &mut encoder_render);
+        self.heightmap_gpu
+            .step(&self.gpu.device, &mut encoder_render);
 
         let cursor_sample_position = self
+            .gpu
             .device
             .create_buffer_mapped::<f32>(
                 4,
@@ -812,8 +752,13 @@ impl App {
                     mip_level: 0,
                     array_layer: 0,
                     origin: wgpu::Origin3d {
-                        x: clamp(self.input_state.cursor_pos.0, 0, self.sc_desc.width - 1) as f32,
-                        y: clamp(self.input_state.cursor_pos.1, 0, self.sc_desc.height - 1) as f32,
+                        x: clamp(self.input_state.cursor_pos.0, 0, self.gpu.sc_desc.width - 1)
+                            as f32,
+                        y: clamp(
+                            self.input_state.cursor_pos.1,
+                            0,
+                            self.gpu.sc_desc.height - 1,
+                        ) as f32,
                         z: 0.0,
                     },
                 },
@@ -831,29 +776,43 @@ impl App {
             );
         }
 
-        let uniform_buf = self
+        let start_drag = if let input_state::Drag::Dragging { x0, y0, .. } = self.input_state.drag {
+            (x0 as f32, y0 as f32)
+        } else {
+            (
+                self.input_state.cursor_pos.0 as f32,
+                self.input_state.cursor_pos.1 as f32,
+            )
+        };
+
+        let ub_misc = self
+            .gpu
             .device
-            .create_buffer_mapped(2, wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::COPY_DST)
+            .create_buffer_mapped(6, wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::COPY_DST)
             .fill_from_slice(&[
-                self.input_state.cursor_pos.0 as f32 / self.sc_desc.width as f32,
-                self.input_state.cursor_pos.1 as f32 / self.sc_desc.height as f32,
+                self.input_state.cursor_pos.0 as f32,
+                self.input_state.cursor_pos.1 as f32,
+                self.gpu.sc_desc.width as f32,
+                self.gpu.sc_desc.height as f32,
+                start_drag.0,
+                start_drag.1,
             ]);
 
-        encoder_render.copy_buffer_to_buffer(&uniform_buf, 0, &self.ub_misc, 0, 8);
+        encoder_render.copy_buffer_to_buffer(&ub_misc, 0, &self.ub_misc, 0, 6 * 4);
 
         self.heightmap_gpu.update_uniform(
-            &self.device,
+            &self.gpu.device,
             &mut encoder_render,
             self.game_state.position_smooth.x,
             self.game_state.position_smooth.y,
         );
 
         camera::update_camera_uniform(
-            (self.sc_desc.width, self.sc_desc.height),
+            (self.gpu.sc_desc.width, self.gpu.sc_desc.height),
             &self.game_state.position_smooth,
             &self.game_state.dir_smooth,
             &self.ub_camera_mat,
-            &self.device,
+            &self.gpu.device,
             &mut encoder_render,
         );
 
@@ -925,7 +884,7 @@ impl App {
 
             self.postfx.render(
                 &mut rpass,
-                &self.device,
+                &self.gpu.device,
                 &self.bind_group,
                 &self.position_att_view,
             );
@@ -936,7 +895,7 @@ impl App {
             log::trace!("imgui render");
             self.imgui_wrap
                 .platform
-                .prepare_frame(self.imgui_wrap.imgui.io_mut(), &self.window)
+                .prepare_frame(self.imgui_wrap.imgui.io_mut(), &self.gpu.window)
                 .expect("Failed to prepare frame");
 
             let ui: Ui = self.imgui_wrap.imgui.frame();
@@ -945,6 +904,7 @@ impl App {
                 let mut_fps = &mut self.input_state.fps;
                 let debug_i1 = &mut self.input_state.debug_i1;
                 let mut rebuild_heightmap = false;
+                let mut reload_shader = false;
                 let stats_window = imgui::Window::new(im_str!("Statistics"));
                 stats_window
                     .size([400.0, 200.0], imgui::Condition::FirstUseEver)
@@ -960,6 +920,8 @@ impl App {
                         if imgui::Slider::new(im_str!("debug_i1"), 1..=1000).build(&ui, debug_i1) {
                             rebuild_heightmap = true;
                         }
+
+                        reload_shader = ui.small_button(im_str!("reload shader"));
                     });
 
                 self.game_state
@@ -968,18 +930,31 @@ impl App {
 
                 self.phy_state.draw_ui(&ui);
 
+                if reload_shader {
+                    self.postfx.reload_shader(
+                        &self.gpu.device,
+                        &self.bind_group_layout,
+                        self.gpu.sc_desc.format,
+                    )
+                }
+
                 if true || rebuild_heightmap {
                     //                    let t = self.game_state.start_time.elapsed().as_secs_f32();
                 }
             }
-            self.imgui_wrap.platform.prepare_render(&ui, &self.window);
+            self.imgui_wrap
+                .platform
+                .prepare_render(&ui, &self.gpu.window);
             self.imgui_wrap
                 .renderer
-                .render(ui, &self.device, &mut encoder_render, &frame.view)
+                .render(ui, &self.gpu.device, &mut encoder_render, &frame.view)
                 .expect("Rendering failed");
         }
 
-        self.device.get_queue().submit(&[encoder_render.finish()]);
+        self.gpu
+            .device
+            .get_queue()
+            .submit(&[encoder_render.finish()]);
 
         self.input_state.update();
 
@@ -1000,7 +975,7 @@ impl App {
     }
 
     pub fn map_read_async_msg(&mut self, vec: Vec<f32>) {
-        if vec.len() == 4 && vec[3] != 0.0 {
+        if vec.len() == 4 {
             self.game_state.mouse_world_pos = Some(Vector3::new(vec[0], vec[1], vec[2]));
         } else {
             self.game_state.mouse_world_pos = None;
@@ -1008,6 +983,30 @@ impl App {
     }
 
     pub fn receive(&mut self) {
+        let msg: std::result::Result<
+            notify::Result<notify::event::Event>,
+            crossbeam_channel::TryRecvError,
+        > = self.receiver_notify.try_recv();
+        match msg {
+            Ok(Ok(event)) => {
+                println!("notify {:?}", event);
+
+                if event.paths.iter().any(|p| {
+                    p.file_name().iter().any(|name| {
+                        name.to_os_string() == "post.frag" || name.to_os_string() == "post.vert"
+                    })
+                }) {
+                    println!("Reloading post.vert/post.frag");
+                    self.postfx.reload_shader(
+                        &self.gpu.device,
+                        &self.bind_group_layout,
+                        self.gpu.sc_desc.format,
+                    );
+                }
+            }
+            _ => {}
+        }
+
         match self.receiver_to_app.try_recv() {
             Ok(x) => {
                 log::trace!("receive: {:?}", x);

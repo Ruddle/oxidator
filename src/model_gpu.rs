@@ -49,13 +49,15 @@ impl ModelGpu {
 
         // Create the render pipeline
         let vs_bytes = glsl_compiler::load(
-            include_str!("shader/cube_instanced.vert"),
+            "shader/cube_instanced.vert",
             glsl_compiler::ShaderStage::Vertex,
-        );
+        )
+        .unwrap();
         let fs_bytes = glsl_compiler::load(
-            include_str!("shader/cube_instanced.frag"),
+            "shader/cube_instanced.frag",
             glsl_compiler::ShaderStage::Fragment,
-        );
+        )
+        .unwrap();
         let vs_module = device.create_shader_module(&vs_bytes);
         let fs_module = device.create_shader_module(&fs_bytes);
 
@@ -119,7 +121,7 @@ impl ModelGpu {
                     ],
                 },
                 wgpu::VertexBufferDescriptor {
-                    stride: (4 * 16) as wgpu::BufferAddress,
+                    stride: (4 * 17) as wgpu::BufferAddress,
                     step_mode: wgpu::InputStepMode::Instance,
                     attributes: &[
                         wgpu::VertexAttributeDescriptor {
@@ -141,6 +143,11 @@ impl ModelGpu {
                             format: wgpu::VertexFormat::Float4,
                             offset: 4 * 12,
                             shader_location: 5,
+                        },
+                        wgpu::VertexAttributeDescriptor {
+                            format: wgpu::VertexFormat::Float,
+                            offset: 4 * 16,
+                            shader_location: 6,
                         },
                     ],
                 },
@@ -169,17 +176,17 @@ impl ModelGpu {
         rpass.draw_indexed(0..self.index_count as u32, 0, 0..self.instance_count as u32);
     }
 
-    pub fn update_instance(&mut self, transforms: &[f32], device: &wgpu::Device) {
+    pub fn update_instance(&mut self, instance_attr: &[f32], device: &wgpu::Device) {
         log::trace!("ModelGpu update_instance");
         let temp_buf = device
             .create_buffer_mapped(
-                transforms.len(),
+                instance_attr.len(),
                 wgpu::BufferUsage::VERTEX, // | wgpu::BufferUsage::COPY_SRC,
             )
-            .fill_from_slice(transforms);
+            .fill_from_slice(instance_attr);
 
         std::mem::replace(&mut self.instance_buf, temp_buf);
-        self.instance_count = transforms.len() as u32 / 16;
+        self.instance_count = instance_attr.len() as u32 / 17;
         //        encoder.copy_buffer_to_buffer(
         //            &temp_buf,
         //            0,

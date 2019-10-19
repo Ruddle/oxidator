@@ -64,9 +64,9 @@ void main() {
 
     float m = 0.1;
     vec3 phong = vec3(ambientColor +
-    lambertian* mix(tex.xyz,tex_checker.xyz,m) +
+    lambertian* mix(vec3(0.5,0.4,0.3),tex_checker.xyz,m) +
     specular*specColor);
 
-    position_att = vec4(pos, 1.0);
+    position_att = vec4(pos, 0.0);
     o_Target =   vec4(phong,1.0);
 }

@@ -3,6 +3,7 @@ mod camera;
 mod fake_texels;
 mod game_state;
 mod glsl_compiler;
+mod gpu;
 mod group_behavior;
 mod heightmap;
 mod heightmap_editor;
@@ -15,6 +16,8 @@ mod phy_state;
 mod post_fx;
 mod utils;
 
+#[macro_use]
+extern crate load_file;
 extern crate crossbeam_channel;
 extern crate nalgebra as na;
 extern crate shaderc;
@@ -36,6 +39,8 @@ pub enum EventLoopMsg {
 //mod test;
 fn main() {
     //    test::main();
+
+    println!("dir: {:?}", std::env::current_dir().unwrap());
 
     env_logger::init();
     log::trace!("Starting actix system");

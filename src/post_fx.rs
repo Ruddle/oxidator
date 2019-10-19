@@ -32,19 +32,29 @@ impl PostFx {
             ],
         });
 
+        let pipeline =
+            Self::create_pipeline(device, &bind_group_layout, main_bind_group_layout, format)
+                .unwrap();
+        PostFx {
+            pipeline,
+            bind_group_layout,
+        }
+    }
+
+    fn create_pipeline(
+        device: &Device,
+        bind_group_layout: &BindGroupLayout,
+        main_bind_group_layout: &BindGroupLayout,
+        format: TextureFormat,
+    ) -> glsl_compiler::Result<wgpu::RenderPipeline> {
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             bind_group_layouts: &[&main_bind_group_layout, &bind_group_layout],
         });
 
         // Create the render pipeline
-        let vs_bytes = glsl_compiler::load(
-            include_str!("shader/post.vert"),
-            glsl_compiler::ShaderStage::Vertex,
-        );
-        let fs_bytes = glsl_compiler::load(
-            include_str!("shader/post.frag"),
-            glsl_compiler::ShaderStage::Fragment,
-        );
+        let vs_bytes = glsl_compiler::load("shader/post.vert", glsl_compiler::ShaderStage::Vertex)?;
+        let fs_bytes =
+            glsl_compiler::load("shader/post.frag", glsl_compiler::ShaderStage::Fragment)?;
         let vs_module = device.create_shader_module(&vs_bytes);
         let fs_module = device.create_shader_module(&fs_bytes);
 
@@ -83,10 +93,24 @@ impl PostFx {
             sample_mask: !0,
             alpha_to_coverage_enabled: false,
         });
-        PostFx {
-            pipeline,
-            bind_group_layout,
-        }
+        Ok(pipeline)
+    }
+
+    pub fn reload_shader(
+        &mut self,
+        device: &Device,
+        main_bind_group_layout: &BindGroupLayout,
+        format: TextureFormat,
+    ) {
+        match Self::create_pipeline(
+            device,
+            &self.bind_group_layout,
+            main_bind_group_layout,
+            format,
+        ) {
+            Ok(pipeline) => self.pipeline = pipeline,
+            Err(x) => println!("{}", x),
+        };
     }
 
     pub fn render(
@@ -96,7 +120,7 @@ impl PostFx {
         main_bind_group: &BindGroup,
         position_att_view: &TextureView,
     ) {
-        log::trace!("ModelGpu render");
+        log::trace!("PostFx render");
         rpass.set_pipeline(&self.pipeline);
         rpass.set_bind_group(0, &main_bind_group, &[]);
         let sampler = device.create_sampler(&wgpu::SamplerDescriptor {

@@ -34,6 +34,10 @@ nphysics3d = "0.12"
 crossbeam-channel = "0.3"
 rand = "0.7.2"
 
+load_file = "1.0.0"
+
+notify = "=5.0.0-pre.1"
+
 [dependencies.imgui-winit-support]
 version = "0.2.1"
 default-features = false
