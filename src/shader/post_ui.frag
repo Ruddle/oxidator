@@ -8,6 +8,7 @@ layout(set = 1, binding = 1) uniform sampler s_pos;
 layout(set = 0, binding = 3) uniform Locals {
     vec2 mouse_pos;
     vec2 resolution;
+    vec2 inv_resolution;
     vec2 start_drag;
 };
 
@@ -60,7 +61,7 @@ void main() {
         color = vec3(0.0,1.0,0.0);
     } else if(!is_selected_area && is_edge2_area){
         alpha = 0.5;
-        color = vec3(0.0,0.0,0.0);
+        color = vec3(0.0,0.5,0.0);
     }
 
     if (start_drag != mouse_pos){

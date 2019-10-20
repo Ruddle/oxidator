@@ -32,6 +32,7 @@ pub struct App {
     forward_depth: wgpu::TextureView,
     position_att: wgpu::Texture,
     position_att_view: wgpu::TextureView,
+
     heightmap_gpu: HeightmapGpu,
     cube_gpu: ModelGpu,
     mobile_gpu: ModelGpu,
@@ -43,6 +44,7 @@ pub struct App {
     ub_misc: wgpu::Buffer,
 
     postfx: post_fx::PostFx,
+    postfxaa: post_fxaa::PostFxaa,
 
     frame_count: u32,
     game_state: game_state::State,
@@ -173,8 +175,8 @@ impl App {
         //2 resolution
         let ub_misc = gpu
             .device
-            .create_buffer_mapped(6, wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::COPY_DST)
-            .fill_from_slice(&[0.0_f32, 0.0, 0.0, 0.0, 0.0, 0.0]);
+            .create_buffer_mapped(8, wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::COPY_DST)
+            .fill_from_slice(&[0.0_f32, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]);
 
         // Create bind group
         let bind_group = gpu.device.create_bind_group(&wgpu::BindGroupDescriptor {
@@ -199,7 +201,7 @@ impl App {
                     binding: 3,
                     resource: wgpu::BindingResource::Buffer {
                         buffer: &ub_misc,
-                        range: 0..(6 * 4),
+                        range: 0..(8 * 4),
                     },
                 },
             ],
@@ -293,6 +295,7 @@ impl App {
         });
 
         let postfx = post_fx::PostFx::new(&gpu.device, &bind_group_layout, format);
+        let postfxaa = post_fxaa::PostFxaa::new(&gpu.device, &bind_group_layout, format);
 
         gpu.device.get_queue().submit(&[init_encoder.finish()]);
 
@@ -344,6 +347,7 @@ impl App {
             position_att,
 
             postfx,
+            postfxaa,
 
             game_state,
             input_state: input_state::InputState::new(),
@@ -534,8 +538,6 @@ impl App {
 
         self.phy_state.step();
 
-        let frame = &self.gpu.swap_chain.get_next_texture();
-
         let mut now = Instant::now();
         let mut delta = now - self.game_state.last_frame;
         let last_compute_time = delta.clone();
@@ -656,24 +658,30 @@ impl App {
             );
 
             let start_proj = std::time::Instant::now();
-            let projected = self.game_state.mobiles.iter().map(|(id, e)| {
+            let projected = self.game_state.mobiles.iter().flat_map(|(id, e)| {
                 let p = e.position.to_homogeneous();
                 let r = view_proj * p;
-                (id, Vector2::new(r.x / r.w, r.y / r.w))
+                //Keeping those of the clipped space in screen (-1 1, -1 1 , 0 1)
+                if r.z > 0.0 && r.x < r.w && r.x > -r.w && r.y < r.w && r.y > -r.w {
+                    Some((id, Vector2::new(r.x / r.w, r.y / r.w)))
+                } else {
+                    None
+                }
             });
 
-            println!("Projecting took {}", start_proj.elapsed().as_micros());
+            // let projected: Vec<_> = projected.collect();
+            // println!("Clipped {}", projected.len());
+            // let projected = projected.into_iter();
+            // println!("Projecting took {}", start_proj.elapsed().as_micros());
 
             let selected: HashSet<String> = projected
                 .filter(|(_, e)| e.x > min_x && e.x < max_x && e.y < max_y && e.y > min_y)
                 .map(|(i, _)| i.clone())
                 .collect();
 
-            self.game_state.selected = selected;
+            println!("Selection took {}", start_proj.elapsed().as_micros());
 
-            for s in self.game_state.selected.iter() {
-                println!("{}", s)
-            }
+            self.game_state.selected = selected;
         }
 
         //Mobile update target
@@ -788,17 +796,19 @@ impl App {
         let ub_misc = self
             .gpu
             .device
-            .create_buffer_mapped(6, wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::COPY_DST)
+            .create_buffer_mapped(8, wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::COPY_DST)
             .fill_from_slice(&[
                 self.input_state.cursor_pos.0 as f32,
                 self.input_state.cursor_pos.1 as f32,
                 self.gpu.sc_desc.width as f32,
                 self.gpu.sc_desc.height as f32,
+                1.0 / self.gpu.sc_desc.width as f32,
+                1.0 / self.gpu.sc_desc.height as f32,
                 start_drag.0,
                 start_drag.1,
             ]);
 
-        encoder_render.copy_buffer_to_buffer(&ub_misc, 0, &self.ub_misc, 0, 6 * 4);
+        encoder_render.copy_buffer_to_buffer(&ub_misc, 0, &self.ub_misc, 0, 8 * 4);
 
         self.heightmap_gpu.update_uniform(
             &self.gpu.device,
@@ -816,13 +826,30 @@ impl App {
             &mut encoder_render,
         );
 
+        let first_color_att = self.gpu.device.create_texture(&wgpu::TextureDescriptor {
+            size: wgpu::Extent3d {
+                width: self.gpu.sc_desc.width,
+                height: self.gpu.sc_desc.height,
+                depth: 1,
+            },
+            array_layer_count: 1,
+            mip_level_count: 1,
+            sample_count: 1,
+            dimension: wgpu::TextureDimension::D2,
+            format: wgpu::TextureFormat::Bgra8UnormSrgb,
+            usage: wgpu::TextureUsage::OUTPUT_ATTACHMENT | wgpu::TextureUsage::SAMPLED,
+        });
+
+        let first_color_att_view = first_color_att.create_default_view();
+
+        let frame = &self.gpu.swap_chain.get_next_texture();
         //Pass
         {
             log::trace!("begin_render_pass");
             let mut rpass = encoder_render.begin_render_pass(&wgpu::RenderPassDescriptor {
                 color_attachments: &[
                     wgpu::RenderPassColorAttachmentDescriptor {
-                        attachment: &frame.view,
+                        attachment: &first_color_att_view,
                         resolve_target: None,
                         load_op: wgpu::LoadOp::Clear,
                         store_op: wgpu::StoreOp::Store,
@@ -867,7 +894,7 @@ impl App {
             log::trace!("begin_post_render_pass");
             let mut rpass = encoder_render.begin_render_pass(&wgpu::RenderPassDescriptor {
                 color_attachments: &[wgpu::RenderPassColorAttachmentDescriptor {
-                    attachment: &frame.view,
+                    attachment: &first_color_att_view,
                     resolve_target: None,
                     load_op: wgpu::LoadOp::Load,
                     store_op: wgpu::StoreOp::Store,
@@ -887,6 +914,34 @@ impl App {
                 &self.gpu.device,
                 &self.bind_group,
                 &self.position_att_view,
+            );
+        }
+
+        //Post fxaa pass
+        {
+            log::trace!("begin_post_render_pass");
+            let mut rpass = encoder_render.begin_render_pass(&wgpu::RenderPassDescriptor {
+                color_attachments: &[wgpu::RenderPassColorAttachmentDescriptor {
+                    attachment: &frame.view,
+                    resolve_target: None,
+                    load_op: wgpu::LoadOp::Clear,
+                    store_op: wgpu::StoreOp::Store,
+                    clear_color: wgpu::Color {
+                        r: 0.1,
+                        g: 0.2,
+                        b: 0.3,
+                        a: 1.0,
+                    },
+                }],
+
+                depth_stencil_attachment: None,
+            });
+
+            self.postfxaa.render(
+                &mut rpass,
+                &self.gpu.device,
+                &self.bind_group,
+                &first_color_att_view,
             );
         }
 
@@ -935,7 +990,12 @@ impl App {
                         &self.gpu.device,
                         &self.bind_group_layout,
                         self.gpu.sc_desc.format,
-                    )
+                    );
+                    self.postfxaa.reload_shader(
+                        &self.gpu.device,
+                        &self.bind_group_layout,
+                        self.gpu.sc_desc.format,
+                    );
                 }
 
                 if true || rebuild_heightmap {
@@ -993,11 +1053,25 @@ impl App {
 
                 if event.paths.iter().any(|p| {
                     p.file_name().iter().any(|name| {
-                        name.to_os_string() == "post.frag" || name.to_os_string() == "post.vert"
+                        name.to_os_string() == "post_ui.frag" || name.to_os_string() == "post.vert"
                     })
                 }) {
-                    println!("Reloading post.vert/post.frag");
+                    println!("Reloading post.vert/post_ui.frag");
                     self.postfx.reload_shader(
+                        &self.gpu.device,
+                        &self.bind_group_layout,
+                        self.gpu.sc_desc.format,
+                    );
+                }
+
+                if event.paths.iter().any(|p| {
+                    p.file_name().iter().any(|name| {
+                        name.to_os_string() == "post_fxaa.frag"
+                            || name.to_os_string() == "post.vert"
+                    })
+                }) {
+                    println!("Reloading post.vert/post_fxaa.frag");
+                    self.postfxaa.reload_shader(
                         &self.gpu.device,
                         &self.bind_group_layout,
                         self.gpu.sc_desc.format,

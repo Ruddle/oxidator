@@ -175,7 +175,9 @@ impl Group {
 
                             collision_avoid_priority = ((4.0 - closeness) / 4.0).max(0.0).min(0.8);
 
-                            collision_avoid_dir = if mobile.speed.dot(&nearest.speed) < 0.0 {
+                            collision_avoid_dir = if nearest.speed.norm_squared() > 0.01
+                                && mobile.speed.dot(&nearest.speed) < 0.0
+                            {
                                 let u =
                                     (mobile.position.coords - nearest.position.coords).normalize();
 
