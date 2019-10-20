@@ -11,6 +11,7 @@ use imgui_winit_support::WinitPlatform;
 use model_gpu::ModelGpu;
 use std::collections::{HashMap, HashSet};
 use std::time::Instant;
+use utils::time;
 use wgpu::{BufferMapAsyncResult, Extent3d, SwapChain, TextureFormat};
 
 use log::info;
@@ -29,6 +30,7 @@ pub struct App {
     //Physics
     phy_state: phy_state::State,
 
+    first_color_att_view: wgpu::TextureView,
     forward_depth: wgpu::TextureView,
     position_att: wgpu::Texture,
     position_att_view: wgpu::TextureView,
@@ -330,6 +332,22 @@ impl App {
             (rx, watcher)
         };
 
+        let first_color_att = gpu.device.create_texture(&wgpu::TextureDescriptor {
+            size: wgpu::Extent3d {
+                width: gpu.sc_desc.width,
+                height: gpu.sc_desc.height,
+                depth: 1,
+            },
+            array_layer_count: 1,
+            mip_level_count: 1,
+            sample_count: 1,
+            dimension: wgpu::TextureDimension::D2,
+            format: wgpu::TextureFormat::Bgra8UnormSrgb,
+            usage: wgpu::TextureUsage::OUTPUT_ATTACHMENT | wgpu::TextureUsage::SAMPLED,
+        });
+
+        let first_color_att_view = first_color_att.create_default_view();
+
         // Done
         let this = App {
             gpu,
@@ -342,6 +360,7 @@ impl App {
             cube_gpu,
             mobile_gpu,
             heightmap_gpu,
+            first_color_att_view,
             forward_depth: depth_texture.create_default_view(),
             position_att_view: position_att.create_default_view(),
             position_att,
@@ -366,6 +385,23 @@ impl App {
 
     fn resize(&mut self) -> Option<wgpu::CommandBuffer> {
         log::trace!("resize");
+
+        let first_color_att = self.gpu.device.create_texture(&wgpu::TextureDescriptor {
+            size: wgpu::Extent3d {
+                width: self.gpu.sc_desc.width,
+                height: self.gpu.sc_desc.height,
+                depth: 1,
+            },
+            array_layer_count: 1,
+            mip_level_count: 1,
+            sample_count: 1,
+            dimension: wgpu::TextureDimension::D2,
+            format: wgpu::TextureFormat::Bgra8UnormSrgb,
+            usage: wgpu::TextureUsage::OUTPUT_ATTACHMENT | wgpu::TextureUsage::SAMPLED,
+        });
+
+        self.first_color_att_view = first_color_att.create_default_view();
+
         let depth_texture = self.gpu.device.create_texture(&wgpu::TextureDescriptor {
             size: wgpu::Extent3d {
                 width: self.gpu.sc_desc.width,
@@ -554,12 +590,10 @@ impl App {
         delta = now - self.game_state.last_frame;
         self.game_state.last_frame = now;
         let last_compute_time_total = delta.clone();
-
         let delta_sim_sec = last_compute_time_total.as_secs_f32();
-
         self.frame_count += 1;
 
-        // Movements
+        // Camera Movements
         {
             use winit::event::VirtualKeyCode as Key;
             let key_pressed = &self.input_state.key_pressed;
@@ -625,12 +659,6 @@ impl App {
                 * 15.0;
         }
 
-        //Render
-        let mut encoder_render = self
-            .gpu
-            .device
-            .create_command_encoder(&wgpu::CommandEncoderDescriptor { todo: 0 });
-
         //Phy Drawing
         // {
         //     let cubes_t = self.phy_state.cubes_transform();
@@ -669,11 +697,6 @@ impl App {
                 }
             });
 
-            // let projected: Vec<_> = projected.collect();
-            // println!("Clipped {}", projected.len());
-            // let projected = projected.into_iter();
-            // println!("Projecting took {}", start_proj.elapsed().as_micros());
-
             let selected: HashSet<String> = projected
                 .filter(|(_, e)| e.x > min_x && e.x < max_x && e.y < max_y && e.y > min_y)
                 .map(|(i, _)| i.clone())
@@ -693,12 +716,15 @@ impl App {
         );
 
         //Mobile update
-        group_behavior::Group::update_mobiles(
-            delta_sim_sec,
-            &mut self.game_state.mobiles,
-            &self.heightmap_gpu,
-        );
-        {
+        let us_update_mobiles = time(|| {
+            group_behavior::Group::update_mobiles(
+                delta_sim_sec,
+                &mut self.game_state.mobiles,
+                &self.heightmap_gpu,
+            )
+        });
+
+        let us_mobile_to_gpu = time(|| {
             let mut positions = Vec::with_capacity(self.game_state.mobiles.len() * 17);
             for mobile in self.game_state.mobiles.values() {
                 let mat = Matrix4::face_towards(
@@ -719,10 +745,10 @@ impl App {
 
             self.mobile_gpu
                 .update_instance(&positions[..], &self.gpu.device);
-        }
+        });
 
         //Action
-
+        now = Instant::now();
         if let Some(mouse_world_pos) = self.game_state.mouse_world_pos {
             self.game_state.heightmap_editor.handle_user_input(
                 &self.input_state.mouse_pressed,
@@ -730,9 +756,18 @@ impl App {
                 &mut self.heightmap_gpu,
             );
         }
+        let us_heightmap_editor = now.elapsed().as_micros();
 
+        //Render
+        let mut encoder_render = self
+            .gpu
+            .device
+            .create_command_encoder(&wgpu::CommandEncoderDescriptor { todo: 0 });
+
+        now = Instant::now();
         self.heightmap_gpu
             .step(&self.gpu.device, &mut encoder_render);
+        let us_heightmap_step = now.elapsed().as_micros();
 
         let cursor_sample_position = self
             .gpu
@@ -826,30 +861,16 @@ impl App {
             &mut encoder_render,
         );
 
-        let first_color_att = self.gpu.device.create_texture(&wgpu::TextureDescriptor {
-            size: wgpu::Extent3d {
-                width: self.gpu.sc_desc.width,
-                height: self.gpu.sc_desc.height,
-                depth: 1,
-            },
-            array_layer_count: 1,
-            mip_level_count: 1,
-            sample_count: 1,
-            dimension: wgpu::TextureDimension::D2,
-            format: wgpu::TextureFormat::Bgra8UnormSrgb,
-            usage: wgpu::TextureUsage::OUTPUT_ATTACHMENT | wgpu::TextureUsage::SAMPLED,
-        });
-
-        let first_color_att_view = first_color_att.create_default_view();
-
         let frame = &self.gpu.swap_chain.get_next_texture();
+
+        now = Instant::now();
         //Pass
         {
             log::trace!("begin_render_pass");
             let mut rpass = encoder_render.begin_render_pass(&wgpu::RenderPassDescriptor {
                 color_attachments: &[
                     wgpu::RenderPassColorAttachmentDescriptor {
-                        attachment: &first_color_att_view,
+                        attachment: &self.first_color_att_view,
                         resolve_target: None,
                         load_op: wgpu::LoadOp::Clear,
                         store_op: wgpu::StoreOp::Store,
@@ -894,7 +915,7 @@ impl App {
             log::trace!("begin_post_render_pass");
             let mut rpass = encoder_render.begin_render_pass(&wgpu::RenderPassDescriptor {
                 color_attachments: &[wgpu::RenderPassColorAttachmentDescriptor {
-                    attachment: &first_color_att_view,
+                    attachment: &self.first_color_att_view,
                     resolve_target: None,
                     load_op: wgpu::LoadOp::Load,
                     store_op: wgpu::StoreOp::Store,
@@ -941,9 +962,10 @@ impl App {
                 &mut rpass,
                 &self.gpu.device,
                 &self.bind_group,
-                &first_color_att_view,
+                &self.first_color_att_view,
             );
         }
+        let us_3d_render_pass = now.elapsed().as_micros();
 
         //Imgui
         {
@@ -971,6 +993,12 @@ impl App {
                             " \" Capped: {}us",
                             last_compute_time_total.as_micros()
                         ));
+
+                        ui.text(im_str!("us_update_mobiles: {}us", us_update_mobiles));
+                        ui.text(im_str!("us_mobile_to_gpu: {}us", us_mobile_to_gpu));
+                        ui.text(im_str!("us_heightmap_editor: {}us", us_heightmap_editor));
+                        ui.text(im_str!("us_heightmap_step: {}us", us_heightmap_step));
+                        ui.text(im_str!("us_3d_render_pass: {}us", us_3d_render_pass));
 
                         if imgui::Slider::new(im_str!("debug_i1"), 1..=1000).build(&ui, debug_i1) {
                             rebuild_heightmap = true;

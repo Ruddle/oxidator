@@ -22,3 +22,12 @@ pub fn pop_set<T: Clone + Eq + std::hash::Hash>(set: &mut HashSet<T>) -> T {
     let elt = set.iter().next().cloned().unwrap();
     set.take(&elt).unwrap()
 }
+
+pub fn time<F, K>(f: F) -> u128
+where
+    F: FnOnce() -> K,
+{
+    let start = std::time::Instant::now();
+    f();
+    start.elapsed().as_micros()
+}
