@@ -7,13 +7,13 @@ pub struct Group {}
 
 impl Group {
     pub fn update_mobile_target(
-        mouse_triggered: &HashSet<winit::event::MouseButton>,
+        mouse_trigger: &HashSet<winit::event::MouseButton>,
         mouse_world_pos: Option<Vector3<f32>>,
         selected: &HashSet<String>,
         mobiles: &mut HashMap<String, mobile::Mobile>,
     ) {
         match (
-            mouse_triggered.contains(&winit::event::MouseButton::Right),
+            mouse_trigger.contains(&winit::event::MouseButton::Right),
             mouse_world_pos,
         ) {
             (true, Some(mouse_pos_world)) => {

@@ -14,5 +14,5 @@ void main() {
 
     position_att = vec4(world_pos, v_param );
 
-    o_Target =    mix(tex, vec4(0.5,0.5,0.5,1.0),0.01);
+    o_Target =    mix(tex, vec4(0.0,0.0,0.0,1.0),0.5);
 }

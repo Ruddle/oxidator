@@ -32,7 +32,7 @@ impl WgpuState {
             power_preference: wgpu::PowerPreference::HighPerformance,
         });
 
-        let mut device: wgpu::Device = adapter.request_device(&wgpu::DeviceDescriptor {
+        let device: wgpu::Device = adapter.request_device(&wgpu::DeviceDescriptor {
             extensions: wgpu::Extensions {
                 anisotropic_filtering: false,
             },

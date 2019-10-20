@@ -11,8 +11,11 @@ pub struct InputState {
     pub key_pressed: HashSet<winit::event::VirtualKeyCode>,
     pub mouse_pressed: HashSet<winit::event::MouseButton>,
 
-    pub key_triggered: HashSet<winit::event::VirtualKeyCode>,
-    pub mouse_triggered: HashSet<winit::event::MouseButton>,
+    pub key_trigger: HashSet<winit::event::VirtualKeyCode>,
+    pub mouse_trigger: HashSet<winit::event::MouseButton>,
+
+    pub key_release: HashSet<winit::event::VirtualKeyCode>,
+    pub mouse_release: HashSet<winit::event::MouseButton>,
 
     pub drag: Drag,
 
@@ -27,8 +30,10 @@ impl InputState {
         InputState {
             key_pressed: HashSet::new(),
             mouse_pressed: HashSet::new(),
-            key_triggered: HashSet::new(),
-            mouse_triggered: HashSet::new(),
+            key_trigger: HashSet::new(),
+            mouse_trigger: HashSet::new(),
+            key_release: HashSet::new(),
+            mouse_release: HashSet::new(),
             last_scroll: 0.0,
             fps: 144,
             debug_i1: 1,
@@ -38,8 +43,10 @@ impl InputState {
     }
 
     pub fn update(&mut self) {
-        self.key_triggered.clear();
-        self.mouse_triggered.clear();
+        self.key_trigger.clear();
+        self.mouse_trigger.clear();
+        self.mouse_release.clear();
+        self.key_release.clear();
         if let Drag::End { .. } = self.drag {
             self.drag = Drag::None;
         }
