@@ -87,7 +87,7 @@ impl App {
         }
 
         // Camera Movements
-        {
+        if self.main_menu != MainMode::Home {
             use winit::event::VirtualKeyCode as Key;
             let key_pressed = &self.input_state.key_pressed;
             let on = |vkc| key_pressed.contains(&vkc);
@@ -131,7 +131,12 @@ impl App {
                     rotation.z -= 1.0
                 }
             } else {
-                offset.z = -self.input_state.last_scroll * k * 20.0;
+                if let Some(mouse_world_pos) = self.game_state.mouse_world_pos {
+                    let u = (mouse_world_pos - self.game_state.position.coords).normalize();
+                    offset += self.input_state.last_scroll * u * k * 32.0;
+                } else {
+                    offset.z = -self.input_state.last_scroll * k * 20.0;
+                }
             }
 
             self.input_state.last_scroll = 0.0;
@@ -308,9 +313,9 @@ impl App {
                         load_op: wgpu::LoadOp::Clear,
                         store_op: wgpu::StoreOp::Store,
                         clear_color: wgpu::Color {
-                            r: 0.0,
-                            g: 0.0,
-                            b: 0.0,
+                            r: -1.0,
+                            g: -1.0,
+                            b: -1.0,
                             a: 0.0,
                         },
                     },

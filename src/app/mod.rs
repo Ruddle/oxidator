@@ -577,7 +577,7 @@ impl App {
     }
 
     pub fn map_read_async_msg(&mut self, vec: Vec<f32>) {
-        if vec.len() == 4 {
+        if vec.len() == 4 && vec[0] >= 0.0 {
             self.game_state.mouse_world_pos = Some(Vector3::new(vec[0], vec[1], vec[2]));
         } else {
             self.game_state.mouse_world_pos = None;
