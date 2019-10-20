@@ -619,6 +619,20 @@ impl App {
                         self.gpu.sc_desc.format,
                     );
                 }
+
+                if event.paths.iter().any(|p| {
+                    p.file_name().iter().any(|name| {
+                        name.to_os_string() == "heightmap.frag"
+                            || name.to_os_string() == "heightmap.vert"
+                    })
+                }) {
+                    println!("Reloading heightmap.vert/heightmap.frag");
+                    self.heightmap_gpu.reload_shader(
+                        &self.gpu.device,
+                        &self.bind_group_layout,
+                        self.gpu.sc_desc.format,
+                    );
+                }
             }
             _ => {}
         }

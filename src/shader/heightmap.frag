@@ -25,6 +25,22 @@ const vec3 ambientColor = vec3(0.05);
 const vec3 diffuseColor = vec3(1.0, 1.0, 1.0);
 const vec3 specColor = vec3(0.8);
 
+float linlerp(float v, float min, float max){
+    return (v-min)/(max-min);
+}
+
+vec3 normal_at(vec2 uv,float lod){
+    float r=  textureLod(sampler2D(height_tex, height_sampler),uv +vec2(1,0)/ vec2(width,height),lod ).r;
+    float l=  textureLod(sampler2D(height_tex, height_sampler),uv+ vec2(-1,0)/ vec2(width,height),lod ).r;
+    float u=  textureLod(sampler2D(height_tex, height_sampler),uv+vec2(0,1)/ vec2(width,height),lod ).r;
+    float d=  textureLod(sampler2D(height_tex, height_sampler),uv +vec2(0,-1)/ vec2(width,height),lod ).r;
+    return normalize(vec3(-(r-l), (d-u), 2));
+}
+
+float slope_of(vec3 normal){
+    return 1-asin(normal.z)/(3.141592/2.0);
+}
+
 void main() {
     vec4 tex = texture(sampler2D(t_Color, s_Color), v_TexCoord);
     vec4 tex_checker = texture(sampler2D(t_Color_checker, s_Color_checker),
@@ -38,15 +54,27 @@ void main() {
 
     vec3 pos = vec3(pos_xy, textureLod(sampler2D(height_tex, height_sampler),v_TexCoord,lod ).r );
 
-    vec2 a_xy=  pos_xy+vec2(1,0) ;
-    vec3 a = vec3(a_xy, textureLod(sampler2D(height_tex, height_sampler),a_xy/ vec2(width,height),lod ).r );
-    vec2 b_xy=  pos_xy+vec2(0,1) ;
-    vec3 b = vec3(b_xy, textureLod(sampler2D(height_tex, height_sampler),b_xy/ vec2(width,height),lod ).r );
-    vec3 normal = normalize(cross(a-pos, b-pos));
+    vec3 normal = normal_at(v_TexCoord,lod);
+    float slope = slope_of(normal);
 
+    vec3 diffuse=  mix(vec3(0.5,0.4,0.3),tex_checker.xyz,0.1);
+
+    float ground_end= 1/90.0;
+    float grass_start= 2/90.0;
+    vec3 grass_color = vec3(0.45,0.7,0.2);
+    
+    if  (slope > ground_end){
+        diffuse = mix(diffuse,grass_color, linlerp(slope,ground_end,grass_start) );
+    }
+    if (slope > grass_start){
+        diffuse= grass_color;
+    }
+    if (slope > 45/90.0){
+        diffuse = vec3(0.5);
+    }
 
     //blinn phong
-    vec3 lightPos = vec3(0.0*width/2.0,0.0*height/2.0,2000.0);
+    vec3 lightPos = vec3(0.0*width/2.0,1.0*height/2.0,2000.0);
 
     vec3 vertPos = pos;
     vec3 lightDir = normalize(lightPos - vertPos);
@@ -59,12 +87,10 @@ void main() {
         vec3 halfDir = normalize(lightDir + viewDir);
         float specAngle = max(dot(halfDir, normal), 0.0);
         specular = pow(specAngle, 16.0);
-
     }
-
-    float m = 0.1;
+    
     vec3 phong = vec3(ambientColor +
-    lambertian* mix(vec3(0.5,0.4,0.3),tex_checker.xyz,m) +
+    lambertian* diffuse +
     specular*specColor);
 
     position_att = vec4(pos, 0.0);

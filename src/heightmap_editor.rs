@@ -60,8 +60,8 @@ impl State {
                 ui.radio_button(im_str!("Noise"), mode, Mode::Noise);
 
                 if mode == &mut Mode::Noise {
-                    imgui::Slider::new(im_str!("noise frequency"), 0.0_f64..=100.0)
-                        .power(2.0)
+                    imgui::Slider::new(im_str!("noise frequency"), 0.0_f64..=200.0)
+                        .power(3.0)
                         .build(&ui, noise_freq);
 
                     update_noise = ui

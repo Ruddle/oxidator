@@ -11,6 +11,7 @@ pub const MAX_Z: f32 = 511.0;
 
 pub struct HeightmapGpu {
     pipeline: RenderPipeline,
+    bind_group_layout: BindGroupLayout,
     bind_group: BindGroup,
     vertex_buf: wgpu::Buffer,
     index_buf: wgpu::Buffer,
@@ -298,7 +299,6 @@ impl HeightmapGpu {
             .create_buffer_mapped(5, wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::COPY_DST)
             .fill_from_slice(&map_size_cam_pos);
 
-        // Create pipeline layout
         let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             bindings: &[
                 wgpu::BindGroupLayoutBinding {
@@ -348,6 +348,10 @@ impl HeightmapGpu {
             ],
         });
 
+        let pipeline =
+            Self::create_pipeline(device, &bind_group_layout, main_bind_group_layout, format)
+                .unwrap();
+
         // Create bind group
         let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
             layout: &bind_group_layout,
@@ -386,19 +390,81 @@ impl HeightmapGpu {
             ],
         });
 
+        let (vertex_data, height_index_data) = heightmap::create_vertex_index_rings(ring_size);
+        //            heightmap::create_vertices_indices(width, height, 0.0);
+        let vertex_buf = device
+            .create_buffer_mapped(vertex_data.len(), wgpu::BufferUsage::VERTEX)
+            .fill_from_slice(&vertex_data);
+
+        let index_buf = device
+            .create_buffer_mapped(height_index_data.len(), wgpu::BufferUsage::INDEX)
+            .fill_from_slice(&height_index_data);
+
+        let index_count = height_index_data.len();
+
+        let mut zone_to_update_mip0 = Vec::new();
+
+        for _ in (0..=width).step_by(ZONE_SIZE_MIP0) {
+            for _ in (0..=height).step_by(ZONE_SIZE_MIP0) {
+                zone_to_update_mip0.push(0);
+            }
+        }
+
+        let mut zone_to_update_mip1 = Vec::new();
+
+        for _ in (0..=width).step_by(ZONE_SIZE_MIP0 * 2) {
+            for _ in (0..=height).step_by(ZONE_SIZE_MIP0 * 2) {
+                zone_to_update_mip1.push(0);
+            }
+        }
+
+        let mut zone_to_update_mip2 = Vec::new();
+        for _ in (0..=width).step_by(ZONE_SIZE_MIP0 * 4) {
+            for _ in (0..=height).step_by(ZONE_SIZE_MIP0 * 4) {
+                zone_to_update_mip2.push(0);
+            }
+        }
+
+        HeightmapGpu {
+            pipeline,
+            bind_group,
+            bind_group_layout,
+            vertex_buf,
+            index_buf,
+            index_count,
+            width,
+            height,
+            texels,
+            ring_size,
+            texture,
+            texture_lod,
+            uniform_buf,
+            zone_to_update_mip0,
+            zone_to_update_mip1,
+            zone_to_update_mip2,
+            mip4_to_update: false,
+        }
+    }
+
+    pub fn create_pipeline(
+        device: &Device,
+        bind_group_layout: &BindGroupLayout,
+        main_bind_group_layout: &BindGroupLayout,
+        format: TextureFormat,
+    ) -> glsl_compiler::Result<wgpu::RenderPipeline> {
+        // Create pipeline layout
+
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-            bind_group_layouts: &[main_bind_group_layout, &bind_group_layout],
+            bind_group_layouts: &[main_bind_group_layout, bind_group_layout],
         });
 
         // Create the render pipeline
         let vs_bytes =
-            glsl_compiler::load("shader/heightmap.vert", glsl_compiler::ShaderStage::Vertex)
-                .unwrap();
+            glsl_compiler::load("shader/heightmap.vert", glsl_compiler::ShaderStage::Vertex)?;
         let fs_bytes = glsl_compiler::load(
             "shader/heightmap.frag",
             glsl_compiler::ShaderStage::Fragment,
-        )
-        .unwrap();
+        )?;
         let vs_module = device.create_shader_module(&vs_bytes);
         let fs_module = device.create_shader_module(&fs_bytes);
 
@@ -464,60 +530,24 @@ impl HeightmapGpu {
             sample_mask: !0,
             alpha_to_coverage_enabled: false,
         });
+        Ok(pipeline)
+    }
 
-        let (vertex_data, height_index_data) = heightmap::create_vertex_index_rings(ring_size);
-        //            heightmap::create_vertices_indices(width, height, 0.0);
-        let vertex_buf = device
-            .create_buffer_mapped(vertex_data.len(), wgpu::BufferUsage::VERTEX)
-            .fill_from_slice(&vertex_data);
-
-        let index_buf = device
-            .create_buffer_mapped(height_index_data.len(), wgpu::BufferUsage::INDEX)
-            .fill_from_slice(&height_index_data);
-
-        let index_count = height_index_data.len();
-
-        let mut zone_to_update_mip0 = Vec::new();
-
-        for _ in (0..=width).step_by(ZONE_SIZE_MIP0) {
-            for _ in (0..=height).step_by(ZONE_SIZE_MIP0) {
-                zone_to_update_mip0.push(0);
-            }
-        }
-
-        let mut zone_to_update_mip1 = Vec::new();
-
-        for _ in (0..=width).step_by(ZONE_SIZE_MIP0 * 2) {
-            for _ in (0..=height).step_by(ZONE_SIZE_MIP0 * 2) {
-                zone_to_update_mip1.push(0);
-            }
-        }
-
-        let mut zone_to_update_mip2 = Vec::new();
-        for _ in (0..=width).step_by(ZONE_SIZE_MIP0 * 4) {
-            for _ in (0..=height).step_by(ZONE_SIZE_MIP0 * 4) {
-                zone_to_update_mip2.push(0);
-            }
-        }
-
-        HeightmapGpu {
-            pipeline,
-            bind_group,
-            vertex_buf,
-            index_buf,
-            index_count,
-            width,
-            height,
-            texels,
-            ring_size,
-            texture,
-            texture_lod,
-            uniform_buf,
-            zone_to_update_mip0,
-            zone_to_update_mip1,
-            zone_to_update_mip2,
-            mip4_to_update: false,
-        }
+    pub fn reload_shader(
+        &mut self,
+        device: &Device,
+        main_bind_group_layout: &BindGroupLayout,
+        format: TextureFormat,
+    ) {
+        match Self::create_pipeline(
+            device,
+            &self.bind_group_layout,
+            main_bind_group_layout,
+            format,
+        ) {
+            Ok(pipeline) => self.pipeline = pipeline,
+            Err(x) => println!("{}", x),
+        };
     }
 
     pub fn mipmap_update(
