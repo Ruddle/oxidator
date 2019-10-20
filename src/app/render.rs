@@ -475,7 +475,7 @@ impl App {
                     MainMode::MapEditor => {
                         self.game_state
                             .heightmap_editor
-                            .draw_ui(&ui, &self.heightmap_gpu);
+                            .draw_ui(&ui, &mut self.heightmap_gpu);
                     }
                 }
 

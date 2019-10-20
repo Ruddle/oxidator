@@ -37,7 +37,7 @@ impl State {
         }
     }
 
-    pub fn draw_ui(&mut self, ui: &Ui, heightmap_gpu: &heightmap_gpu::HeightmapGpu) {
+    pub fn draw_ui(&mut self, ui: &Ui, heightmap_gpu: &mut heightmap_gpu::HeightmapGpu) {
         let pen_radius = &mut self.pen_radius;
         let pen_strength = &mut self.pen_strength;
         let mode = &mut self.mode;
@@ -82,16 +82,30 @@ impl State {
                 imgui::Slider::new(im_str!("max height"), 0.0..=heightmap_gpu::MAX_Z)
                     .build(&ui, max_z);
 
-                save = ui.small_button(im_str!("Save"));
+                if ui.small_button(im_str!("Save")) {
+                    Self::save(heightmap_gpu);
+                }
+
+                if ui.small_button(im_str!("Clear")) {
+                    for i in 0..heightmap_gpu.width * heightmap_gpu.height {
+                        heightmap_gpu.texels[i as usize] = 0.0;
+                    }
+                    heightmap_gpu.update_rect(
+                        0 as u32,
+                        0 as u32,
+                        heightmap_gpu.width as u32,
+                        heightmap_gpu.height as u32,
+                    );
+                }
+
+                if ui.small_button(im_str!("Load")) {
+                    Self::load(heightmap_gpu);
+                }
             });
 
         self.max_z = max_z.max(*min_z);
         if update_noise {
             self.noise = self.noise.set_seed(*noise_seed as u32);
-        }
-
-        if save {
-            self.save(heightmap_gpu);
         }
     }
 
@@ -264,7 +278,7 @@ impl State {
         }
     }
 
-    pub fn save(&self, heightmap_gpu: &heightmap_gpu::HeightmapGpu) {
+    pub fn save(heightmap_gpu: &heightmap_gpu::HeightmapGpu) {
         //         For reading and opening files
         use std::fs::File;
         use std::io::BufWriter;
@@ -282,10 +296,53 @@ impl State {
         let data: Vec<u8> = heightmap_gpu
             .texels
             .iter()
-            .map(|e| ((e / 511.0).min(1.0).max(0.0) * 256.0 * 256.0) as u16)
+            .map(|e| ((e / 511.0).min(1.0).max(0.0) * 65535.0) as u16)
             .flat_map(|e| vec![(e >> 8) as u8, e as u8])
             .collect();
         //        let data = &data[..] ;//[255, 0, 0, 255, 0, 0, 0, 255]; // An array containing a RGBA sequence. First pixel is red and second pixel is black.
         writer.write_image_data(&data).unwrap(); // Save
+    }
+
+    pub fn load(heightmap_gpu: &mut heightmap_gpu::HeightmapGpu) {
+        use byteorder::{BigEndian, ReadBytesExt};
+        use std::fs::File;
+
+        use std::io::Cursor;
+
+        // The decoder is a build for reader and can be used to set various decoding options
+        // via `Transformations`. The default output transformation is `Transformations::EXPAND
+        // | Transformations::STRIP_ALPHA`.
+        let mut decoder = png::Decoder::new(File::open(r"heightmap.png").unwrap());
+        decoder.set_transformations(png::Transformations::IDENTITY);
+        let (info, mut reader) = decoder.read_info().unwrap();
+
+        // Display image metadata.
+        println!("info: {:?}", info.width);
+        println!("height: {:?}", info.height);
+        println!("bit depth: {:?}", info.bit_depth);
+        println!("buffer size: {:?}", info.buffer_size());
+
+        // Allocate the output buffer.
+        let mut buf = vec![0; info.buffer_size()];
+        // Read the next frame. Currently this function should only called once.
+        // The default options
+        reader.next_frame(&mut buf).unwrap();
+
+        // Transform buffer into 16 bits slice.
+        let mut buffer_u16 = vec![0; (info.width * info.height) as usize];
+        let mut buffer_cursor = Cursor::new(buf);
+        buffer_cursor
+            .read_u16_into::<BigEndian>(&mut buffer_u16)
+            .unwrap();
+
+        for i in 0..heightmap_gpu.width * heightmap_gpu.height {
+            heightmap_gpu.texels[i as usize] = buffer_u16[i as usize] as f32 / (65535.0 / 511.0);
+        }
+        heightmap_gpu.update_rect(
+            0 as u32,
+            0 as u32,
+            heightmap_gpu.width as u32,
+            heightmap_gpu.height as u32,
+        );
     }
 }
