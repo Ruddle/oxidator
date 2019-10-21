@@ -1,16 +1,19 @@
 use crate::heightmap_gpu;
 use crate::mobile;
 use crate::utils;
+use mobile::*;
 use na::{Matrix4, Point3, Vector2, Vector3};
 use std::collections::{HashMap, HashSet};
+use utils::*;
+
 pub struct Group {}
 
 impl Group {
     pub fn update_mobile_target(
         mouse_trigger: &HashSet<winit::event::MouseButton>,
         mouse_world_pos: Option<Vector3<f32>>,
-        selected: &HashSet<String>,
-        mobiles: &mut HashMap<String, mobile::Mobile>,
+        selected: &HashSet<IdValue>,
+        kbots: &mut HashMap<Id<KBot>, KBot>,
     ) {
         match (
             mouse_trigger.contains(&winit::event::MouseButton::Right),
@@ -38,9 +41,9 @@ impl Group {
                 let mut tap = 0.0;
 
                 let mut id_to_pos = Vec::new();
-                for s in selected.iter() {
-                    if let Some(mobile) = mobiles.get(s) {
-                        id_to_pos.push((mobile.id.clone(), mobile.position.coords));
+                for &s in selected.iter() {
+                    if let Some(mobile) = kbots.get(&Id::new(s)) {
+                        id_to_pos.push((mobile.id, mobile.position.coords));
                         center += mobile.position.coords;
                         tap += 1.0;
                     }
@@ -77,8 +80,8 @@ impl Group {
                 });
 
                 for ((id, _), (spot_id, _)) in id_to_proj.iter().zip(&projected_spot[..]) {
-                    if let Some(mobile) = mobiles.get_mut(*id) {
-                        println!("New order for {}", mobile.id.clone());
+                    if let Some(mobile) = kbots.get_mut(id) {
+                        println!("New order for {}", mobile.id);
                         mobile.target = Some(Point3::<f32>::from(spot[*spot_id]));
                     }
                 }
@@ -87,31 +90,32 @@ impl Group {
         }
     }
 
-    pub fn update_mobiles(
+    pub fn update_units(
         dt: f32,
-        mobiles: &mut HashMap<String, mobile::Mobile>,
+        kbots: &mut HashMap<Id<KBot>, KBot>,
+        kinematic_projectiles: &mut HashMap<Id<KinematicProjectile>, KinematicProjectile>,
         heightmap_gpu: &heightmap_gpu::HeightmapGpu,
     ) {
         let cell_size = 16;
         let grid_w = (heightmap_gpu.width / cell_size) as usize;
         let grid_h = (heightmap_gpu.height / cell_size) as usize;
-        let mut grid = vec![HashSet::<String>::new(); grid_w * grid_h];
+        let mut grid = vec![HashSet::<Id<KBot>>::new(); grid_w * grid_h];
 
-        let grid_pos = |mobile: &mobile::Mobile| -> usize {
+        let grid_pos = |mobile: &KBot| -> usize {
             let (x, y) = (mobile.position.x, mobile.position.y);
             (x as usize / cell_size as usize) as usize
                 + (y as usize / cell_size as usize) as usize * grid_w
         };
 
-        for (id, mobile) in mobiles.iter() {
-            grid[grid_pos(mobile)].insert(id.clone());
+        for (&id, mobile) in kbots.iter() {
+            grid[grid_pos(mobile)].insert(id);
         }
 
-        let mobiles2 = mobiles.clone();
-
+        let mobiles2 = kbots.clone();
+        //Movement compute
         {
             {
-                for (id, mobile) in mobiles.iter_mut() {
+                for (id, mobile) in kbots.iter_mut() {
                     let grid_pos = grid_pos(mobile);
 
                     let mut neighbors_id = grid[grid_pos].clone();
@@ -249,6 +253,37 @@ impl Group {
                     mobile.position.z =
                         heightmap_gpu.get_z_linear(mobile.position.x, mobile.position.y) + 0.5;
                 }
+            }
+        }
+
+        //Projectile move compute
+        {
+            let mut to_remove = Vec::new();
+            for proj in kinematic_projectiles.values_mut() {
+                proj.positions = proj.positions.clone().into_iter().skip(1).collect();
+                if proj.positions.len() == 0 {
+                    to_remove.push(proj.id);
+                }
+            }
+
+            for r in to_remove {
+                kinematic_projectiles.remove(&r);
+            }
+        }
+
+        //Projectile fire compute
+        {
+            for kbot in kbots.values_mut().next() {
+                let mut positions = Vec::new();
+                positions.push(kbot.position);
+                let mut speed = Vector3::new(0.1, 0.0, 0.1);
+                for i in 0..144 {
+                    speed -= Vector3::new(0.0, 0.0, 0.001);
+                    positions.push(positions.last().unwrap() + speed);
+                }
+
+                let proj = KinematicProjectile::new(positions);
+                kinematic_projectiles.insert(proj.id, proj);
             }
         }
     }

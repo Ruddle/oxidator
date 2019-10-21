@@ -51,13 +51,33 @@ impl App {
                     self.clear_from_play();
                     self.game_state.position = Point3::new(200.0, 100.0, 50.0);
                     self.game_state.dir = Vector3::new(0.0, 0.3, -1.0);
-                    for i in (200..250).step_by(7) {
-                        for j in (100..150).step_by(7) {
-                            let m = mobile::Mobile::new(Point3::new(i as f32, j as f32, 100.0));
 
-                            self.game_state.mobiles.insert(m.id.clone(), m);
+                    let mut player_me = game_state::Player::new();
+
+                    for i in (150..200).step_by(7) {
+                        for j in (100..150).step_by(7) {
+                            let m = mobile::KBot::new(Point3::new(i as f32, j as f32, 100.0));
+                            player_me.mobiles.insert(m.id);
+                            self.game_state.kbots.insert(m.id, m);
                         }
                     }
+
+                    let mut player_ennemy = game_state::Player::new();
+                    player_ennemy.team = 1;
+
+                    for i in (230..280).step_by(7) {
+                        for j in (100..150).step_by(7) {
+                            let m = mobile::KBot::new(Point3::new(i as f32, j as f32, 100.0));
+                            player_ennemy.mobiles.insert(m.id);
+                            self.game_state.kbots.insert(m.id, m);
+                        }
+                    }
+
+                    self.game_state.my_player_id = Some(player_me.id);
+                    self.game_state.players.insert(player_me.id, player_me);
+                    self.game_state
+                        .players
+                        .insert(player_ennemy.id, player_ennemy);
                 }
 
                 RenderEvent::ChangeMode {
@@ -398,7 +418,9 @@ impl App {
 
             self.heightmap_gpu.render(&mut rpass, &self.bind_group);
             self.cube_gpu.render(&mut rpass, &self.bind_group);
-            self.mobile_gpu.render(&mut rpass, &self.bind_group);
+            self.kbot_gpu.render(&mut rpass, &self.bind_group);
+            self.kinematic_projectile_gpu
+                .render(&mut rpass, &self.bind_group);
         }
 
         //Post pass

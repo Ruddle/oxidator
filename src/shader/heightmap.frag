@@ -57,7 +57,7 @@ void main() {
     vec3 normal = normal_at(v_TexCoord,lod);
     float slope = slope_of(normal);
 
-    vec3 diffuse=  mix(vec3(0.5,0.4,0.3),tex_checker.xyz,0.1);
+    vec3 diffuse=  mix(vec3(0.5,0.4,0.3),tex_checker.xyz,0.041);
 
     float ground_end= 1/90.0;
     float grass_start= 2/90.0;

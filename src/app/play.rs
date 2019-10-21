@@ -4,7 +4,7 @@ use imgui::*;
 use na::{Isometry3, Matrix4, Point3, Vector2, Vector3, Vector4};
 use std::collections::{HashMap, HashSet};
 
-use utils::time;
+use utils::*;
 
 impl App {
     pub fn handle_play(&mut self, delta_sim_sec: f32) -> (u128, u128) {
@@ -23,21 +23,28 @@ impl App {
                     &self.game_state.dir_smooth,
                 );
 
-                let start_proj = std::time::Instant::now();
-                let projected = self.game_state.mobiles.iter().flat_map(|(id, e)| {
-                    let p = e.position.to_homogeneous();
-                    let r = view_proj * p;
-                    //Keeping those of the clipped space in screen (-1 1, -1 1 , 0 1)
-                    if r.z > 0.0 && r.x < r.w && r.x > -r.w && r.y < r.w && r.y > -r.w {
-                        Some((id, Vector2::new(r.x / r.w, r.y / r.w)))
-                    } else {
-                        None
-                    }
-                });
+                let me = self.game_state.my_player().unwrap();
 
-                let selected: HashSet<String> = projected
+                let start_proj = std::time::Instant::now();
+                let projected = self
+                    .game_state
+                    .kbots
+                    .iter()
+                    .filter(|(id, e)| me.mobiles.contains(id))
+                    .flat_map(|(id, e)| {
+                        let p = e.position.to_homogeneous();
+                        let r = view_proj * p;
+                        //Keeping those of the clipped space in screen (-1 1, -1 1 , 0 1)
+                        if r.z > 0.0 && r.x < r.w && r.x > -r.w && r.y < r.w && r.y > -r.w {
+                            Some((id, Vector2::new(r.x / r.w, r.y / r.w)))
+                        } else {
+                            None
+                        }
+                    });
+
+                let selected: HashSet<IdValue> = projected
                     .filter(|(_, e)| e.x > min_x && e.x < max_x && e.y < max_y && e.y > min_y)
-                    .map(|(i, _)| i.clone())
+                    .map(|(i, _)| i.value)
                     .collect();
 
                 println!("Selection took {}us", start_proj.elapsed().as_micros());
@@ -52,43 +59,78 @@ impl App {
             }
         }
 
-        //Mobile update target
+        //KBot update target
         group_behavior::Group::update_mobile_target(
             &self.input_state.mouse_trigger,
             self.game_state.mouse_world_pos,
             &self.game_state.selected,
-            &mut self.game_state.mobiles,
+            &mut self.game_state.kbots,
         );
 
-        //Mobile update
+        //KBot update
         let us_update_mobiles = time(|| {
-            group_behavior::Group::update_mobiles(
+            group_behavior::Group::update_units(
                 delta_sim_sec,
-                &mut self.game_state.mobiles,
+                &mut self.game_state.kbots,
+                &mut self.game_state.kinematic_projectiles,
                 &self.heightmap_gpu,
             )
         });
 
         let us_mobile_to_gpu = time(|| {
-            let mut positions = Vec::with_capacity(self.game_state.mobiles.len() * 17);
-            for mobile in self.game_state.mobiles.values() {
+            let mut positions = Vec::with_capacity(self.game_state.kbots.len() * 18);
+            for mobile in self.game_state.kbots.values() {
                 let mat = Matrix4::face_towards(
                     &mobile.position,
                     &(mobile.position + mobile.dir),
                     &Vector3::new(0.0, 0.0, 1.0),
                 );
 
-                let is_selected = if self.game_state.selected.contains(&mobile.id) {
+                let is_selected = if self.game_state.selected.contains(&mobile.id.value) {
                     1.0
                 } else {
                     0.0
                 };
 
+                let team = self
+                    .game_state
+                    .players
+                    .values()
+                    .find(|e| e.mobiles.contains(&mobile.id))
+                    .unwrap()
+                    .team;
+
                 positions.extend_from_slice(mat.as_slice());
                 positions.push(is_selected);
+                positions.push(team as f32)
             }
 
-            self.mobile_gpu
+            self.kbot_gpu
+                .update_instance(&positions[..], &self.gpu.device);
+
+            let mut positions =
+                Vec::with_capacity(self.game_state.kinematic_projectiles.len() * 18);
+            for mobile in self.game_state.kinematic_projectiles.values() {
+                let mat = Matrix4::face_towards(
+                    &mobile.positions.iter().next().unwrap(),
+                    &(mobile.positions.iter().next().unwrap() + Vector3::new(1.0, 0.0, 0.0)),
+                    &Vector3::new(0.0, 0.0, 1.0),
+                );
+
+                let is_selected = if self.game_state.selected.contains(&mobile.id.value) {
+                    1.0
+                } else {
+                    0.0
+                };
+
+                let team = -1.0;
+
+                positions.extend_from_slice(mat.as_slice());
+                positions.push(is_selected);
+                positions.push(team)
+            }
+
+            self.kinematic_projectile_gpu
                 .update_instance(&positions[..], &self.gpu.device);
         });
 

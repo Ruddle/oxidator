@@ -1,9 +1,31 @@
 extern crate nalgebra as na;
 use crate::heightmap_editor;
 use crate::mobile;
+use crate::utils;
 use na::{Point3, Vector3};
 use std::collections::{HashMap, HashSet};
 use std::time::Instant;
+use utils::*;
+
+use mobile::*;
+
+#[derive(Clone, TypeName)]
+pub struct Player {
+    pub id: Id<Player>,
+    pub mobiles: HashSet<Id<KBot>>,
+    pub team: u8,
+}
+
+impl Player {
+    pub fn new() -> Self {
+        let id = utils::rand_id();
+        Player {
+            id,
+            mobiles: HashSet::new(),
+            team: 0,
+        }
+    }
+}
 
 pub struct State {
     pub position: Point3<f32>,
@@ -17,11 +39,17 @@ pub struct State {
 
     pub heightmap_editor: heightmap_editor::State,
 
-    pub mobiles: HashMap<String, mobile::Mobile>,
-    pub selected: HashSet<String>,
+    pub kbots: HashMap<Id<KBot>, KBot>,
+
+    pub kinematic_projectiles: HashMap<Id<KinematicProjectile>, KinematicProjectile>,
+    pub selected: HashSet<IdValue>,
 
     pub start_time: Instant,
     pub last_frame: Instant,
+
+    pub my_player_id: Option<Id<Player>>,
+
+    pub players: HashMap<Id<Player>, Player>,
 }
 
 impl State {
@@ -40,11 +68,27 @@ impl State {
 
             heightmap_editor: heightmap_editor::State::new(),
 
-            mobiles: HashMap::new(),
+            kbots: HashMap::new(),
+            kinematic_projectiles: HashMap::new(),
             selected: HashSet::new(),
+
+            players: HashMap::new(),
+            my_player_id: None,
 
             start_time: Instant::now(),
             last_frame: Instant::now(),
+        }
+    }
+
+    pub fn my_player(&self) -> Option<&Player> {
+        self.my_player_id
+            .map(|id| self.players.get(&id))
+            .unwrap_or(None)
+    }
+    pub fn my_player_mut(&mut self) -> Option<&mut Player> {
+        match self.my_player_id {
+            Some(id) => self.players.get_mut(&id),
+            None => None,
         }
     }
 }

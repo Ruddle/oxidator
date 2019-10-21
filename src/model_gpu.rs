@@ -121,7 +121,7 @@ impl ModelGpu {
                     ],
                 },
                 wgpu::VertexBufferDescriptor {
-                    stride: (4 * 17) as wgpu::BufferAddress,
+                    stride: (4 * 18) as wgpu::BufferAddress,
                     step_mode: wgpu::InputStepMode::Instance,
                     attributes: &[
                         wgpu::VertexAttributeDescriptor {
@@ -148,6 +148,11 @@ impl ModelGpu {
                             format: wgpu::VertexFormat::Float,
                             offset: 4 * 16,
                             shader_location: 6,
+                        },
+                        wgpu::VertexAttributeDescriptor {
+                            format: wgpu::VertexFormat::Float,
+                            offset: 4 * 17,
+                            shader_location: 7,
                         },
                     ],
                 },
@@ -186,7 +191,7 @@ impl ModelGpu {
             .fill_from_slice(instance_attr);
 
         std::mem::replace(&mut self.instance_buf, temp_buf);
-        self.instance_count = instance_attr.len() as u32 / 17;
+        self.instance_count = instance_attr.len() as u32 / 18;
         //        encoder.copy_buffer_to_buffer(
         //            &temp_buf,
         //            0,

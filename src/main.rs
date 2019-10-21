@@ -24,6 +24,9 @@ extern crate byteorder;
 extern crate crossbeam_channel;
 extern crate nalgebra as na;
 extern crate shaderc;
+#[macro_use]
+extern crate typename;
+extern crate base_62;
 
 use winit::event::Event;
 use winit::event_loop::ControlFlow;

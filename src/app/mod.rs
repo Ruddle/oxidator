@@ -52,7 +52,8 @@ pub struct App {
 
     heightmap_gpu: HeightmapGpu,
     cube_gpu: ModelGpu,
-    mobile_gpu: ModelGpu,
+    kbot_gpu: ModelGpu,
+    kinematic_projectile_gpu: ModelGpu,
 
     bind_group: wgpu::BindGroup,
     bind_group_layout: wgpu::BindGroupLayout,
@@ -63,7 +64,7 @@ pub struct App {
     postfx: post_fx::PostFx,
     postfxaa: post_fxaa::PostFxaa,
 
-    frame_count: u32,
+    frame_count: i32,
     game_state: game_state::State,
     input_state: input_state::InputState,
     imgui_wrap: ImguiWrap,
@@ -280,8 +281,15 @@ impl App {
             &bind_group_layout,
         );
 
-        let mobile_gpu = ModelGpu::new(
+        let kbot_gpu = ModelGpu::new(
             &model::create_cube(),
+            &gpu.device,
+            format,
+            &bind_group_layout,
+        );
+
+        let kinematic_projectile_gpu = ModelGpu::new(
+            &model::create_small_cube(),
             &gpu.device,
             format,
             &bind_group_layout,
@@ -322,7 +330,7 @@ impl App {
 
         let mut game_state = game_state::State::new();
 
-        println!("Number of mobiles {}", game_state.mobiles.len());
+        println!("Number of mobiles {}", game_state.kbots.len());
 
         let (receiver_notify, watcher) = {
             use crossbeam_channel::unbounded;
@@ -369,7 +377,8 @@ impl App {
             ub_camera_mat,
             ub_misc,
             cube_gpu,
-            mobile_gpu,
+            kbot_gpu,
+            kinematic_projectile_gpu,
             heightmap_gpu,
             first_color_att_view,
             forward_depth: depth_texture.create_default_view(),

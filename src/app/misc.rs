@@ -8,8 +8,11 @@ use utils::time;
 
 impl App {
     pub fn clear_from_play(&mut self) {
-        self.game_state.mobiles.clear();
+        self.game_state.players.clear();
+        self.game_state.my_player_id = None;
+        self.game_state.kbots.clear();
         self.game_state.selected.clear();
-        self.mobile_gpu.update_instance(&[], &self.gpu.device);
+        self.game_state.kinematic_projectiles.clear();
+        self.kbot_gpu.update_instance(&[], &self.gpu.device);
     }
 }
