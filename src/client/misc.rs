@@ -1,4 +1,4 @@
-use super::app::*;
+use super::client::*;
 use crate::*;
 use imgui::*;
 use na::{Isometry3, Matrix4, Point3, Vector2, Vector3, Vector4};

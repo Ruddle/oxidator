@@ -21,6 +21,10 @@ use log::info;
 
 use winit::event::WindowEvent;
 
+pub enum FromClient {
+    Event(frame::FrameEvent),
+}
+
 struct ImguiWrap {
     imgui: imgui::Context,
     platform: WinitPlatform,
@@ -71,10 +75,12 @@ pub struct App {
 
     main_menu: MainMode,
 
-    sender_to_app: crossbeam_channel::Sender<AppMsg>,
-    receiver_to_app: crossbeam_channel::Receiver<AppMsg>,
+    sender_to_client: crossbeam_channel::Sender<ToClient>,
+    receiver_to_client: crossbeam_channel::Receiver<ToClient>,
 
     sender_to_event_loop: crossbeam_channel::Sender<EventLoopMsg>,
+
+    sender_from_client: crossbeam_channel::Sender<FromClient>,
 
     receiver_notify: crossbeam_channel::Receiver<notify::Result<notify::event::Event>>,
     watcher: notify::RecommendedWatcher,
@@ -85,9 +91,10 @@ pub struct App {
 impl App {
     pub fn new(
         window: winit::window::Window,
-        sender_to_app: crossbeam_channel::Sender<AppMsg>,
-        receiver_to_app: crossbeam_channel::Receiver<AppMsg>,
+        sender_to_client: crossbeam_channel::Sender<ToClient>,
+        receiver_to_client: crossbeam_channel::Receiver<ToClient>,
         sender_to_event_loop: crossbeam_channel::Sender<EventLoopMsg>,
+        sender_from_client: crossbeam_channel::Sender<FromClient>,
     ) -> (Self) {
         log::trace!("App init");
 
@@ -395,9 +402,10 @@ impl App {
 
             main_menu: MainMode::Home,
 
-            sender_to_app,
-            receiver_to_app,
+            sender_to_client,
+            receiver_to_client,
             sender_to_event_loop,
+            sender_from_client,
             receiver_notify,
             watcher,
 
@@ -462,7 +470,7 @@ impl App {
     }
 
     pub fn handle_winit_event(&mut self, _event: &winit::event::Event<()>) {
-        log::trace!("[app.rs] update {:?}", _event);
+        log::trace!("[client.rs] update {:?}", _event);
         use winit::event;
 
         self.imgui_wrap.platform.handle_event(
@@ -652,20 +660,21 @@ impl App {
             _ => {}
         }
 
-        match self.receiver_to_app.try_recv() {
+        match self.receiver_to_client.try_recv() {
             Ok(x) => {
                 log::trace!("receive: {:?}", x);
 
                 match x {
-                    AppMsg::EventMessage { event } => {
+                    ToClient::EventMessage { event } => {
                         self.handle_winit_event(&event);
                     }
-                    AppMsg::MapReadAsyncMessage { vec, usage } => {
+                    ToClient::MapReadAsyncMessage { vec, usage } => {
                         self.map_read_async_msg(vec, usage);
                     }
-                    AppMsg::Render => {
+                    ToClient::Render => {
                         self.render();
                     }
+                    ToClient::NewFrame(frame) => {}
                 }
             }
             _ => {

@@ -3,7 +3,7 @@ use na::{Point3, Vector3};
 use typename::TypeName;
 use utils::Id;
 
-#[derive(Clone, TypeName)]
+#[derive(Clone, TypeName, Debug)]
 pub struct KBot {
     pub position: Point3<f32>,
     pub speed: Vector3<f32>,
@@ -29,7 +29,7 @@ impl KBot {
     }
 }
 
-#[derive(Clone, TypeName)]
+#[derive(Clone, TypeName, Debug)]
 pub struct KinematicProjectile {
     pub id: Id<KinematicProjectile>,
     pub positions: Vec<Point3<f32>>,

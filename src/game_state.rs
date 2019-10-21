@@ -7,25 +7,8 @@ use std::collections::{HashMap, HashSet};
 use std::time::Instant;
 use utils::*;
 
+use crate::frame::Player;
 use mobile::*;
-
-#[derive(Clone, TypeName)]
-pub struct Player {
-    pub id: Id<Player>,
-    pub mobiles: HashSet<Id<KBot>>,
-    pub team: u8,
-}
-
-impl Player {
-    pub fn new() -> Self {
-        let id = utils::rand_id();
-        Player {
-            id,
-            mobiles: HashSet::new(),
-            team: 0,
-        }
-    }
-}
 
 pub struct State {
     pub position: Point3<f32>,
@@ -50,6 +33,8 @@ pub struct State {
     pub my_player_id: Option<Id<Player>>,
 
     pub players: HashMap<Id<Player>, Player>,
+
+    pub fps: u64
 }
 
 impl State {
@@ -77,6 +62,7 @@ impl State {
 
             start_time: Instant::now(),
             last_frame: Instant::now(),
+              fps: 144
         }
     }
 

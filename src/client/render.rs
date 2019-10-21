@@ -1,8 +1,9 @@
-use super::app::*;
+use super::client::*;
+use crate::frame::FrameEvent;
+use crate::frame::Player;
 use crate::*;
 use imgui::*;
 use na::{IsometryMatrix3, Matrix4, Point3, Vector2, Vector3, Vector4};
-
 use std::time::Instant;
 use utils::time;
 use wgpu::{BufferMapAsyncResult, Extent3d};
@@ -17,7 +18,7 @@ impl App {
 
         //empiric, a feed back loop could find this value automatically
         let oversleep = 60;
-        let min_us = 1000000_u64 / self.input_state.fps;
+        let min_us = 1000000_u64 / self.game_state.fps;
         let min_wait_until_next_frame = std::time::Duration::from_micros(min_us - oversleep);
         if min_wait_until_next_frame > delta {
             std::thread::sleep(min_wait_until_next_frame - delta);
@@ -52,7 +53,7 @@ impl App {
                     self.game_state.position = Point3::new(200.0, 100.0, 50.0);
                     self.game_state.dir = Vector3::new(0.0, 0.3, -1.0);
 
-                    let mut player_me = game_state::Player::new();
+                    let mut player_me = Player::new();
 
                     for i in (150..200).step_by(7) {
                         for j in (100..150).step_by(7) {
@@ -62,7 +63,7 @@ impl App {
                         }
                     }
 
-                    let mut player_ennemy = game_state::Player::new();
+                    let mut player_ennemy = Player::new();
                     player_ennemy.team = 1;
 
                     for i in (230..280).step_by(7) {
@@ -493,8 +494,7 @@ impl App {
             let main_menu = &mut self.main_menu;
 
             {
-                let mut_fps = &mut self.input_state.fps;
-                let debug_i1 = &mut self.input_state.debug_i1;
+                let mut_fps = &mut self.game_state.fps;
                 let stats_window = imgui::Window::new(im_str!("Statistics"));
                 stats_window
                     .size([400.0, 200.0], imgui::Condition::FirstUseEver)
@@ -515,8 +515,6 @@ impl App {
                         ui.text(im_str!("us_heightmap_editor: {}us", us_heightmap_editor));
                         ui.text(im_str!("us_heightmap_step: {}us", us_heightmap_step));
                         ui.text(im_str!("us_3d_render_pass: {}us", us_3d_render_pass));
-
-                        if imgui::Slider::new(im_str!("debug_i1"), 1..=1000).build(&ui, debug_i1) {}
                     });
 
                 match main_menu {
@@ -587,14 +585,27 @@ impl App {
             .get_queue()
             .submit(&[encoder_render.finish()]);
 
+        if let Some(id) = self.game_state.my_player_id {
+            let player_input = FrameEvent::PlayerInput {
+                id,
+                input_state: self.input_state.clone(),
+                selected: self.game_state.selected.clone(),
+                mouse_world_pos: self.game_state.mouse_world_pos,
+            };
+
+            let _ = self
+                .sender_from_client
+                .try_send(client::FromClient::Event(player_input));
+        }
+
         self.input_state.update();
 
-        let tx = self.sender_to_app.clone();
+        let tx = self.sender_to_client.clone();
         cursor_sample_position.map_read_async(0, 4 * 4, move |e: BufferMapAsyncResult<&[f32]>| {
             match e {
                 Ok(e) => {
                     log::trace!("BufferMapAsyncResult callback");
-                    let _ = tx.try_send(AppMsg::MapReadAsyncMessage {
+                    let _ = tx.try_send(ToClient::MapReadAsyncMessage {
                         vec: e.data.to_vec(),
                         usage: "mouse_world_pos".to_owned(),
                     });
@@ -603,14 +614,14 @@ impl App {
             }
         });
 
-        let tx = self.sender_to_app.clone();
+        let tx = self.sender_to_client.clone();
         screen_center_sample_position.map_read_async(
             0,
             4 * 4,
             move |e: BufferMapAsyncResult<&[f32]>| match e {
                 Ok(e) => {
                     log::trace!("BufferMapAsyncResult callback");
-                    let _ = tx.try_send(AppMsg::MapReadAsyncMessage {
+                    let _ = tx.try_send(ToClient::MapReadAsyncMessage {
                         vec: e.data.to_vec(),
                         usage: "screen_center_world_pos".to_owned(),
                     });
@@ -619,6 +630,6 @@ impl App {
             },
         );
 
-        let _ = self.sender_to_app.try_send(AppMsg::Render);
+        let _ = self.sender_to_client.try_send(ToClient::Render);
     }
 }

@@ -1,5 +1,6 @@
 use std::collections::HashSet;
 
+#[derive(Clone, Debug)]
 pub enum Drag {
     None,
     Start { x0: u32, y0: u32 },
@@ -7,21 +8,16 @@ pub enum Drag {
     End { x0: u32, y0: u32, x1: u32, y1: u32 },
 }
 
+#[derive(Clone, Debug)]
 pub struct InputState {
     pub key_pressed: HashSet<winit::event::VirtualKeyCode>,
     pub mouse_pressed: HashSet<winit::event::MouseButton>,
-
     pub key_trigger: HashSet<winit::event::VirtualKeyCode>,
     pub mouse_trigger: HashSet<winit::event::MouseButton>,
-
     pub key_release: HashSet<winit::event::VirtualKeyCode>,
     pub mouse_release: HashSet<winit::event::MouseButton>,
-
     pub drag: Drag,
-
     pub last_scroll: f32,
-    pub fps: u64,
-    pub debug_i1: i32,
     pub cursor_pos: (u32, u32),
 }
 
@@ -35,8 +31,6 @@ impl InputState {
             key_release: HashSet::new(),
             mouse_release: HashSet::new(),
             last_scroll: 0.0,
-            fps: 144,
-            debug_i1: 1,
             cursor_pos: (0, 0),
             drag: Drag::None,
         }
