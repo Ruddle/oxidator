@@ -13,6 +13,7 @@ pub struct State {
     pub dir_smooth: Vector3<f32>,
 
     pub mouse_world_pos: Option<Vector3<f32>>,
+    pub screen_center_world_pos: Option<Vector3<f32>>,
 
     pub heightmap_editor: heightmap_editor::State,
 
@@ -35,6 +36,7 @@ impl State {
             dir_smooth: Vector3::new(0.0, 0.01, -1.0),
 
             mouse_world_pos: None,
+            screen_center_world_pos: None,
 
             heightmap_editor: heightmap_editor::State::new(),
 

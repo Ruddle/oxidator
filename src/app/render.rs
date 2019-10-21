@@ -1,7 +1,7 @@
 use super::app::*;
 use crate::*;
 use imgui::*;
-use na::{Isometry3, Matrix4, Point3, Vector2, Vector3, Vector4};
+use na::{IsometryMatrix3, Matrix4, Point3, Vector2, Vector3, Vector4};
 
 use std::time::Instant;
 use utils::time;
@@ -93,7 +93,8 @@ impl App {
             let on = |vkc| key_pressed.contains(&vkc);
 
             let mut offset = Vector3::new(0.0, 0.0, 0.0);
-            let mut rotation = self.game_state.dir.clone();
+            let mut dir_offset = self.game_state.dir.clone();
+            let mut new_dir = None;
 
             let camera_ground_height = self.heightmap_gpu.get_z(
                 self.game_state
@@ -124,11 +125,38 @@ impl App {
             }
 
             if on(Key::LControl) {
-                if self.input_state.last_scroll > 0.0 {
-                    rotation.y += 1.0
-                }
-                if self.input_state.last_scroll < 0.0 {
-                    rotation.z -= 1.0
+                if let Some(screen_center_world_pos) = self.game_state.screen_center_world_pos {
+                    if self.input_state.last_scroll != 0.0 {
+                        let camera_to_center =
+                            screen_center_world_pos - self.game_state.position.coords;
+
+                        let distance = camera_to_center.norm();
+
+                        let mut new_camera_to_center = camera_to_center.normalize();
+
+                        if self.input_state.last_scroll > 0.0 {
+                            new_camera_to_center.y += 1.0 * 33.0 * delta_sim_sec;
+                        }
+                        if self.input_state.last_scroll < 0.0 {
+                            new_camera_to_center.z -= 1.0 * 33.0 * delta_sim_sec;
+                        }
+                        new_camera_to_center.x = 0.0;
+
+                        new_camera_to_center = new_camera_to_center.normalize();
+                        new_camera_to_center.y = new_camera_to_center.y.max(0.01);
+
+                        new_dir = Some(new_camera_to_center);
+                        let new_pos =
+                            screen_center_world_pos - new_camera_to_center.normalize() * distance;
+                        offset += (new_pos - self.game_state.position.coords) / delta_sim_sec;
+                    }
+                } else {
+                    if self.input_state.last_scroll > 0.0 {
+                        dir_offset.y += 1.0;
+                    }
+                    if self.input_state.last_scroll < 0.0 {
+                        dir_offset.z -= 1.0;
+                    }
                 }
             } else {
                 if let Some(mouse_world_pos) = self.game_state.mouse_world_pos {
@@ -143,7 +171,11 @@ impl App {
 
             self.game_state.position += offset * delta_sim_sec;
             self.game_state.dir =
-                (self.game_state.dir + rotation * 33.0 * delta_sim_sec).normalize();
+                (self.game_state.dir + dir_offset * 33.0 * delta_sim_sec).normalize();
+
+            new_dir.map(|new_dir| {
+                self.game_state.dir = new_dir;
+            });
 
             self.game_state.position.z = self.game_state.position.z.max(camera_ground_height + 3.0);
 
@@ -207,7 +239,16 @@ impl App {
                 4,
                 wgpu::BufferUsage::COPY_DST | wgpu::BufferUsage::MAP_READ,
             )
-            .finish(); //.fill_from_slice(initial);
+            .finish();
+
+        let screen_center_sample_position = self
+            .gpu
+            .device
+            .create_buffer_mapped::<f32>(
+                4,
+                wgpu::BufferUsage::COPY_DST | wgpu::BufferUsage::MAP_READ,
+            )
+            .finish();
 
         encoder_render.copy_texture_to_buffer(
             wgpu::TextureCopyView {
@@ -232,6 +273,30 @@ impl App {
             },
             wgpu::BufferCopyView {
                 buffer: &cursor_sample_position,
+                offset: 0,
+                row_pitch: 4 * 4,
+                image_height: 1,
+            },
+            Extent3d {
+                width: 1,
+                height: 1,
+                depth: 1,
+            },
+        );
+
+        encoder_render.copy_texture_to_buffer(
+            wgpu::TextureCopyView {
+                texture: &self.position_att,
+                mip_level: 0,
+                array_layer: 0,
+                origin: wgpu::Origin3d {
+                    x: self.gpu.sc_desc.width as f32 / 2.0,
+                    y: self.gpu.sc_desc.height as f32 / 2.0,
+                    z: 0.0,
+                },
+            },
+            wgpu::BufferCopyView {
+                buffer: &screen_center_sample_position,
                 offset: 0,
                 row_pitch: 4 * 4,
                 image_height: 1,
@@ -509,11 +574,28 @@ impl App {
                     log::trace!("BufferMapAsyncResult callback");
                     let _ = tx.try_send(AppMsg::MapReadAsyncMessage {
                         vec: e.data.to_vec(),
+                        usage: "mouse_world_pos".to_owned(),
                     });
                 }
                 Err(_) => {}
             }
         });
+
+        let tx = self.sender_to_app.clone();
+        screen_center_sample_position.map_read_async(
+            0,
+            4 * 4,
+            move |e: BufferMapAsyncResult<&[f32]>| match e {
+                Ok(e) => {
+                    log::trace!("BufferMapAsyncResult callback");
+                    let _ = tx.try_send(AppMsg::MapReadAsyncMessage {
+                        vec: e.data.to_vec(),
+                        usage: "screen_center_world_pos".to_owned(),
+                    });
+                }
+                Err(_) => {}
+            },
+        );
 
         let _ = self.sender_to_app.try_send(AppMsg::Render);
     }

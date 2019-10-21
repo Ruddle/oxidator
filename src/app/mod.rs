@@ -576,11 +576,17 @@ impl App {
         }
     }
 
-    pub fn map_read_async_msg(&mut self, vec: Vec<f32>) {
+    pub fn map_read_async_msg(&mut self, vec: Vec<f32>, usage: String) {
+        let to_update = match usage.as_ref() {
+            "screen_center_world_pos" => &mut self.game_state.screen_center_world_pos,
+            "mouse_world_pos" => &mut self.game_state.mouse_world_pos,
+            _ => &mut self.game_state.mouse_world_pos,
+        };
+
         if vec.len() == 4 && vec[0] >= 0.0 {
-            self.game_state.mouse_world_pos = Some(Vector3::new(vec[0], vec[1], vec[2]));
+            std::mem::replace(to_update, Some(Vector3::new(vec[0], vec[1], vec[2])));
         } else {
-            self.game_state.mouse_world_pos = None;
+            std::mem::replace(to_update, None);
         }
     }
 
@@ -645,8 +651,8 @@ impl App {
                     AppMsg::EventMessage { event } => {
                         self.handle_winit_event(&event);
                     }
-                    AppMsg::MapReadAsyncMessage { vec } => {
-                        self.map_read_async_msg(vec);
+                    AppMsg::MapReadAsyncMessage { vec, usage } => {
+                        self.map_read_async_msg(vec, usage);
                     }
                     AppMsg::Render => {
                         self.render();

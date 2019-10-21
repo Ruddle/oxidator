@@ -31,7 +31,7 @@ use winit::event_loop::ControlFlow;
 #[derive(Debug)]
 pub enum AppMsg {
     EventMessage { event: Event<()> },
-    MapReadAsyncMessage { vec: Vec<f32> },
+    MapReadAsyncMessage { vec: Vec<f32>, usage: String },
     Render,
 }
 
