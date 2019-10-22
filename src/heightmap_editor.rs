@@ -87,14 +87,14 @@ impl State {
                 }
 
                 if ui.small_button(im_str!("Clear")) {
-                    for i in 0..heightmap_gpu.width * heightmap_gpu.height {
-                        heightmap_gpu.texels[i as usize] = 0.0;
+                    for i in 0..heightmap_gpu.phy.width * heightmap_gpu.phy.height {
+                        heightmap_gpu.phy.texels[i as usize] = 0.0;
                     }
                     heightmap_gpu.update_rect(
                         0 as u32,
                         0 as u32,
-                        heightmap_gpu.width as u32,
-                        heightmap_gpu.height as u32,
+                        heightmap_gpu.phy.width as u32,
+                        heightmap_gpu.phy.height as u32,
                     );
                 }
 
@@ -138,8 +138,8 @@ impl State {
                 let min_i = (middle_i - pen_size).max(0);
                 let min_j = (middle_j - pen_size).max(0);
 
-                let max_i = (middle_i + pen_size).min(heightmap_gpu.width as i32 - 1);
-                let max_j = (middle_j + pen_size).min(heightmap_gpu.height as i32 - 1);
+                let max_i = (middle_i + pen_size).min(heightmap_gpu.phy.width as i32 - 1);
+                let max_j = (middle_j + pen_size).min(heightmap_gpu.phy.height as i32 - 1);
 
                 let size_i = max_i - min_i + 1;
                 let size_j = max_j - min_j + 1;
@@ -157,7 +157,7 @@ impl State {
                             pixels.push((
                                 i,
                                 j,
-                                (i + j * heightmap_gpu.width as i32) as usize,
+                                (i + j * heightmap_gpu.phy.width as i32) as usize,
                                 falloff.max(0.0),
                             ));
                         }
@@ -167,7 +167,8 @@ impl State {
                         Mode::Raise => {
                             for (_, _, index, falloff) in pixels {
                                 let power = pen_strength * falloff;
-                                heightmap_gpu.texels[index] = (heightmap_gpu.texels[index] + power)
+                                heightmap_gpu.phy.texels[index] = (heightmap_gpu.phy.texels[index]
+                                    + power)
                                     .min(self.max_z)
                                     .max(self.min_z);
                             }
@@ -175,15 +176,15 @@ impl State {
                         Mode::Flatten => {
                             let mut average = 0.0;
                             for (_, _, index, _) in &pixels {
-                                let z = heightmap_gpu.texels[*index];
+                                let z = heightmap_gpu.phy.texels[*index];
                                 average += z;
                             }
                             average /= (size_i * size_j) as f32;
                             for (_, _, index, falloff) in pixels {
                                 let power = (pen_strength * falloff) / 50.0;
-                                let z =
-                                    heightmap_gpu.texels[index] * (1.0 - power) + average * power;
-                                heightmap_gpu.texels[index] = z.min(self.max_z).max(self.min_z);
+                                let z = heightmap_gpu.phy.texels[index] * (1.0 - power)
+                                    + average * power;
+                                heightmap_gpu.phy.texels[index] = z.min(self.max_z).max(self.min_z);
                             }
                         }
                         Mode::Noise => {
@@ -195,7 +196,8 @@ impl State {
                                         (0.001 * self.noise_freq) * j as f64,
                                     ]) as f32;
 
-                                heightmap_gpu.texels[index] = (heightmap_gpu.texels[index] + power)
+                                heightmap_gpu.phy.texels[index] = (heightmap_gpu.phy.texels[index]
+                                    + power)
                                     .min(self.max_z)
                                     .max(self.min_z);
                             }
@@ -209,15 +211,16 @@ impl State {
                                 let mut acc = Vec::new();
 
                                 for ti in (-kernel + i).max(0)
-                                    ..=(kernel + i).min(heightmap_gpu.width as i32 - 1)
+                                    ..=(kernel + i).min(heightmap_gpu.phy.width as i32 - 1)
                                 {
                                     for tj in (-kernel + j).max(0)
-                                        ..=(kernel + j).min(heightmap_gpu.height as i32 - 1)
+                                        ..=(kernel + j).min(heightmap_gpu.phy.height as i32 - 1)
                                     {
                                         let tindex =
-                                            (ti + tj * heightmap_gpu.width as i32) as usize;
+                                            (ti + tj * heightmap_gpu.phy.width as i32) as usize;
                                         acc.push(
-                                            (heightmap_gpu.texels[tindex] * 1000.0 * 1000.0).floor()
+                                            (heightmap_gpu.phy.texels[tindex] * 1000.0 * 1000.0)
+                                                .floor()
                                                 as i128,
                                         );
                                     }
@@ -225,12 +228,12 @@ impl State {
                                 acc.sort();
                                 new_pix.push((
                                     index,
-                                    heightmap_gpu.texels[index] * (1.0 - power)
+                                    heightmap_gpu.phy.texels[index] * (1.0 - power)
                                         + power * (acc[acc.len() / 2] as f64 / 1000000.0) as f32,
                                 ));
                             }
                             for (index, z) in new_pix {
-                                heightmap_gpu.texels[index] = z.min(self.max_z).max(self.min_z);
+                                heightmap_gpu.phy.texels[index] = z.min(self.max_z).max(self.min_z);
                             }
                         }
                         Mode::Blur => {
@@ -243,25 +246,25 @@ impl State {
                                 let mut tap = 0;
 
                                 for ti in (-kernel + i).max(0)
-                                    ..=(kernel + i).min(heightmap_gpu.width as i32 - 1)
+                                    ..=(kernel + i).min(heightmap_gpu.phy.width as i32 - 1)
                                 {
                                     for tj in (-kernel + j).max(0)
-                                        ..=(kernel + j).min(heightmap_gpu.height as i32 - 1)
+                                        ..=(kernel + j).min(heightmap_gpu.phy.height as i32 - 1)
                                     {
                                         tap += 1;
                                         let tindex =
-                                            (ti + tj * heightmap_gpu.width as i32) as usize;
-                                        acc += heightmap_gpu.texels[tindex];
+                                            (ti + tj * heightmap_gpu.phy.width as i32) as usize;
+                                        acc += heightmap_gpu.phy.texels[tindex];
                                     }
                                 }
-                                let z = heightmap_gpu.texels
-                                    [(i + j * heightmap_gpu.width as i32) as usize]
+                                let z = heightmap_gpu.phy.texels
+                                    [(i + j * heightmap_gpu.phy.width as i32) as usize]
                                     * (1.0 - power)
                                     + power * (acc / tap as f32);
                                 new_pix.push((index, z));
                             }
                             for (index, z) in new_pix {
-                                heightmap_gpu.texels[index] = z.min(self.max_z).max(self.min_z);
+                                heightmap_gpu.phy.texels[index] = z.min(self.max_z).max(self.min_z);
                             }
                         }
                     }
@@ -288,12 +291,17 @@ impl State {
         let file = File::create(path).unwrap();
         let ref mut w = BufWriter::new(file);
 
-        let mut encoder = png::Encoder::new(w, heightmap_gpu.width, heightmap_gpu.height); // Width is 2 pixels and height is 1.
+        let mut encoder = png::Encoder::new(
+            w,
+            heightmap_gpu.phy.width as u32,
+            heightmap_gpu.phy.height as u32,
+        ); // Width is 2 pixels and height is 1.
         encoder.set_color(png::ColorType::Grayscale);
         encoder.set_depth(png::BitDepth::Sixteen);
         let mut writer = encoder.write_header().unwrap();
 
         let data: Vec<u8> = heightmap_gpu
+            .phy
             .texels
             .iter()
             .map(|e| ((e / 511.0).min(1.0).max(0.0) * 65535.0) as u16)
@@ -335,14 +343,15 @@ impl State {
             .read_u16_into::<BigEndian>(&mut buffer_u16)
             .unwrap();
 
-        for i in 0..heightmap_gpu.width * heightmap_gpu.height {
-            heightmap_gpu.texels[i as usize] = buffer_u16[i as usize] as f32 / (65535.0 / 511.0);
+        for i in 0..heightmap_gpu.phy.width * heightmap_gpu.phy.height {
+            heightmap_gpu.phy.texels[i as usize] =
+                buffer_u16[i as usize] as f32 / (65535.0 / 511.0);
         }
         heightmap_gpu.update_rect(
             0 as u32,
             0 as u32,
-            heightmap_gpu.width as u32,
-            heightmap_gpu.height as u32,
+            heightmap_gpu.phy.width as u32,
+            heightmap_gpu.phy.height as u32,
         );
     }
 }

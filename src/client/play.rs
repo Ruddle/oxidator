@@ -8,6 +8,11 @@ use utils::*;
 
 impl App {
     pub fn handle_play(&mut self, delta_sim_sec: f32) -> (u128, u128) {
+
+        //interpolate
+        self.game_state.interpolate();
+
+
         //Selection square
         {
             if let input_state::Drag::End { x0, y0, x1, y1 } = self.input_state.drag {
@@ -58,24 +63,6 @@ impl App {
                 self.game_state.selected.clear();
             }
         }
-
-        //KBot update target
-        group_behavior::Group::update_mobile_target(
-            &self.input_state.mouse_trigger,
-            self.game_state.mouse_world_pos,
-            &self.game_state.selected,
-            &mut self.game_state.kbots,
-        );
-
-        //KBot update
-        let us_update_mobiles = time(|| {
-            group_behavior::Group::update_units(
-                delta_sim_sec,
-                &mut self.game_state.kbots,
-                &mut self.game_state.kinematic_projectiles,
-                &self.heightmap_gpu,
-            )
-        });
 
         let us_mobile_to_gpu = time(|| {
             let mut positions = Vec::with_capacity(self.game_state.kbots.len() * 18);
@@ -134,6 +121,6 @@ impl App {
                 .update_instance(&positions[..], &self.gpu.device);
         });
 
-        (us_update_mobiles, us_mobile_to_gpu)
+        (0, us_mobile_to_gpu)
     }
 }

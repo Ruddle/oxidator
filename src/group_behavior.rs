@@ -1,4 +1,4 @@
-use crate::heightmap_gpu;
+use crate::heightmap_phy;
 use crate::mobile;
 use crate::utils;
 use mobile::*;
@@ -6,6 +6,8 @@ use na::{Matrix4, Point3, Vector2, Vector3};
 use std::collections::{HashMap, HashSet};
 use utils::*;
 
+const PHY_S: f32 = 0.100;
+const PHY_MS: f32 = 100.0;
 pub struct Group {}
 
 impl Group {
@@ -91,14 +93,13 @@ impl Group {
     }
 
     pub fn update_units(
-        dt: f32,
         kbots: &mut HashMap<Id<KBot>, KBot>,
         kinematic_projectiles: &mut HashMap<Id<KinematicProjectile>, KinematicProjectile>,
-        heightmap_gpu: &heightmap_gpu::HeightmapGpu,
+        heightmap_phy: &heightmap_phy::HeightmapPhy,
     ) {
         let cell_size = 16;
-        let grid_w = (heightmap_gpu.width / cell_size) as usize;
-        let grid_h = (heightmap_gpu.height / cell_size) as usize;
+        let grid_w = (heightmap_phy.width / cell_size) as usize;
+        let grid_h = (heightmap_phy.height / cell_size) as usize;
         let mut grid = vec![HashSet::<Id<KBot>>::new(); grid_w * grid_h];
 
         let grid_pos = |mobile: &KBot| -> usize {
@@ -146,7 +147,7 @@ impl Group {
 
                     if neighbors_id.len() == 0 {
                     } else {
-                        let frame_prediction = 15.0;
+                        let frame_prediction = 1.5;
                         let mut nearest = None;
                         let mut dist_min = None;
                         for neighbor_id in neighbors_id.iter() {
@@ -239,19 +240,19 @@ impl Group {
                         dir_intensity =
                             target_prio + collision_avoid_priority + neighbor_dir_priority;
 
-                        mobile.dir = mobile.dir * 0.95 + dir * 0.05;
+                        mobile.dir = mobile.dir * 0.50 + dir * 0.5;
 
                         if will_to_go_target < 0.01 {
                             mobile.target = None;
                         }
                     }
 
-                    mobile.speed = (mobile.speed + mobile.dir * 0.08 * dir_intensity) * 0.5;
+                    mobile.speed = (mobile.speed + mobile.dir * 10.8 * dir_intensity) * 0.1;
 
                     mobile.position += mobile.speed;
 
                     mobile.position.z =
-                        heightmap_gpu.get_z_linear(mobile.position.x, mobile.position.y) + 0.5;
+                        heightmap_phy.z_linear(mobile.position.x, mobile.position.y) + 0.5;
                 }
             }
         }

@@ -1,4 +1,5 @@
 use super::client::*;
+use crate::frame;
 use crate::frame::FrameEvent;
 use crate::frame::Player;
 use crate::*;
@@ -79,6 +80,20 @@ impl App {
                     self.game_state
                         .players
                         .insert(player_ennemy.id, player_ennemy);
+
+                    let replacer = FrameEvent::ReplaceFrame(frame::Frame {
+                        number: 0,
+                        players: self.game_state.players.clone(),
+                        kbots: self.game_state.kbots.clone(),
+                        kinematic_projectiles: self.game_state.kinematic_projectiles.clone(),
+                        events: Vec::new(),
+                        heightmap_phy: self.heightmap_gpu.phy.clone(),
+                        complete: true,
+                        frame_profiler: frame::FrameProfiler::default(),
+                    });
+                    let _ = self
+                        .sender_from_client
+                        .try_send(client::FromClient::Event(replacer));
                 }
 
                 RenderEvent::ChangeMode {
@@ -122,12 +137,12 @@ impl App {
                     .position
                     .x
                     .max(0.0)
-                    .min(self.heightmap_gpu.width as f32 - 1.0),
+                    .min(self.heightmap_gpu.phy.width as f32 - 1.0),
                 self.game_state
                     .position
                     .y
                     .max(0.0)
-                    .min(self.heightmap_gpu.height as f32 - 1.0),
+                    .min(self.heightmap_gpu.phy.height as f32 - 1.0),
             );
             let height_from_ground = self.game_state.position.z - camera_ground_height;
             let k = (if !on(Key::LShift) { 1.0 } else { 2.0 }) * height_from_ground.max(10.0);
@@ -210,7 +225,7 @@ impl App {
                 * 15.0;
         }
 
-        self.phy_state.step();
+        // self.phy_state.step();
         //Phy Drawing
         // {
         //     let cubes_t = self.phy_state.cubes_transform();

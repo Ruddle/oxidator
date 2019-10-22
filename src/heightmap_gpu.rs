@@ -1,5 +1,6 @@
 use crate::glsl_compiler;
 use crate::heightmap;
+use crate::heightmap_phy;
 
 use wgpu::{BindGroup, BindGroupLayout, RenderPass, RenderPipeline, Texture, TextureFormat};
 use wgpu::{CommandEncoder, Device};
@@ -16,9 +17,7 @@ pub struct HeightmapGpu {
     vertex_buf: wgpu::Buffer,
     index_buf: wgpu::Buffer,
     index_count: usize,
-    pub width: u32,
-    pub height: u32,
-    pub texels: Vec<f32>,
+    pub phy: heightmap_phy::HeightmapPhy,
     ring_size: u32,
     texture: Texture,
     texture_lod: Texture,
@@ -35,8 +34,7 @@ impl HeightmapGpu {
         init_encoder: &mut CommandEncoder,
         format: TextureFormat,
         main_bind_group_layout: &BindGroupLayout,
-        width: u32,
-        height: u32,
+        phy: heightmap_phy::HeightmapPhy,
     ) -> Self {
         log::trace!("HeightmapGpu new");
         let texture_view_checker = {
@@ -126,10 +124,10 @@ impl HeightmapGpu {
         });
 
         let (texture_view_lod, texture_lod) = {
-            let width = width / ZONE_SIZE_MIP0 as u32;
-            let height = height / ZONE_SIZE_MIP0 as u32;
+            let width = phy.width as u32 / ZONE_SIZE_MIP0 as u32;
+            let height = phy.height as u32 / ZONE_SIZE_MIP0 as u32;
 
-            let size = width * height;
+            let size = phy.width as u32 * phy.height as u32;
             let texture_extent = wgpu::Extent3d {
                 width,
                 height,
@@ -188,12 +186,10 @@ impl HeightmapGpu {
         });
 
         let start = std::time::Instant::now();
-        let texels = heightmap::create_texels(width, height, 0.0);
-        println!("texels took {}us", start.elapsed().as_micros());
 
         let texture_extent = wgpu::Extent3d {
-            width,
-            height,
+            width: phy.width as u32,
+            height: phy.height as u32,
             depth: 1,
         };
 
@@ -208,15 +204,15 @@ impl HeightmapGpu {
         });
 
         let temp_buf = device
-            .create_buffer_mapped(texels.len(), wgpu::BufferUsage::COPY_SRC)
-            .fill_from_slice(&texels);
+            .create_buffer_mapped(phy.texels.len(), wgpu::BufferUsage::COPY_SRC)
+            .fill_from_slice(&phy.texels);
 
         init_encoder.copy_buffer_to_texture(
             wgpu::BufferCopyView {
                 buffer: &temp_buf,
                 offset: 0,
-                row_pitch: 4 * width,
-                image_height: height,
+                row_pitch: 4 * phy.width as u32,
+                image_height: phy.height as u32,
             },
             wgpu::TextureCopyView {
                 texture: &texture,
@@ -234,8 +230,8 @@ impl HeightmapGpu {
         let mut mipmaper = |mip: u32| {
             let m = 2_u32.pow(mip);
 
-            let width = width / m;
-            let height = height / m;
+            let width = phy.width as u32 / m;
+            let height = phy.height as u32 / m;
             let texture_extent = wgpu::Extent3d {
                 width,
                 height,
@@ -244,7 +240,7 @@ impl HeightmapGpu {
             let mut texels2 = Vec::new();
             for j in 0..height {
                 for i in 0..width {
-                    texels2.push(texels[(i * m + (j * m) * width * m) as usize]);
+                    texels2.push(phy.texels[(i * m + (j * m) * width * m) as usize]);
                 }
             }
 
@@ -293,7 +289,13 @@ impl HeightmapGpu {
 
         //Map size
         let ring_size = 128;
-        let map_size_cam_pos = [width as f32, height as f32, ring_size as f32, 0.0, 0.0];
+        let map_size_cam_pos = [
+            phy.width as f32,
+            phy.height as f32,
+            ring_size as f32,
+            0.0,
+            0.0,
+        ];
 
         let uniform_buf = device
             .create_buffer_mapped(5, wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::COPY_DST)
@@ -404,23 +406,23 @@ impl HeightmapGpu {
 
         let mut zone_to_update_mip0 = Vec::new();
 
-        for _ in (0..=width).step_by(ZONE_SIZE_MIP0) {
-            for _ in (0..=height).step_by(ZONE_SIZE_MIP0) {
+        for _ in (0..=phy.width).step_by(ZONE_SIZE_MIP0) {
+            for _ in (0..=phy.height).step_by(ZONE_SIZE_MIP0) {
                 zone_to_update_mip0.push(0);
             }
         }
 
         let mut zone_to_update_mip1 = Vec::new();
 
-        for _ in (0..=width).step_by(ZONE_SIZE_MIP0 * 2) {
-            for _ in (0..=height).step_by(ZONE_SIZE_MIP0 * 2) {
+        for _ in (0..=phy.width).step_by(ZONE_SIZE_MIP0 * 2) {
+            for _ in (0..=phy.height).step_by(ZONE_SIZE_MIP0 * 2) {
                 zone_to_update_mip1.push(0);
             }
         }
 
         let mut zone_to_update_mip2 = Vec::new();
-        for _ in (0..=width).step_by(ZONE_SIZE_MIP0 * 4) {
-            for _ in (0..=height).step_by(ZONE_SIZE_MIP0 * 4) {
+        for _ in (0..=phy.width).step_by(ZONE_SIZE_MIP0 * 4) {
+            for _ in (0..=phy.height).step_by(ZONE_SIZE_MIP0 * 4) {
                 zone_to_update_mip2.push(0);
             }
         }
@@ -432,9 +434,7 @@ impl HeightmapGpu {
             vertex_buf,
             index_buf,
             index_count,
-            width,
-            height,
-            texels,
+            phy,
             ring_size,
             texture,
             texture_lod,
@@ -629,11 +629,11 @@ impl HeightmapGpu {
         log::trace!("HeightmapGpu update_uniform");
         //Map size
         let map_size_cam_pos = [
-            self.width as f32,
-            self.height as f32,
+            self.phy.width as u32 as f32,
+            self.phy.height as u32 as f32,
             self.ring_size as f32,
-            (camera_x.max(0.0).min(self.width as f32) / 1.0).floor() * 1.0,
-            (camera_y.max(0.0).min(self.height as f32) / 1.0).floor() * 1.0,
+            (camera_x.max(0.0).min(self.phy.width as u32 as f32) / 1.0).floor() * 1.0,
+            (camera_y.max(0.0).min(self.phy.height as u32 as f32) / 1.0).floor() * 1.0,
         ];
 
         let uniform_buf = device
@@ -644,28 +644,11 @@ impl HeightmapGpu {
     }
 
     pub fn get_z(&self, x: f32, y: f32) -> f32 {
-        let i = x as usize + (y as usize) * self.width as usize;
-        self.texels[i]
+        self.phy.z(x, y)
     }
 
     pub fn get_z_linear(&self, x: f32, y: f32) -> f32 {
-        let imin = x.trunc() as usize;
-        let imax = imin + 1;
-        let jmin = y.trunc() as usize;
-        let jmax = self.width as usize * (jmin + 1);
-        let jmin = self.width as usize * jmin;
-
-        let a = self.texels[imin + jmin];
-        let b = self.texels[imax + jmin];
-        let c = self.texels[imax + jmax];
-        let d = self.texels[imin + jmax];
-
-        let z = a * (1.0 - x.fract()) * (1.0 - y.fract())
-            + b * (x.fract()) * (1.0 - y.fract())
-            + c * (x.fract()) * (y.fract())
-            + d * (1.0 - x.fract()) * (y.fract());
-
-        z
+        self.phy.z_linear(x, y)
     }
 
     pub fn step(&mut self, device: &Device, encoder: &mut CommandEncoder) {
@@ -679,12 +662,12 @@ impl HeightmapGpu {
                     device,
                     encoder,
                     &self.texture,
-                    &self.texels,
-                    self.width,
+                    &self.phy.texels,
+                    self.phy.width as u32,
                     0,
                     0,
-                    self.width,
-                    self.height,
+                    self.phy.width as u32,
+                    self.phy.height as u32,
                 );
             }
         }
@@ -716,22 +699,22 @@ impl HeightmapGpu {
             for index in indices.iter().take(update_to_do) {
                 self.zone_to_update_mip2[*index] = 0;
 
-                let i = *index as u32 % (self.width / (ZONE_SIZE_MIP0 * 4) as u32);
-                let j = *index as u32 / (self.width / (ZONE_SIZE_MIP0 * 4) as u32);
+                let i = *index as u32 % (self.phy.width as u32 / (ZONE_SIZE_MIP0 * 4) as u32);
+                let j = *index as u32 / (self.phy.width as u32 / (ZONE_SIZE_MIP0 * 4) as u32);
                 let min_x = i * ZONE_SIZE_MIP0 as u32 * 4;
                 let min_y = j * ZONE_SIZE_MIP0 as u32 * 4;
 
-                if min_x < self.width && min_y < self.height {
-                    let width = (ZONE_SIZE_MIP0 as u32 * 4).min(self.width - min_x);
-                    let height = (ZONE_SIZE_MIP0 as u32 * 4).min(self.height - min_y);
+                if min_x < self.phy.width as u32 && min_y < self.phy.height as u32 {
+                    let width = (ZONE_SIZE_MIP0 as u32 * 4).min(self.phy.width as u32 - min_x);
+                    let height = (ZONE_SIZE_MIP0 as u32 * 4).min(self.phy.height as u32 - min_y);
 
                     self.mipmap_update(
                         2,
                         device,
                         encoder,
                         &self.texture,
-                        &self.texels,
-                        self.width,
+                        &self.phy.texels,
+                        self.phy.width as u32,
                         min_x,
                         min_y,
                         width,
@@ -768,22 +751,22 @@ impl HeightmapGpu {
             for index in indices.iter().take(update_to_do) {
                 self.zone_to_update_mip1[*index] = 0;
 
-                let i = *index as u32 % (self.width / (ZONE_SIZE_MIP0 * 2) as u32);
-                let j = *index as u32 / (self.width / (ZONE_SIZE_MIP0 * 2) as u32);
+                let i = *index as u32 % (self.phy.width as u32 / (ZONE_SIZE_MIP0 * 2) as u32);
+                let j = *index as u32 / (self.phy.width as u32 / (ZONE_SIZE_MIP0 * 2) as u32);
                 let min_x = i * ZONE_SIZE_MIP0 as u32 * 2;
                 let min_y = j * ZONE_SIZE_MIP0 as u32 * 2;
 
-                if min_x < self.width && min_y < self.height {
-                    let width = (ZONE_SIZE_MIP0 as u32 * 2).min(self.width - min_x);
-                    let height = (ZONE_SIZE_MIP0 as u32 * 2).min(self.height - min_y);
+                if min_x < self.phy.width as u32 && min_y < self.phy.height as u32 {
+                    let width = (ZONE_SIZE_MIP0 as u32 * 2).min(self.phy.width as u32 - min_x);
+                    let height = (ZONE_SIZE_MIP0 as u32 * 2).min(self.phy.height as u32 - min_y);
 
                     self.mipmap_update(
                         1,
                         device,
                         encoder,
                         &self.texture,
-                        &self.texels,
-                        self.width,
+                        &self.phy.texels,
+                        self.phy.width as u32,
                         min_x,
                         min_y,
                         width,
@@ -821,22 +804,22 @@ impl HeightmapGpu {
             for index in indices.iter().take(update_to_do) {
                 self.zone_to_update_mip0[*index] = 0;
 
-                let i = *index as u32 % (self.width / ZONE_SIZE_MIP0 as u32);
-                let j = *index as u32 / (self.width / ZONE_SIZE_MIP0 as u32);
+                let i = *index as u32 % (self.phy.width as u32 / ZONE_SIZE_MIP0 as u32);
+                let j = *index as u32 / (self.phy.width as u32 / ZONE_SIZE_MIP0 as u32);
                 let min_x = i * ZONE_SIZE_MIP0 as u32;
                 let min_y = j * ZONE_SIZE_MIP0 as u32;
 
-                if min_x < self.width && min_y < self.height {
-                    let width = (ZONE_SIZE_MIP0 as u32).min(self.width - min_x);
-                    let height = (ZONE_SIZE_MIP0 as u32).min(self.height - min_y);
+                if min_x < self.phy.width as u32 && min_y < self.phy.height as u32 {
+                    let width = (ZONE_SIZE_MIP0 as u32).min(self.phy.width as u32 - min_x);
+                    let height = (ZONE_SIZE_MIP0 as u32).min(self.phy.height as u32 - min_y);
 
                     self.mipmap_update(
                         0,
                         device,
                         encoder,
                         &self.texture,
-                        &self.texels,
-                        self.width,
+                        &self.phy.texels,
+                        self.phy.width as u32,
                         min_x,
                         min_y,
                         width,
@@ -847,8 +830,8 @@ impl HeightmapGpu {
         }
         //Update lod texture
 
-        let width = self.width / ZONE_SIZE_MIP0 as u32;
-        let height = self.height / ZONE_SIZE_MIP0 as u32;
+        let width = self.phy.width as u32 / ZONE_SIZE_MIP0 as u32;
+        let height = self.phy.height as u32 / ZONE_SIZE_MIP0 as u32;
 
         let size = width * height;
         let texture_extent = wgpu::Extent3d {
@@ -898,7 +881,7 @@ impl HeightmapGpu {
     pub fn update_rect(&mut self, min_x: u32, min_y: u32, width: u32, height: u32) {
         for i in (min_x / ZONE_SIZE_MIP0 as u32)..=(min_x + width) / ZONE_SIZE_MIP0 as u32 {
             for j in (min_y / ZONE_SIZE_MIP0 as u32)..=(min_y + height) / ZONE_SIZE_MIP0 as u32 {
-                let width = self.width / ZONE_SIZE_MIP0 as u32;
+                let width = self.phy.width as u32 / ZONE_SIZE_MIP0 as u32;
 
                 let rank = &mut self.zone_to_update_mip2[(i / 4 + (j / 4) * (width / 4)) as usize];
                 if *rank == 0 {

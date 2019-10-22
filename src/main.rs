@@ -10,6 +10,7 @@ mod group_behavior;
 mod heightmap;
 mod heightmap_editor;
 mod heightmap_gpu;
+mod heightmap_phy;
 mod input_state;
 mod mobile;
 mod model;
@@ -68,7 +69,13 @@ fn main() {
     //Client
     std::thread::spawn(move || {
         let _ = s_to_client.send(ToClient::Render);
-        let mut client = client::App::new(window, s_to_client, r_to_client, s_to_event_loop,s_from_client);
+        let mut client = client::App::new(
+            window,
+            s_to_client,
+            r_to_client,
+            s_to_event_loop,
+            s_from_client,
+        );
         loop {
             client.receive();
         }

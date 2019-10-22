@@ -12,12 +12,13 @@ use model_gpu::ModelGpu;
 mod misc;
 mod play;
 mod render;
+
+use crate::heightmap_phy;
+use log::info;
 use std::collections::{HashMap, HashSet};
 use std::time::Instant;
 use utils::time;
 use wgpu::{BufferMapAsyncResult, Extent3d, SwapChain, TextureFormat};
-
-use log::info;
 
 use winit::event::WindowEvent;
 
@@ -69,6 +70,7 @@ pub struct App {
     postfxaa: post_fxaa::PostFxaa,
 
     frame_count: i32,
+
     game_state: game_state::State,
     input_state: input_state::InputState,
     imgui_wrap: ImguiWrap,
@@ -277,8 +279,7 @@ impl App {
             &mut init_encoder,
             format,
             &bind_group_layout,
-            2048,
-            2048,
+            heightmap_phy::HeightmapPhy::new(2048, 2048),
         );
 
         let cube_gpu = ModelGpu::new(
@@ -674,7 +675,9 @@ impl App {
                     ToClient::Render => {
                         self.render();
                     }
-                    ToClient::NewFrame(frame) => {}
+                    ToClient::NewFrame(frame) => {
+                        self.game_state.handle_new_frame(frame);
+                    }
                 }
             }
             _ => {
