@@ -5,6 +5,7 @@ use crate::frame::Player;
 use crate::*;
 use imgui::*;
 use na::{IsometryMatrix3, Matrix4, Point3, Vector2, Vector3, Vector4};
+use std::time::Duration;
 use std::time::Instant;
 use utils::time;
 use wgpu::{BufferMapAsyncResult, Extent3d};
@@ -101,7 +102,11 @@ impl App {
                     to: MainMode::Home,
                 } => {
                     self.game_state.position = Point3::new(200.0, 100.0, 50.0);
-                    self.game_state.dir = Vector3::new(0.0, 0.3, -1.0)
+                    self.game_state.dir = Vector3::new(0.0, 0.3, -1.0);
+                    let replacer = FrameEvent::ReplaceFrame(frame::Frame::new());
+                    let _ = self
+                        .sender_from_client
+                        .try_send(client::FromClient::Event(replacer));
                 }
                 _ => {}
             }
@@ -238,24 +243,23 @@ impl App {
         //         .update_instance(&positions[..], &self.gpu.device);
         // }
 
-        let (us_update_mobiles, us_mobile_to_gpu) = if self.main_menu == MainMode::Play {
+        let (interp_duration, mobile_to_gpu_duration) = if self.main_menu == MainMode::Play {
             self.handle_play(delta_sim_sec)
         } else {
-            (0, 0)
+            (Duration::default(), Duration::default())
         };
 
-        //Action
-        now = Instant::now();
-        if let MainMode::MapEditor = self.main_menu {
-            if let Some(mouse_world_pos) = self.game_state.mouse_world_pos {
-                self.game_state.heightmap_editor.handle_user_input(
-                    &self.input_state.mouse_pressed,
-                    &mouse_world_pos,
-                    &mut self.heightmap_gpu,
-                );
+        let heightmap_editor_duration = time(|| {
+            if let MainMode::MapEditor = self.main_menu {
+                if let Some(mouse_world_pos) = self.game_state.mouse_world_pos {
+                    self.game_state.heightmap_editor.handle_user_input(
+                        &self.input_state.mouse_pressed,
+                        &mouse_world_pos,
+                        &mut self.heightmap_gpu,
+                    );
+                }
             }
-        }
-        let us_heightmap_editor = now.elapsed().as_micros();
+        });
 
         //Render
         let mut encoder_render = self
@@ -263,10 +267,10 @@ impl App {
             .device
             .create_command_encoder(&wgpu::CommandEncoderDescriptor { todo: 0 });
 
-        now = Instant::now();
-        self.heightmap_gpu
-            .step(&self.gpu.device, &mut encoder_render);
-        let us_heightmap_step = now.elapsed().as_micros();
+        let heightmap_gpu_step_duration = time(|| {
+            self.heightmap_gpu
+                .step(&self.gpu.device, &mut encoder_render);
+        });
 
         let cursor_sample_position = self
             .gpu
@@ -494,7 +498,7 @@ impl App {
                 &self.first_color_att_view,
             );
         }
-        let us_3d_render_pass = now.elapsed().as_micros();
+        let us_3d_render_pass = now.elapsed();
 
         //Imgui
         {
@@ -510,12 +514,13 @@ impl App {
 
             {
                 let mut_fps = &mut self.game_state.fps;
+                let p = &self.game_state.frame_zero.frame_profiler;
                 let stats_window = imgui::Window::new(im_str!("Statistics"));
                 stats_window
-                    .size([400.0, 200.0], imgui::Condition::FirstUseEver)
+                    .size([270.0, 260.0], imgui::Condition::FirstUseEver)
                     .position([3.0, 3.0], imgui::Condition::FirstUseEver)
                     .collapsed(true, imgui::Condition::FirstUseEver)
-                    .resizable(false)
+                    .resizable(true)
                     .movable(false)
                     .build(&ui, || {
                         imgui::Slider::new(im_str!("fps"), 1..=480).build(&ui, mut_fps);
@@ -525,11 +530,26 @@ impl App {
                             last_compute_time_total.as_micros()
                         ));
 
-                        ui.text(im_str!("us_update_mobiles: {}us", us_update_mobiles));
-                        ui.text(im_str!("us_mobile_to_gpu: {}us", us_mobile_to_gpu));
-                        ui.text(im_str!("us_heightmap_editor: {}us", us_heightmap_editor));
-                        ui.text(im_str!("us_heightmap_step: {}us", us_heightmap_step));
-                        ui.text(im_str!("us_3d_render_pass: {}us", us_3d_render_pass));
+                        ui.separator();
+                        ui.text(im_str!("renderer:               {:?}", last_compute_time));
+                        ui.text(im_str!("   interpolation:       {:?}", interp_duration));
+                        ui.text(im_str!(
+                            "   us_mobile_to_gpu:    {:?}",
+                            mobile_to_gpu_duration
+                        ));
+                        ui.text(im_str!(
+                            "   heightmap_editor:    {:?}",
+                            heightmap_editor_duration
+                        ));
+                        ui.text(im_str!(
+                            "   heightmap_step:      {:?}",
+                            heightmap_gpu_step_duration
+                        ));
+                        ui.text(im_str!("   3d_render_pass:      {:?}", us_3d_render_pass));
+                        ui.separator();
+                        ui.text(im_str!("logic:                  {:?}", p.total));
+                        ui.text(im_str!("   handle_events:       {:?}", p.handle_events));
+                        ui.text(im_str!("   update_units:        {:?}", p.update_units));
                     });
 
                 match main_menu {

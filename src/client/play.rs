@@ -3,15 +3,16 @@ use crate::*;
 use imgui::*;
 use na::{Isometry3, Matrix4, Point3, Vector2, Vector3, Vector4};
 use std::collections::{HashMap, HashSet};
+use std::time::{Duration, Instant};
 
 use utils::*;
 
 impl App {
-    pub fn handle_play(&mut self, delta_sim_sec: f32) -> (u128, u128) {
-
-        //interpolate
-        self.game_state.interpolate();
-
+    pub fn handle_play(&mut self, delta_sim_sec: f32) -> (Duration, Duration) {
+        //Interpolate
+        let interp_duration = time(|| {
+            self.game_state.interpolate();
+        });
 
         //Selection square
         {
@@ -64,7 +65,8 @@ impl App {
             }
         }
 
-        let us_mobile_to_gpu = time(|| {
+        //Upload to gpu
+        let mobile_to_gpu_duration = time(|| {
             let mut positions = Vec::with_capacity(self.game_state.kbots.len() * 18);
             for mobile in self.game_state.kbots.values() {
                 let mat = Matrix4::face_towards(
@@ -121,6 +123,6 @@ impl App {
                 .update_instance(&positions[..], &self.gpu.device);
         });
 
-        (0, us_mobile_to_gpu)
+        (interp_duration, mobile_to_gpu_duration)
     }
 }

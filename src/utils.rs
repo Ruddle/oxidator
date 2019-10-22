@@ -100,11 +100,11 @@ pub fn pop_set<T: Clone + Eq + std::hash::Hash>(set: &mut HashSet<T>) -> T {
     set.take(&elt).unwrap()
 }
 
-pub fn time<F, K>(f: F) -> u128
+pub fn time<F, K>(f: F) -> std::time::Duration
 where
     F: FnOnce() -> K,
 {
     let start = std::time::Instant::now();
     f();
-    start.elapsed().as_micros()
+    start.elapsed()
 }
