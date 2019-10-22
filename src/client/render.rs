@@ -182,10 +182,10 @@ impl App {
                         let mut new_camera_to_center = camera_to_center.normalize();
 
                         if self.input_state.last_scroll > 0.0 {
-                            new_camera_to_center.y += 1.0 * 33.0 * delta_sim_sec;
+                            new_camera_to_center.y += 1.0 * 0.30;
                         }
                         if self.input_state.last_scroll < 0.0 {
-                            new_camera_to_center.z -= 1.0 * 33.0 * delta_sim_sec;
+                            new_camera_to_center.z -= 1.0 * 0.30;
                         }
                         new_camera_to_center.x = 0.0;
 
@@ -199,18 +199,18 @@ impl App {
                     }
                 } else {
                     if self.input_state.last_scroll > 0.0 {
-                        dir_offset.y += 1.0;
+                        dir_offset.y += 1.0 / delta_sim_sec;
                     }
                     if self.input_state.last_scroll < 0.0 {
-                        dir_offset.z -= 1.0;
+                        dir_offset.z -= 1.0 / delta_sim_sec;
                     }
                 }
             } else {
                 if let Some(mouse_world_pos) = self.game_state.mouse_world_pos {
                     let u = (mouse_world_pos - self.game_state.position.coords).normalize();
-                    offset += self.input_state.last_scroll * u * k * 32.0;
+                    offset += self.input_state.last_scroll * u * k * 0.75 * 0.320 / delta_sim_sec;
                 } else {
-                    offset.z = -self.input_state.last_scroll * k * 20.0;
+                    offset.z = -self.input_state.last_scroll * k * 0.75 * 0.20 / delta_sim_sec;
                 }
             }
 
