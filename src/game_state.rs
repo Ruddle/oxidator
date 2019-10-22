@@ -87,7 +87,6 @@ impl State {
         let im = 1.0 - lambda;
 
         self.kbots = HashMap::with_capacity(self.frame_zero.kbots.len());
-
         for kbot_0 in self.frame_zero.kbots.values() {
             let to_insert = {
                 if let Some(kbot_m) = self.frame_minus_one.kbots.get(&kbot_0.id) {
@@ -109,8 +108,32 @@ impl State {
             self.kbots.insert(to_insert.id, to_insert);
         }
 
+        self.kinematic_projectiles =
+            HashMap::with_capacity(self.frame_zero.kinematic_projectiles.len());
+        for kine_0 in self.frame_zero.kinematic_projectiles.values() {
+            let to_insert = {
+                if let Some(kine_m) = self.frame_minus_one.kinematic_projectiles.get(&kine_0.id) {
+                    let position = kine_0.position() * i0 + (im * kine_m.position()).coords;
+
+                    let mut positions = vec![position];
+                    positions.extend(&kine_0.positions.clone());
+                    let kine = KinematicProjectile {
+                        positions,
+                        ..*kine_0
+                    };
+
+                    kine
+                } else {
+                    //No interpolation possible, taking last data point
+                    kine_0.clone()
+                }
+            };
+
+            self.kinematic_projectiles.insert(to_insert.id, to_insert);
+        }
+
         // self.kbots = self.frame_zero.kbots.clone();
-        self.kinematic_projectiles = self.frame_zero.kinematic_projectiles.clone();
+        // self.kinematic_projectiles = self.frame_zero.kinematic_projectiles.clone();
         self.players = self.frame_zero.players.clone();
     }
 

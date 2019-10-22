@@ -42,6 +42,10 @@ impl KinematicProjectile {
             positions,
         }
     }
+
+    pub fn position(&self) -> Point3<f32> {
+        self.positions.first().unwrap().clone()
+    }
 }
 
 #[derive(Clone, Debug)]

@@ -59,7 +59,7 @@ impl App {
                     for i in (150..200).step_by(7) {
                         for j in (100..150).step_by(7) {
                             let m = mobile::KBot::new(Point3::new(i as f32, j as f32, 100.0));
-                            player_me.mobiles.insert(m.id);
+                            player_me.kbots.insert(m.id);
                             self.game_state.kbots.insert(m.id, m);
                         }
                     }
@@ -70,7 +70,7 @@ impl App {
                     for i in (230..280).step_by(7) {
                         for j in (100..150).step_by(7) {
                             let m = mobile::KBot::new(Point3::new(i as f32, j as f32, 100.0));
-                            player_ennemy.mobiles.insert(m.id);
+                            player_ennemy.kbots.insert(m.id);
                             self.game_state.kbots.insert(m.id, m);
                         }
                     }

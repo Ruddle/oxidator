@@ -15,7 +15,7 @@ use mobile::*;
 #[derive(Clone, TypeName, Debug)]
 pub struct Player {
     pub id: Id<Player>,
-    pub mobiles: HashSet<Id<KBot>>,
+    pub kbots: HashSet<Id<KBot>>,
     pub team: u8,
 }
 
@@ -24,7 +24,7 @@ impl Player {
         let id = utils::rand_id();
         Player {
             id,
-            mobiles: HashSet::new(),
+            kbots: HashSet::new(),
             team: 0,
         }
     }

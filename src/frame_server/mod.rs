@@ -28,6 +28,7 @@ pub fn next_frame(mut old_frame: Frame) -> Frame {
     }
 
     let mut frame = replacer.unwrap_or(old_frame);
+    frame.number += 1;
 
     for event in frame.events {
         match event {
@@ -58,11 +59,13 @@ pub fn next_frame(mut old_frame: Frame) -> Frame {
         &mut frame.kinematic_projectiles,
         &frame.heightmap_phy,
         &mut arrows,
+        frame.number,
+        &frame.players,
     );
     let update_units = start_update_units.elapsed();
 
     Frame {
-        number: frame.number + 1,
+        number: frame.number,
         events: Vec::new(),
         complete: false,
         frame_profiler: FrameProfiler {

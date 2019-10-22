@@ -36,7 +36,7 @@ impl App {
                     .game_state
                     .kbots
                     .iter()
-                    .filter(|(id, e)| me.mobiles.contains(id))
+                    .filter(|(id, e)| me.kbots.contains(id))
                     .flat_map(|(id, e)| {
                         let p = e.position.to_homogeneous();
                         let r = view_proj * p;
@@ -86,7 +86,7 @@ impl App {
                     .game_state
                     .players
                     .values()
-                    .find(|e| e.mobiles.contains(&mobile.id))
+                    .find(|e| e.kbots.contains(&mobile.id))
                     .unwrap()
                     .team;
 
