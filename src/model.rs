@@ -9,6 +9,29 @@ pub struct TriangleList {
     pub index_data: Vec<u32>,
 }
 
+pub fn open_arrow() -> TriangleList {
+    use obj::{load_obj, Obj};
+    use std::fs::File;
+    use std::io::BufReader;
+
+    let input = BufReader::new(File::open("./src/asset/arrow.obj").unwrap());
+    let model: Obj = load_obj(input).unwrap();
+
+    let vertex_data: Vec<_> = model
+        .vertices
+        .iter()
+        .map(|v| Vertex {
+            _pos: [v.position[0], v.position[1], v.position[2], 1.0],
+            _tex_coord: [0.0, 0.0],
+        })
+        .collect();
+
+    TriangleList {
+        vertex_data,
+        index_data: model.indices.iter().map(|u| *u as u32).collect(),
+    }
+}
+
 pub fn create_cube() -> TriangleList {
     fn vertex(pos: [i8; 3], tc: [i8; 2]) -> Vertex {
         Vertex {

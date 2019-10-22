@@ -31,7 +31,6 @@ impl App {
         self.game_state.last_frame = now;
         let last_compute_time_total = delta.clone();
         let delta_sim_sec = last_compute_time_total.as_secs_f32();
-        self.frame_count += 1;
 
         let mailbox = self.mailbox.clone();
         self.mailbox.clear();

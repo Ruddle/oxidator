@@ -69,8 +69,6 @@ pub struct App {
     postfx: post_fx::PostFx,
     postfxaa: post_fxaa::PostFxaa,
 
-    frame_count: i32,
-
     game_state: game_state::State,
     input_state: input_state::InputState,
     imgui_wrap: ImguiWrap,
@@ -297,7 +295,7 @@ impl App {
         );
 
         let kinematic_projectile_gpu = ModelGpu::new(
-            &model::create_small_cube(),
+            &model::open_arrow(),
             &gpu.device,
             format,
             &bind_group_layout,
@@ -399,8 +397,6 @@ impl App {
             game_state,
             input_state: input_state::InputState::new(),
             imgui_wrap,
-            frame_count: 0,
-
             main_menu: MainMode::Home,
 
             sender_to_client,
