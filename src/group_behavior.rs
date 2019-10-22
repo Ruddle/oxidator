@@ -102,9 +102,11 @@ impl Group {
         frame_count: i32,
         players: &HashMap<Id<Player>, Player>,
     ) {
-        let cell_size = 8;
+        let cell_size = 16;
         let grid_w = (heightmap_phy.width / cell_size) as usize;
         let grid_h = (heightmap_phy.height / cell_size) as usize;
+
+        let start = std::time::Instant::now();
         let mut grid = vec![HashSet::<Id<KBot>>::new(); grid_w * grid_h];
 
         let grid_pos = |mobile: &KBot| -> usize {
@@ -114,17 +116,9 @@ impl Group {
         };
 
         for (&id, mobile) in kbots.iter() {
-            grid[grid_pos(mobile)].insert(id);
-        }
+            let gp = grid_pos(mobile);
+            grid[gp].insert(id);
 
-        let mobiles2 = kbots.clone();
-        //Movement compute
-
-        for (id, mobile) in kbots.iter_mut() {
-            let grid_pos = grid_pos(mobile);
-
-            let mut neighbors_id: HashSet<Id<KBot>> = grid[grid_pos].clone();
-            neighbors_id.remove(id);
             for cell in &[
                 -1_i32 - grid_w as i32,
                 -(grid_w as i32),
@@ -135,14 +129,22 @@ impl Group {
                 grid_w as i32,
                 1 + grid_w as i32,
             ] {
-                let cell_index = cell + grid_pos as i32;
+                let cell_index = cell + gp as i32;
                 if cell_index >= 0 && (cell_index as usize) < grid_w * grid_h {
-                    neighbors_id = neighbors_id
-                        .union(&grid[cell_index as usize])
-                        .copied()
-                        .collect();
+                    grid[cell_index as usize].insert(id);
                 }
             }
+        }
+        println!("Grid took {:?}", start.elapsed());
+
+        let mobiles2 = kbots.clone();
+        //Movement compute
+
+        for (id, mobile) in kbots.iter_mut() {
+            let grid_pos = grid_pos(mobile);
+
+            let mut neighbors_id: HashSet<Id<KBot>> = grid[grid_pos].clone();
+            neighbors_id.remove(id);
 
             let mut collision_avoid_dir = Vector2::new(0.0_f32, 0.0);
             let mut collision_avoid_priority = 0.0_f32;

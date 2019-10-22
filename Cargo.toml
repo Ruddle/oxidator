@@ -7,11 +7,12 @@ edition = "2018"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [features]
-default = ["wgpu/vulkan"]
 metal = ["wgpu/metal"]
 dx11 = ["wgpu/dx11"]
 dx12 = ["wgpu/dx12"]
 vulkan = ["wgpu/vulkan"]
+use_shaderc =["shaderc"]
+default = ["wgpu/vulkan","use_shaderc"]
 
 [dependencies]
 wgpu = { version = "0.3.0" }
@@ -24,7 +25,7 @@ raw-window-handle = "0.1"
 
 imgui = "0.2.1"
 imgui-wgpu = "0.1.0"
-shaderc = "0.6"
+shaderc = {version = "0.6", optional = true} 
 noise = "0.6.0"
 
 nalgebra = "0.18"

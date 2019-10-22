@@ -28,6 +28,7 @@ extern crate load_file;
 extern crate byteorder;
 extern crate crossbeam_channel;
 extern crate nalgebra as na;
+#[cfg(feature = "use_shaderc")]
 extern crate shaderc;
 #[macro_use]
 extern crate typename;

@@ -150,7 +150,13 @@ impl App {
                     .min(self.heightmap_gpu.phy.height as f32 - 1.0),
             );
             let height_from_ground = self.game_state.position.z - camera_ground_height;
-            let k = (if !on(Key::LShift) { 1.0 } else { 2.0 }) * height_from_ground.max(10.0);
+            let distance_camera_middle_screen = self
+                .game_state
+                .screen_center_world_pos
+                .map(|scwp| (self.game_state.position.coords - scwp).magnitude())
+                .unwrap_or(height_from_ground);
+            let k = (if !on(Key::LShift) { 1.0 } else { 2.0 })
+                * distance_camera_middle_screen.max(10.0);
             //Game
             if on(Key::S) {
                 offset.y -= k;
