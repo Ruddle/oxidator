@@ -2,7 +2,7 @@ use crate::heightmap_phy;
 use crate::mobile;
 use crate::utils;
 use mobile::*;
-use na::{Matrix4, Point3, Vector2, Vector3};
+use na::{Matrix4, Point2, Point3, Vector2, Vector3};
 use std::collections::{HashMap, HashSet};
 use utils::*;
 
@@ -137,13 +137,13 @@ impl Group {
                         }
                     }
 
-                    let mut collision_avoid_dir = Vector3::new(0.0_f32, 0.0, 0.0);
+                    let mut collision_avoid_dir = Vector2::new(0.0_f32, 0.0);
                     let mut collision_avoid_priority = 0.0_f32;
 
-                    let mut neighbor_dir = Vector3::new(0.0_f32, 0.0, 0.0);
+                    let mut neighbor_dir = Vector2::new(0.0_f32, 0.0);
                     let mut neighbor_dir_priority = 0.0_f32;
 
-                    let mut dir = Vector3::new(0.0, 0.0, 0.0);
+                    let mut dir = Vector2::new(0.0, 0.0);
 
                     if neighbors_id.len() == 0 {
                     } else {
@@ -176,31 +176,34 @@ impl Group {
                                 + mobile.speed * frame_prediction
                                 - nearest.position.coords
                                 - nearest.speed * frame_prediction)
+                                .xy()
                                 .magnitude();
 
                             collision_avoid_priority = ((4.0 - closeness) / 4.0).max(0.0).min(0.8);
 
-                            collision_avoid_dir = if nearest.speed.norm_squared() > 0.01
-                                && mobile.speed.dot(&nearest.speed) < 0.0
+                            collision_avoid_dir = if nearest.speed.xy().norm_squared() > 0.01
+                                && mobile.speed.xy().dot(&nearest.speed.xy()) < 0.0
                             {
-                                let u =
-                                    (mobile.position.coords - nearest.position.coords).normalize();
+                                let u = (mobile.position.coords - nearest.position.coords)
+                                    .xy()
+                                    .normalize();
 
-                                let v = Vector3::<f32>::new(u.y, -u.x, u.z).normalize();
-                                let w = Vector3::<f32>::new(-u.y, u.x, u.z).normalize();
+                                let v = Vector2::<f32>::new(u.y, -u.x).normalize();
+                                let w = Vector2::<f32>::new(-u.y, u.x).normalize();
 
-                                if v.dot(&mobile.speed) > w.dot(&mobile.speed) {
+                                if v.dot(&mobile.speed.xy()) > w.dot(&mobile.speed.xy()) {
                                     v
                                 } else {
                                     w
                                 }
                             } else {
-                                let him_to_me =
-                                    (mobile.position.coords - nearest.position.coords).normalize();
+                                let him_to_me = (mobile.position.coords - nearest.position.coords)
+                                    .xy()
+                                    .normalize();
                                 him_to_me
                             };
 
-                            let speed_closeness = mobile.speed.dot(&nearest.speed);
+                            let speed_closeness = mobile.speed.xy().dot(&nearest.speed.xy());
                             neighbor_dir_priority =
                                 if speed_closeness > 0.0 && nearest.speed.norm() > 0.1 {
                                     speed_closeness.max(0.2).min(1.0 - collision_avoid_priority)
@@ -210,15 +213,16 @@ impl Group {
 
                             neighbor_dir = nearest
                                 .speed
+                                .xy()
                                 .try_normalize(0.001)
-                                .unwrap_or(Vector3::new(0.0, 0.0, 0.0));
+                                .unwrap_or(Vector2::new(0.0, 0.0));
                         }
                     }
 
                     let mut dir_intensity = 0.0;
 
                     if let Some(target) = mobile.target {
-                        let to_target = target.coords - mobile.position.coords;
+                        let to_target = (target.coords - mobile.position.coords).xy();
                         let to_target_distance = to_target.norm();
                         let will_to_go_target = if to_target_distance > 0.5 {
                             (to_target_distance / 2.0).min(1.0)
@@ -240,7 +244,7 @@ impl Group {
                         dir_intensity =
                             target_prio + collision_avoid_priority + neighbor_dir_priority;
 
-                        mobile.dir = mobile.dir * 0.50 + dir * 0.5;
+                        mobile.dir = mobile.dir * 0.50 + Vector3::new(dir.x, dir.y, 0.0) * 0.5;
 
                         if will_to_go_target < 0.01 {
                             mobile.target = None;
