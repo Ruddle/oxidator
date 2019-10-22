@@ -339,8 +339,7 @@ impl App {
             usage: wgpu::TextureUsage::OUTPUT_ATTACHMENT | wgpu::TextureUsage::SAMPLED,
         });
 
-        let postfx = post_fx::PostFx::new(&gpu.device, &bind_group_layout, format);
-        let postfxaa = post_fxaa::PostFxaa::new(&gpu.device, &bind_group_layout, format);
+        let position_att_view = position_att.create_default_view();
 
         gpu.device.get_queue().submit(&[init_encoder.finish()]);
 
@@ -383,6 +382,14 @@ impl App {
 
         let first_color_att_view = first_color_att.create_default_view();
 
+        let postfx =
+            post_fx::PostFx::new(&gpu.device, &bind_group_layout, format, &position_att_view);
+        let postfxaa = post_fxaa::PostFxaa::new(
+            &gpu.device,
+            &bind_group_layout,
+            format,
+            &first_color_att_view,
+        );
         // Done
         let this = App {
             gpu,
@@ -399,7 +406,7 @@ impl App {
             heightmap_gpu,
             first_color_att_view,
             forward_depth: depth_texture.create_default_view(),
-            position_att_view: position_att.create_default_view(),
+            position_att_view,
             position_att,
 
             postfx,
@@ -442,6 +449,9 @@ impl App {
 
         self.first_color_att_view = first_color_att.create_default_view();
 
+        self.postfxaa
+            .update_last_pass_view(&self.gpu.device, &self.first_color_att_view);
+
         let depth_texture = self.gpu.device.create_texture(&wgpu::TextureDescriptor {
             size: wgpu::Extent3d {
                 width: self.gpu.sc_desc.width,
@@ -472,6 +482,9 @@ impl App {
         });
 
         self.position_att_view = position_att.create_default_view();
+
+        self.postfx
+            .update_pos_att_view(&self.gpu.device, &self.position_att_view);
         self.position_att = position_att;
 
         None

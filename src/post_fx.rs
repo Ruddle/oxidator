@@ -4,6 +4,7 @@ use wgpu::{BindGroup, BindGroupLayout, RenderPass, TextureFormat, TextureView};
 
 pub struct PostFx {
     pipeline: wgpu::RenderPipeline,
+    bind_group: BindGroup,
     bind_group_layout: BindGroupLayout,
     sampler: wgpu::Sampler,
 }
@@ -13,6 +14,7 @@ impl PostFx {
         device: &Device,
         main_bind_group_layout: &BindGroupLayout,
         format: TextureFormat,
+        position_att_view: &TextureView,
     ) -> Self {
         // Create pipeline layout
         let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
@@ -45,14 +47,44 @@ impl PostFx {
             compare_function: wgpu::CompareFunction::Always,
         });
 
+        let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            layout: &bind_group_layout,
+            bindings: &[
+                wgpu::Binding {
+                    binding: 0,
+                    resource: wgpu::BindingResource::TextureView(&position_att_view),
+                },
+                wgpu::Binding {
+                    binding: 1,
+                    resource: wgpu::BindingResource::Sampler(&sampler),
+                },
+            ],
+        });
         let pipeline =
             Self::create_pipeline(device, &bind_group_layout, main_bind_group_layout, format)
                 .unwrap();
         PostFx {
             pipeline,
             bind_group_layout,
+            bind_group,
             sampler,
         }
+    }
+
+    pub fn update_pos_att_view(&mut self, device: &Device, position_att_view: &TextureView) {
+        self.bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            layout: &self.bind_group_layout,
+            bindings: &[
+                wgpu::Binding {
+                    binding: 0,
+                    resource: wgpu::BindingResource::TextureView(&position_att_view),
+                },
+                wgpu::Binding {
+                    binding: 1,
+                    resource: wgpu::BindingResource::Sampler(&self.sampler),
+                },
+            ],
+        });
     }
 
     fn create_pipeline(
@@ -110,38 +142,15 @@ impl PostFx {
         Ok(pipeline)
     }
 
-  
-
-    pub fn render(
-        &self,
-        rpass: &mut RenderPass,
-        device: &Device,
-        main_bind_group: &BindGroup,
-        position_att_view: &TextureView,
-    ) {
+    pub fn render(&self, rpass: &mut RenderPass, device: &Device, main_bind_group: &BindGroup) {
         log::trace!("PostFx render");
         rpass.set_pipeline(&self.pipeline);
         rpass.set_bind_group(0, &main_bind_group, &[]);
 
-        let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-            layout: &self.bind_group_layout,
-            bindings: &[
-                wgpu::Binding {
-                    binding: 0,
-                    resource: wgpu::BindingResource::TextureView(&position_att_view),
-                },
-                wgpu::Binding {
-                    binding: 1,
-                    resource: wgpu::BindingResource::Sampler(&self.sampler),
-                },
-            ],
-        });
-
-        rpass.set_bind_group(1, &bind_group, &[]);
+        rpass.set_bind_group(1, &self.bind_group, &[]);
         rpass.draw(0..4, 0..1);
     }
 }
-
 
 impl crate::trait_gpu::TraitGpu for PostFx {
     fn reload_shader(
@@ -150,7 +159,7 @@ impl crate::trait_gpu::TraitGpu for PostFx {
         main_bind_group_layout: &BindGroupLayout,
         format: TextureFormat,
     ) {
-         match Self::create_pipeline(
+        match Self::create_pipeline(
             device,
             &self.bind_group_layout,
             main_bind_group_layout,

@@ -450,7 +450,7 @@ impl App {
             self.arrow_gpu.render(&mut rpass, &self.bind_group);
         }
 
-        //Post pass
+        // Post pass
         {
             log::trace!("begin_post_render_pass");
             let mut rpass = encoder_render.begin_render_pass(&wgpu::RenderPassDescriptor {
@@ -470,12 +470,8 @@ impl App {
                 depth_stencil_attachment: None,
             });
 
-            self.postfx.render(
-                &mut rpass,
-                &self.gpu.device,
-                &self.bind_group,
-                &self.position_att_view,
-            );
+            self.postfx
+                .render(&mut rpass, &self.gpu.device, &self.bind_group);
         }
 
         //Post fxaa pass
