@@ -87,6 +87,7 @@ impl App {
                         kbots: self.game_state.kbots.clone(),
                         kinematic_projectiles: self.game_state.kinematic_projectiles.clone(),
                         events: Vec::new(),
+                        arrows: Vec::new(),
                         heightmap_phy: self.heightmap_gpu.phy.clone(),
                         complete: true,
                         frame_profiler: frame::FrameProfiler::default(),
@@ -440,6 +441,7 @@ impl App {
             self.kbot_gpu.render(&mut rpass, &self.bind_group);
             self.kinematic_projectile_gpu
                 .render(&mut rpass, &self.bind_group);
+            self.arrow_gpu.render(&mut rpass, &self.bind_group);
         }
 
         //Post pass

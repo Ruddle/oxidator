@@ -96,6 +96,7 @@ impl Group {
         kbots: &mut HashMap<Id<KBot>, KBot>,
         kinematic_projectiles: &mut HashMap<Id<KinematicProjectile>, KinematicProjectile>,
         heightmap_phy: &heightmap_phy::HeightmapPhy,
+        arrows: &mut Vec<Arrow>,
     ) {
         let cell_size = 16;
         let grid_w = (heightmap_phy.width / cell_size) as usize;
@@ -181,8 +182,8 @@ impl Group {
 
                             collision_avoid_priority = ((4.0 - closeness) / 4.0).max(0.0).min(0.8);
 
-                            collision_avoid_dir = if nearest.speed.xy().norm_squared() > 0.01
-                                && mobile.speed.xy().dot(&nearest.speed.xy()) < 0.0
+                            collision_avoid_dir = if nearest.speed.xy().norm_squared() < 0.01
+                                || mobile.speed.xy().dot(&nearest.speed.xy()) < 0.0
                             {
                                 let u = (mobile.position.coords - nearest.position.coords)
                                     .xy()
@@ -203,10 +204,23 @@ impl Group {
                                 him_to_me
                             };
 
+                            // arrows.push(Arrow {
+                            //     position: mobile.position,
+                            //     color: [collision_avoid_priority, 0.0, 0.0, 0.0],
+                            //     end: mobile.position
+                            //         + Vector3::new(
+                            //             collision_avoid_dir.x * 2.0,
+                            //             collision_avoid_dir.y * 2.0,
+                            //             0.0,
+                            //         ),
+                            // });
+
                             let speed_closeness = mobile.speed.xy().dot(&nearest.speed.xy());
                             neighbor_dir_priority =
                                 if speed_closeness > 0.0 && nearest.speed.norm() > 0.1 {
-                                    speed_closeness.max(0.2).min(1.0 - collision_avoid_priority)
+                                    speed_closeness
+                                        .max(0.0)
+                                        .min((1.0 - collision_avoid_priority) * 0.2)
                                 } else {
                                     0.0
                                 };
@@ -216,6 +230,13 @@ impl Group {
                                 .xy()
                                 .try_normalize(0.001)
                                 .unwrap_or(Vector2::new(0.0, 0.0));
+
+                            // arrows.push(Arrow {
+                            //     position: mobile.position,
+                            //     color: [0.0, neighbor_dir_priority, 0.0, 0.0],
+                            //     end: mobile.position
+                            //         + Vector3::new(neighbor_dir.x * 2.0, neighbor_dir.y * 2.0, 0.0),
+                            // });
                         }
                     }
 

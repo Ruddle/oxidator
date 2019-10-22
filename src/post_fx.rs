@@ -110,22 +110,7 @@ impl PostFx {
         Ok(pipeline)
     }
 
-    pub fn reload_shader(
-        &mut self,
-        device: &Device,
-        main_bind_group_layout: &BindGroupLayout,
-        format: TextureFormat,
-    ) {
-        match Self::create_pipeline(
-            device,
-            &self.bind_group_layout,
-            main_bind_group_layout,
-            format,
-        ) {
-            Ok(pipeline) => self.pipeline = pipeline,
-            Err(x) => println!("{}", x),
-        };
-    }
+  
 
     pub fn render(
         &self,
@@ -154,5 +139,25 @@ impl PostFx {
 
         rpass.set_bind_group(1, &bind_group, &[]);
         rpass.draw(0..4, 0..1);
+    }
+}
+
+
+impl crate::trait_gpu::TraitGpu for PostFx {
+    fn reload_shader(
+        &mut self,
+        device: &Device,
+        main_bind_group_layout: &BindGroupLayout,
+        format: TextureFormat,
+    ) {
+         match Self::create_pipeline(
+            device,
+            &self.bind_group_layout,
+            main_bind_group_layout,
+            format,
+        ) {
+            Ok(pipeline) => self.pipeline = pipeline,
+            Err(x) => println!("{}", x),
+        };
     }
 }

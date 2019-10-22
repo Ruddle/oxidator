@@ -533,23 +533,6 @@ impl HeightmapGpu {
         Ok(pipeline)
     }
 
-    pub fn reload_shader(
-        &mut self,
-        device: &Device,
-        main_bind_group_layout: &BindGroupLayout,
-        format: TextureFormat,
-    ) {
-        match Self::create_pipeline(
-            device,
-            &self.bind_group_layout,
-            main_bind_group_layout,
-            format,
-        ) {
-            Ok(pipeline) => self.pipeline = pipeline,
-            Err(x) => println!("{}", x),
-        };
-    }
-
     pub fn mipmap_update(
         &self,
         mip: u32,
@@ -901,5 +884,24 @@ impl HeightmapGpu {
         }
 
         self.mip4_to_update = true;
+    }
+}
+
+impl crate::trait_gpu::TraitGpu for HeightmapGpu {
+    fn reload_shader(
+        &mut self,
+        device: &Device,
+        main_bind_group_layout: &BindGroupLayout,
+        format: TextureFormat,
+    ) {
+        match Self::create_pipeline(
+            device,
+            &self.bind_group_layout,
+            main_bind_group_layout,
+            format,
+        ) {
+            Ok(pipeline) => self.pipeline = pipeline,
+            Err(x) => println!("{}", x),
+        };
     }
 }

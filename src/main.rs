@@ -1,3 +1,4 @@
+mod arrow_gpu;
 mod camera;
 mod client;
 mod fake_texels;
@@ -18,6 +19,7 @@ mod model_gpu;
 mod phy_state;
 mod post_fx;
 mod post_fxaa;
+mod trait_gpu;
 
 mod utils;
 

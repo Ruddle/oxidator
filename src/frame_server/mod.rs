@@ -26,9 +26,8 @@ pub fn next_frame(mut old_frame: Frame) -> Frame {
             _ => {}
         }
     }
-    replacer.map(|r| old_frame = r);
 
-    let mut frame = old_frame;
+    let mut frame = replacer.unwrap_or(old_frame);
 
     for event in frame.events {
         match event {
@@ -51,15 +50,16 @@ pub fn next_frame(mut old_frame: Frame) -> Frame {
 
     let handle_events = start.elapsed();
 
+    let mut arrows = Vec::new();
+
     let start_update_units = Instant::now();
     group_behavior::Group::update_units(
         &mut frame.kbots,
         &mut frame.kinematic_projectiles,
         &frame.heightmap_phy,
+        &mut arrows,
     );
     let update_units = start_update_units.elapsed();
-
-    log::debug!("{} us", start.elapsed().as_micros());
 
     Frame {
         number: frame.number + 1,
@@ -70,6 +70,7 @@ pub fn next_frame(mut old_frame: Frame) -> Frame {
             handle_events,
             update_units,
         },
+        arrows,
         ..frame
     }
 }

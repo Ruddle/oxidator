@@ -2,6 +2,8 @@ use crate::*;
 
 use na::{Isometry3, Matrix4, Point3, Vector2, Vector3, Vector4};
 
+use crate::trait_gpu::TraitGpu;
+use arrow_gpu::ArrowGpu;
 use gpu;
 use heightmap_gpu::HeightmapGpu;
 use imgui::*;
@@ -58,6 +60,7 @@ pub struct App {
     heightmap_gpu: HeightmapGpu,
     cube_gpu: ModelGpu,
     kbot_gpu: ModelGpu,
+    arrow_gpu: ArrowGpu,
     kinematic_projectile_gpu: ModelGpu,
 
     bind_group: wgpu::BindGroup,
@@ -295,6 +298,13 @@ impl App {
         );
 
         let kinematic_projectile_gpu = ModelGpu::new(
+            &model::create_small_cube(),
+            &gpu.device,
+            format,
+            &bind_group_layout,
+        );
+
+        let arrow_gpu = ArrowGpu::new(
             &model::open_arrow(),
             &gpu.device,
             format,
@@ -385,6 +395,7 @@ impl App {
             cube_gpu,
             kbot_gpu,
             kinematic_projectile_gpu,
+            arrow_gpu,
             heightmap_gpu,
             first_color_att_view,
             forward_depth: depth_texture.create_default_view(),
@@ -648,6 +659,38 @@ impl App {
                 }) {
                     println!("Reloading heightmap.vert/heightmap.frag");
                     self.heightmap_gpu.reload_shader(
+                        &self.gpu.device,
+                        &self.bind_group_layout,
+                        self.gpu.sc_desc.format,
+                    );
+                }
+
+                if event.paths.iter().any(|p| {
+                    p.file_name().iter().any(|name| {
+                        name.to_os_string() == "cube_instanced.frag"
+                            || name.to_os_string() == "cube_instanced.vert"
+                    })
+                }) {
+                    println!("Reloading cube_instanced.vert/cube_instanced.frag");
+                    self.cube_gpu.reload_shader(
+                        &self.gpu.device,
+                        &self.bind_group_layout,
+                        self.gpu.sc_desc.format,
+                    );
+                    self.kbot_gpu.reload_shader(
+                        &self.gpu.device,
+                        &self.bind_group_layout,
+                        self.gpu.sc_desc.format,
+                    );
+                }
+
+                if event.paths.iter().any(|p| {
+                    p.file_name().iter().any(|name| {
+                        name.to_os_string() == "arrow.frag" || name.to_os_string() == "arrow.vert"
+                    })
+                }) {
+                    println!("Reloading arrow.vert/arrow.frag");
+                    self.arrow_gpu.reload_shader(
                         &self.gpu.device,
                         &self.bind_group_layout,
                         self.gpu.sc_desc.format,

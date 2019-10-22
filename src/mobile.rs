@@ -43,3 +43,20 @@ impl KinematicProjectile {
         }
     }
 }
+
+#[derive(Clone, Debug)]
+pub struct Arrow {
+    pub position: Point3<f32>,
+    pub end: Point3<f32>,
+    pub color: [f32; 4],
+}
+
+impl Arrow {
+    pub fn new(position: Point3<f32>, end: Point3<f32>, color: [f32; 4]) -> Self {
+        Arrow {
+            position,
+            color,
+            end,
+        }
+    }
+}

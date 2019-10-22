@@ -67,6 +67,7 @@ impl App {
 
         //Upload to gpu
         let mobile_to_gpu_duration = time(|| {
+            //Kbot
             let mut positions = Vec::with_capacity(self.game_state.kbots.len() * 18);
             for mobile in self.game_state.kbots.values() {
                 let mat = Matrix4::face_towards(
@@ -97,6 +98,7 @@ impl App {
             self.kbot_gpu
                 .update_instance(&positions[..], &self.gpu.device);
 
+            //Kinematic Projectile
             let mut positions =
                 Vec::with_capacity(self.game_state.kinematic_projectiles.len() * 18);
             for mobile in self.game_state.kinematic_projectiles.values() {
@@ -120,6 +122,23 @@ impl App {
             }
 
             self.kinematic_projectile_gpu
+                .update_instance(&positions[..], &self.gpu.device);
+
+            //Arrow
+            let mut positions = Vec::with_capacity(self.game_state.frame_zero.arrows.len() * 20);
+            for arrow in self.game_state.frame_zero.arrows.iter() {
+                let mat = Matrix4::face_towards(
+                    &arrow.position,
+                    &arrow.end,
+                    &Vector3::new(0.0, 0.0, 1.0),
+                );
+
+                positions.extend_from_slice(mat.as_slice());
+                positions.extend_from_slice(&arrow.color[..3]);
+                positions.push((arrow.end.coords - arrow.position.coords).magnitude());
+            }
+
+            self.arrow_gpu
                 .update_instance(&positions[..], &self.gpu.device);
         });
 
