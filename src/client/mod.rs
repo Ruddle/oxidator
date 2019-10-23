@@ -94,6 +94,7 @@ impl App {
         window: winit::window::Window,
         sender_to_client: crossbeam_channel::Sender<ToClient>,
         receiver_to_client: crossbeam_channel::Receiver<ToClient>,
+
         sender_to_event_loop: crossbeam_channel::Sender<EventLoopMsg>,
         sender_from_client: crossbeam_channel::Sender<FromClient>,
     ) -> (Self) {
@@ -602,11 +603,10 @@ impl App {
                     }
                 }
 
-                _ => {}
+                _ => {
+                    // log::warn!("{:?}", x);
+                }
             },
-            event::Event::EventsCleared => {
-                //                self.render();
-            }
             _ => (),
         }
     }
@@ -710,29 +710,22 @@ impl App {
             _ => {}
         }
 
-        match self.receiver_to_client.try_recv() {
-            Ok(x) => {
-                log::trace!("receive: {:?}", x);
+        let msgs: Vec<_> = self.receiver_to_client.try_iter().collect();
+        for msg in msgs {
+            {
+                log::trace!("receive: {:?}", msg);
 
-                match x {
-                    ToClient::EventMessage { event } => {
-                        self.handle_winit_event(&event);
-                    }
+                match msg {
                     ToClient::MapReadAsyncMessage { vec, usage } => {
                         self.map_read_async_msg(vec, usage);
-                    }
-                    ToClient::Render => {
-                        self.render();
                     }
                     ToClient::NewFrame(frame) => {
                         self.game_state.handle_new_frame(frame);
                     }
-                    _ => {}
+                    _ => panic!(
+                        "receiver_to_client should not receive EventMessage or WindowPassing"
+                    ),
                 }
-            }
-            _ => {
-                log::trace!("No message yo");
-                std::thread::sleep(std::time::Duration::from_millis(1000));
             }
         }
     }

@@ -667,7 +667,5 @@ impl App {
                 Err(_) => {}
             },
         );
-
-        let _ = self.sender_to_client.try_send(ToClient::Render);
     }
 }
