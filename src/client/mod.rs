@@ -2,12 +2,12 @@ use crate::*;
 
 use na::{Isometry3, Matrix4, Point3, Vector2, Vector3, Vector4};
 
+use crate::imgui_wgpu::Renderer;
 use crate::trait_gpu::TraitGpu;
 use arrow_gpu::ArrowGpu;
 use gpu;
 use heightmap_gpu::HeightmapGpu;
 use imgui::*;
-use imgui_wgpu::Renderer;
 use imgui_winit_support;
 use imgui_winit_support::WinitPlatform;
 use model_gpu::ModelGpu;
@@ -49,8 +49,6 @@ pub enum MainMode {
 pub struct App {
     //Wgpu
     gpu: gpu::WgpuState,
-    //Physics
-    phy_state: phy_state::State,
 
     first_color_att_view: wgpu::TextureView,
     forward_depth: wgpu::TextureView,
@@ -393,7 +391,6 @@ impl App {
         // Done
         let this = App {
             gpu,
-            phy_state: phy_state::State::new(),
 
             bind_group,
             bind_group_layout,

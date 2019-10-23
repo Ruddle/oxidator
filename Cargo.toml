@@ -25,33 +25,22 @@ log = "0.4"
 png = "0.15"
 winit = "0.20.0-alpha3"
 raw-window-handle = "0.1"
-
 imgui = "0.2.1"
-imgui-wgpu = "0.1.0"
 shaderc = {version = "0.6", optional = true} 
 noise = "0.6.0"
-
 nalgebra = "0.18"
-ncollide3d = "0.20"
-nphysics3d = "0.12"
-
 crossbeam-channel = "0.3"
 rand = "0.7.2"
-
-
 notify = "=5.0.0-pre.1"
 byteorder = "1.3.2"
-
 typename = "0.1.1"
 base-62 = "0.1.1"
-
 obj-rs = "0.5"
 
 [dependencies.imgui-winit-support]
 version = "0.2.1"
 default-features = false
 features = ["winit-20"]
-
 
 [[bin]]
 name = "oxidator"
