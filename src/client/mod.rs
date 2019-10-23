@@ -727,6 +727,7 @@ impl App {
                     ToClient::NewFrame(frame) => {
                         self.game_state.handle_new_frame(frame);
                     }
+                    _ => {}
                 }
             }
             _ => {
