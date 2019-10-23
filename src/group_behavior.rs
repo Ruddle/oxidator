@@ -1,3 +1,5 @@
+use crate::frame::FrameProfiler;
+use crate::frame::Player;
 use crate::heightmap_phy;
 use crate::mobile;
 use crate::utils;
@@ -5,8 +7,6 @@ use mobile::*;
 use na::{Matrix4, Point2, Point3, Vector2, Vector3};
 use std::collections::{HashMap, HashSet};
 use utils::*;
-
-use crate::frame::Player;
 
 const PHY_S: f32 = 0.100;
 const PHY_MS: f32 = 100.0;
@@ -95,6 +95,7 @@ impl Group {
     }
 
     pub fn update_units(
+        frame_profiler: &mut FrameProfiler,
         kbots: &mut HashMap<Id<KBot>, KBot>,
         kinematic_projectiles: &mut HashMap<Id<KinematicProjectile>, KinematicProjectile>,
         heightmap_phy: &heightmap_phy::HeightmapPhy,
@@ -107,7 +108,7 @@ impl Group {
         let grid_h = (heightmap_phy.height / cell_size) as usize;
 
         let start = std::time::Instant::now();
-        let mut grid = vec![HashSet::<Id<KBot>>::new(); grid_w * grid_h];
+        let mut grid = vec![Vec::<Id<KBot>>::new(); grid_w * grid_h];
 
         let grid_pos = |mobile: &KBot| -> usize {
             let (x, y) = (mobile.position.x, mobile.position.y);
@@ -117,7 +118,7 @@ impl Group {
 
         for (&id, mobile) in kbots.iter() {
             let gp = grid_pos(mobile);
-            grid[gp].insert(id);
+            grid[gp].push(id);
 
             for cell in &[
                 -1_i32 - grid_w as i32,
@@ -131,11 +132,12 @@ impl Group {
             ] {
                 let cell_index = cell + gp as i32;
                 if cell_index >= 0 && (cell_index as usize) < grid_w * grid_h {
-                    grid[cell_index as usize].insert(id);
+                    grid[cell_index as usize].push(id);
                 }
             }
         }
-        println!("Grid took {:?}", start.elapsed());
+
+        frame_profiler.add("1  grid", start.elapsed());
 
         let mobiles2 = kbots.clone();
         //Movement compute
@@ -143,8 +145,9 @@ impl Group {
         for (id, mobile) in kbots.iter_mut() {
             let grid_pos = grid_pos(mobile);
 
-            let mut neighbors_id: HashSet<Id<KBot>> = grid[grid_pos].clone();
-            neighbors_id.remove(id);
+            let mut neighbors_id: Vec<Id<KBot>> = grid[grid_pos].clone();
+            let to_remove = neighbors_id.iter().position(|e| e == id).unwrap();
+            neighbors_id.remove(to_remove);
 
             let mut collision_avoid_dir = Vector2::new(0.0_f32, 0.0);
             let mut collision_avoid_priority = 0.0_f32;
@@ -273,38 +276,206 @@ impl Group {
             mobile.position.z = heightmap_phy.z_linear(mobile.position.x, mobile.position.y) + 0.5;
         }
 
-        //Projectile move compute
+        //AABB for kbot and proj
         {
-            let mut to_remove = Vec::new();
-            for proj in kinematic_projectiles.values_mut() {
-                proj.positions = proj.positions.clone().into_iter().skip(1).collect();
-                if proj.positions.len() == 0 {
-                    to_remove.push(proj.id);
+            let start = std::time::Instant::now();
+            let cell_size = 2;
+            let grid_w = (heightmap_phy.width / cell_size) as usize;
+            let grid_h = (heightmap_phy.height / cell_size) as usize;
+            let mut small_grid_kbot = vec![Vec::<Id<KBot>>::new(); grid_w * grid_h];
+
+            fn insert_aabb<T>(
+                position: Vector3<f32>,
+                radius: f32,
+                id: T,
+                grid: &mut Vec<Vec<T>>,
+                cell_size: usize,
+                grid_w: usize,
+            ) where
+                T: Copy + std::fmt::Display,
+            {
+                let min_x = (position.x - radius * 2.0).floor() as usize;
+                let max_x = (position.x + radius * 2.0).ceil() as usize;
+                let min_y = (position.y - radius * 2.0).floor() as usize;
+                let max_y = (position.y + radius * 2.0).ceil() as usize;
+
+                let min_x = (min_x / cell_size);
+                let max_x = ((max_x + 1) / cell_size);
+                let min_y = (min_y / cell_size);
+                let max_y = ((max_y + 1) / cell_size);
+
+                for i in (min_x..=max_x).step_by(cell_size) {
+                    for j in (min_y..=max_y).step_by(cell_size) {
+                        // println!("INSERTION {} {} {}", i, j, id);
+                        grid[i + j * grid_w].push(id);
+                    }
                 }
             }
 
-            for r in to_remove {
-                kinematic_projectiles.remove(&r);
+            for (id, kbot) in kbots.iter() {
+                insert_aabb::<Id<KBot>>(
+                    kbot.position.coords,
+                    kbot.radius,
+                    *id,
+                    &mut small_grid_kbot,
+                    cell_size,
+                    grid_w,
+                );
             }
+
+            frame_profiler.add("3  small_grid", start.elapsed());
+
+            let start = std::time::Instant::now();
+            //Projectile move compute
+            {
+                let mut to_remove = HashSet::new();
+                for proj in kinematic_projectiles.values_mut() {
+                    let current_pos = proj.positions.iter().next().unwrap();
+                    let next_pos = proj.positions.iter().skip(1).next();
+
+                    if let Some(next_pos) = next_pos {
+                        //Slowly interpolate to not miss collisions
+                        let step_size = proj.radius * 1.0;
+                        let ul = next_pos.coords - current_pos.coords;
+                        let distance_to_travel = ul.magnitude();
+                        let u = ul / distance_to_travel;
+
+                        let mut current_interp = current_pos.coords.clone();
+                        let count = (distance_to_travel / step_size).floor() as usize;
+                        for n in 0..=count {
+                            current_interp += u * step_size;
+                            if n == count {
+                                current_interp = next_pos.coords;
+                            }
+
+                            //Checking collision with current_interp
+                            let (x, y) = (current_interp.x + 1.0, current_interp.y + 1.0);
+                            let index = (x as usize / cell_size as usize) as usize
+                                + (y as usize / cell_size as usize) as usize * grid_w;
+
+                            let kbots_in_proximity = &small_grid_kbot[index];
+
+                            for kbot_id in kbots_in_proximity.iter() {
+                                let kbot = kbots.get(kbot_id).unwrap();
+                                let distance_to_target =
+                                    (kbot.position.coords - current_interp).magnitude();
+
+                                if distance_to_target < (kbot.radius + proj.radius) {
+                                    println!("COLLISION");
+                                }
+                            }
+                        }
+                    }
+
+                    proj.positions = proj.positions.clone().into_iter().skip(1).collect();
+                    if proj.positions.len() == 0 {
+                        to_remove.insert(proj.id);
+                    }
+                }
+
+                for r in to_remove {
+                    kinematic_projectiles.remove(&r);
+                }
+            }
+            frame_profiler.add("4  proj move", start.elapsed());
         }
 
         //Projectile fire compute
         {
-            for kbot in kbots.values_mut().next() {
-                if frame_count - kbot.frame_last_shot > kbot.reload_frame_count {
-                    let mut positions = Vec::new();
-                    positions.push(kbot.position);
-                    let mut speed = Vector3::new(2.0, 0.0, 0.2);
-                    for i in 0..5 {
-                        speed -= Vector3::new(0.0, 0.0, 0.08);
-                        positions.push(positions.last().unwrap() + speed);
+            let teams: HashSet<_> = players.values().map(|p| p.team).collect();
+
+            let start2 = std::time::Instant::now();
+            //TODO cache
+            let mut team_to_kbots_id: HashMap<u8, HashSet<Id<KBot>>> = HashMap::new();
+            let mut id_to_team: HashMap<Id<KBot>, u8> = HashMap::new();
+
+            for team in teams.iter() {
+                let team_players: Vec<_> = players.values().filter(|e| &e.team == team).collect();
+                let team_kbots_id: HashSet<Id<KBot>> = team_players
+                    .iter()
+                    .map(|p| {
+                        for kbot in p.kbots.iter() {
+                            id_to_team.insert(*kbot, *team);
+                        }
+                        p.kbots.clone()
+                    })
+                    .flatten()
+                    .collect();
+
+                team_to_kbots_id.insert(*team, team_kbots_id);
+            }
+
+            let mut team_to_ennemy_grid: HashMap<u8, Vec<Vec<Id<KBot>>>> = HashMap::new();
+
+            for team in teams.iter() {
+                let grid_team: Vec<Vec<Id<KBot>>> = grid
+                    .iter()
+                    .map(|zone| {
+                        zone.iter()
+                            .filter(|kbot| id_to_team.get(kbot).unwrap() != team)
+                            .copied()
+                            .collect::<Vec<Id<KBot>>>()
+                    })
+                    .collect();
+
+                team_to_ennemy_grid.insert(*team, grid_team);
+            }
+
+            frame_profiler.add("2  team_to_ennemy_grid", start2.elapsed());
+
+            struct Shot {
+                bot: Id<KBot>,
+                target: Vector3<f32>,
+            };
+
+            let mut shots = Vec::new();
+
+            for (me, me_kbot) in kbots.iter() {
+                let grid_pos = grid_pos(me_kbot);
+
+                let my_team = id_to_team.get(me).unwrap();
+
+                let ennemies_in_cell = &team_to_ennemy_grid.get(my_team).unwrap()[grid_pos];
+
+                // let mut neighbors_id: Vec<Id<KBot>> = grid[grid_pos].clone();
+                // let to_remove = neighbors_id.iter().position(|e| e == me).unwrap();
+                // neighbors_id.remove(to_remove);
+
+                let can_shoot = *my_team == 0
+                    && frame_count - me_kbot.frame_last_shot > me_kbot.reload_frame_count;
+                if can_shoot {
+                    //We choose the first ennemy in the cell, we could sort by distance or something else here
+                    'meloop: for potential_ennemy in ennemies_in_cell {
+                        {
+                            let ennemy_kbot = kbots.get(&potential_ennemy).unwrap();
+
+                            shots.push(Shot {
+                                bot: *me,
+                                target: ennemy_kbot.position.coords,
+                            });
+                            break 'meloop;
+                        }
                     }
-
-                    kbot.frame_last_shot = frame_count;
-
-                    let proj = KinematicProjectile::new(positions);
-                    kinematic_projectiles.insert(proj.id, proj);
                 }
+            }
+
+            for shot in shots.iter() {
+                let kbot = kbots.get_mut(&shot.bot).unwrap();
+
+                let dir = (shot.target - kbot.position.coords).normalize();
+                let mut positions = Vec::new();
+                positions.push(kbot.position + dir * kbot.radius * 1.1);
+
+                let mut speed = dir * 2.0 + Vector3::new(0.0, 0.0, 0.2);
+                for i in 0..5 {
+                    speed -= Vector3::new(0.0, 0.0, 0.08);
+                    positions.push(positions.last().unwrap() + speed);
+                }
+
+                kbot.frame_last_shot = frame_count;
+
+                let proj = KinematicProjectile::new(positions);
+                kinematic_projectiles.insert(proj.id, proj);
             }
         }
     }

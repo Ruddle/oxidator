@@ -48,7 +48,6 @@ pub enum EventLoopMsg {
     Stop,
 }
 
-
 fn main() {
     println!("dir: {:?}", std::env::current_dir().unwrap());
     env_logger::init();

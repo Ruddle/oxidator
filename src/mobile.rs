@@ -11,6 +11,10 @@ pub struct KBot {
     pub target: Option<Point3<f32>>,
     pub id: Id<KBot>,
 
+    pub radius: f32,
+    pub life: i32,
+    pub max_life: i32,
+
     pub frame_last_shot: i32,
     pub reload_frame_count: i32,
 }
@@ -23,8 +27,11 @@ impl KBot {
             dir: Vector3::new(1.0, 0.0, 0.0),
             target: None,
             id: utils::rand_id(),
+            radius: 0.5,
             frame_last_shot: 0,
             reload_frame_count: 10,
+            life: 100,
+            max_life: 100,
         }
     }
 }
@@ -33,6 +40,7 @@ impl KBot {
 pub struct KinematicProjectile {
     pub id: Id<KinematicProjectile>,
     pub positions: Vec<Point3<f32>>,
+    pub radius: f32,
 }
 
 impl KinematicProjectile {
@@ -40,6 +48,7 @@ impl KinematicProjectile {
         KinematicProjectile {
             id: utils::rand_id(),
             positions,
+            radius: 0.25,
         }
     }
 

@@ -11,6 +11,7 @@ pub enum FromFrameServer {
 }
 
 pub fn next_frame(mut old_frame: Frame) -> Frame {
+    let mut frame_profiler = FrameProfiler::new();
     let start = std::time::Instant::now();
     log::debug!("Received frame {} to compute next frame", old_frame.number);
 
@@ -49,12 +50,14 @@ pub fn next_frame(mut old_frame: Frame) -> Frame {
         }
     }
 
-    let handle_events = start.elapsed();
+    frame_profiler.add("handle_events", start.elapsed());
 
     let mut arrows = Vec::new();
 
     let start_update_units = Instant::now();
-    group_behavior::Group::update_units(
+
+    let profiles = group_behavior::Group::update_units(
+        &mut frame_profiler,
         &mut frame.kbots,
         &mut frame.kinematic_projectiles,
         &frame.heightmap_phy,
@@ -62,17 +65,14 @@ pub fn next_frame(mut old_frame: Frame) -> Frame {
         frame.number,
         &frame.players,
     );
-    let update_units = start_update_units.elapsed();
 
+    frame_profiler.add("0 update_units", start_update_units.elapsed());
+    frame_profiler.add("total", start.elapsed());
     Frame {
         number: frame.number,
         events: Vec::new(),
         complete: false,
-        frame_profiler: FrameProfiler {
-            total: start.elapsed(),
-            handle_events,
-            update_units,
-        },
+        frame_profiler,
         arrows,
         ..frame
     }

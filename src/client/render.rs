@@ -56,8 +56,8 @@ impl App {
 
                     let mut player_me = Player::new();
 
-                    for i in (150..200).step_by(7) {
-                        for j in (100..150).step_by(7) {
+                    for i in (150..300).step_by(2) {
+                        for j in (100..200).step_by(2) {
                             let m = mobile::KBot::new(Point3::new(i as f32, j as f32, 100.0));
                             player_me.kbots.insert(m.id);
                             self.game_state.kbots.insert(m.id, m);
@@ -67,8 +67,8 @@ impl App {
                     let mut player_ennemy = Player::new();
                     player_ennemy.team = 1;
 
-                    for i in (230..280).step_by(7) {
-                        for j in (100..150).step_by(7) {
+                    for i in (320..420).step_by(4) {
+                        for j in (100..200).step_by(4) {
                             let m = mobile::KBot::new(Point3::new(i as f32, j as f32, 100.0));
                             player_ennemy.kbots.insert(m.id);
                             self.game_state.kbots.insert(m.id, m);
@@ -90,7 +90,7 @@ impl App {
                         arrows: Vec::new(),
                         heightmap_phy: self.heightmap_gpu.phy.clone(),
                         complete: true,
-                        frame_profiler: frame::FrameProfiler::default(),
+                        frame_profiler: frame::FrameProfiler::new(),
                     });
                     let _ = self
                         .sender_from_client
@@ -537,7 +537,7 @@ impl App {
                         ui.text(im_str!("renderer:               {:?}", last_compute_time));
                         ui.text(im_str!("   interpolation:       {:?}", interp_duration));
                         ui.text(im_str!(
-                            "   us_mobile_to_gpu:    {:?}",
+                            "   mobile_to_gpu:       {:?}",
                             mobile_to_gpu_duration
                         ));
                         ui.text(im_str!(
@@ -550,9 +550,26 @@ impl App {
                         ));
                         ui.text(im_str!("   3d_render_pass:      {:?}", us_3d_render_pass));
                         ui.separator();
-                        ui.text(im_str!("logic:                  {:?}", p.total));
-                        ui.text(im_str!("   handle_events:       {:?}", p.handle_events));
-                        ui.text(im_str!("   update_units:        {:?}", p.update_units));
+
+                        ui.text(im_str!(
+                            "logic:                  {:?}",
+                            p.get("total").unwrap()
+                        ));
+
+                        let mut others =
+                            p.hm.iter()
+                                .filter(|(n, d)| *n != "total")
+                                .collect::<Vec<_>>();
+                        others.sort_by_key(|e| e.0);
+                        for (name, dur) in others.iter() {
+                            let name: String = format!("{}                          ", name)
+                                .chars()
+                                .take(23)
+                                .collect::<Vec<char>>()
+                                .into_iter()
+                                .collect();
+                            ui.text(im_str!(" {}: {:?}", name, dur));
+                        }
                     });
 
                 match main_menu {

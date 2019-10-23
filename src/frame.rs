@@ -41,11 +41,20 @@ pub enum FrameEvent {
     ReplaceFrame(Frame),
 }
 
-#[derive(Default, Clone, Debug)]
+#[derive(Clone, Debug)]
 pub struct FrameProfiler {
-    pub total: Duration,
-    pub update_units: Duration,
-    pub handle_events: Duration,
+    pub hm: HashMap<String, std::time::Duration>,
+}
+impl FrameProfiler {
+    pub fn new() -> Self {
+        FrameProfiler { hm: HashMap::new() }
+    }
+    pub fn add(&mut self, s: &str, duration: Duration) {
+        self.hm.insert(s.to_owned(), duration);
+    }
+    pub fn get(&self, s: &str) -> Option<&Duration> {
+        self.hm.get(s)
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -72,7 +81,7 @@ impl Frame {
             arrows: Vec::new(),
             heightmap_phy: heightmap_phy::HeightmapPhy::new(16, 16),
             complete: true,
-            frame_profiler: FrameProfiler::default(),
+            frame_profiler: FrameProfiler::new(),
         }
     }
 }
