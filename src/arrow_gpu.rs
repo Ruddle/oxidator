@@ -64,10 +64,8 @@ impl ArrowGpu {
         });
         let vertex_size = std::mem::size_of::<model::Vertex>();
         // Create the render pipeline
-        let vs_bytes =
-            glsl_compiler::load("shader/arrow.vert", glsl_compiler::ShaderStage::Vertex)?;
-        let fs_bytes =
-            glsl_compiler::load("shader/arrow.frag", glsl_compiler::ShaderStage::Fragment)?;
+        let vs_bytes = glsl_compiler::load("./src/shader/arrow.vert")?;
+        let fs_bytes = glsl_compiler::load("./src/shader/arrow.frag")?;
 
         let vs_module = device.create_shader_module(&vs_bytes);
         let fs_module = device.create_shader_module(&fs_bytes);

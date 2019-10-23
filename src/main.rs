@@ -23,8 +23,6 @@ mod trait_gpu;
 
 mod utils;
 
-#[macro_use]
-extern crate load_file;
 extern crate byteorder;
 extern crate crossbeam_channel;
 extern crate nalgebra as na;

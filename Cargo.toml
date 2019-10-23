@@ -1,8 +1,9 @@
 [package]
-name = "rust3d"
+name = "oxidator"
 version = "0.1.0"
 authors = ["Thomas SIMON <thomas.simon.work@gmail.com>"]
 edition = "2018"
+default-run = "oxidator"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -12,12 +13,14 @@ dx11 = ["wgpu/dx11"]
 dx12 = ["wgpu/dx12"]
 vulkan = ["wgpu/vulkan"]
 use_shaderc =["shaderc"]
-default = ["wgpu/vulkan","use_shaderc"]
+use_glsl_to_spirv =["glsl-to-spirv"]
+use_spirv =[]
+default = ["wgpu/vulkan","use_glsl_to_spirv"]
 
 [dependencies]
 wgpu = { version = "0.3.0" }
 env_logger = "0.7.1"
-glsl-to-spirv = "0.1"
+glsl-to-spirv = {version= "0.1", optional= true}
 log = "0.4"
 png = "0.15"
 winit = "0.20.0-alpha3"
@@ -35,7 +38,6 @@ nphysics3d = "0.12"
 crossbeam-channel = "0.3"
 rand = "0.7.2"
 
-load_file = "1.0.0"
 
 notify = "=5.0.0-pre.1"
 byteorder = "1.3.2"
@@ -51,6 +53,13 @@ default-features = false
 features = ["winit-20"]
 
 
+[[bin]]
+name = "oxidator"
+path = "src/main.rs"
+
+[[bin]]
+name = "glsl"
+path = "src/glsl.rs"
 
 [profile.release]
 #lto = true

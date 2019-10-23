@@ -99,11 +99,8 @@ impl PostFxaa {
         });
 
         // Create the render pipeline
-        let vs_bytes = glsl_compiler::load("shader/post.vert", glsl_compiler::ShaderStage::Vertex)?;
-        let fs_bytes = glsl_compiler::load(
-            "shader/post_fxaa.frag",
-            glsl_compiler::ShaderStage::Fragment,
-        )?;
+        let vs_bytes = glsl_compiler::load("./src/shader/post.vert")?;
+        let fs_bytes = glsl_compiler::load("./src/shader/post_fxaa.frag")?;
         let vs_module = device.create_shader_module(&vs_bytes);
         let fs_module = device.create_shader_module(&fs_bytes);
 

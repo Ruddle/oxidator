@@ -64,16 +64,8 @@ impl ModelGpu {
         });
         let vertex_size = std::mem::size_of::<model::Vertex>();
         // Create the render pipeline
-        let vs_bytes = glsl_compiler::load(
-            "shader/cube_instanced.vert",
-            glsl_compiler::ShaderStage::Vertex,
-        )
-        .unwrap();
-        let fs_bytes = glsl_compiler::load(
-            "shader/cube_instanced.frag",
-            glsl_compiler::ShaderStage::Fragment,
-        )
-        .unwrap();
+        let vs_bytes = glsl_compiler::load("./src/shader/cube_instanced.vert").unwrap();
+        let fs_bytes = glsl_compiler::load("./src/shader/cube_instanced.frag").unwrap();
 
         let vs_module = device.create_shader_module(&vs_bytes);
         let fs_module = device.create_shader_module(&fs_bytes);

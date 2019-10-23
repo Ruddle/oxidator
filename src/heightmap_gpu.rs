@@ -459,12 +459,8 @@ impl HeightmapGpu {
         });
 
         // Create the render pipeline
-        let vs_bytes =
-            glsl_compiler::load("shader/heightmap.vert", glsl_compiler::ShaderStage::Vertex)?;
-        let fs_bytes = glsl_compiler::load(
-            "shader/heightmap.frag",
-            glsl_compiler::ShaderStage::Fragment,
-        )?;
+        let vs_bytes = glsl_compiler::load("./src/shader/heightmap.vert")?;
+        let fs_bytes = glsl_compiler::load("./src/shader/heightmap.frag")?;
         let vs_module = device.create_shader_module(&vs_bytes);
         let fs_module = device.create_shader_module(&fs_bytes);
 

@@ -7,6 +7,7 @@ layout(location = 2) in vec4 v_color;
 
 layout(location = 0) out vec4 o_Target;
 layout(location = 1) out vec4 position_att;
+
 layout(set = 0, binding = 1) uniform texture2D t_Color;
 layout(set = 0, binding = 2) uniform sampler s_Color;
 
