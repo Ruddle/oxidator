@@ -32,10 +32,11 @@ extern crate shaderc;
 #[macro_use]
 extern crate typename;
 extern crate base_62;
+extern crate spin_sleep;
 
 use winit::event::Event;
 use winit::event_loop::ControlFlow;
-
+use spin_sleep::LoopHelper;
 #[derive(Debug)]
 pub enum ToClient {
     WindowPassing(winit::window::Window),
@@ -81,13 +82,15 @@ fn main() {
         let _ = s_to_frame_server.send(frame_server::ToFrameServer::AskNextFrameMsg {
             old_frame: frame0.clone(),
         });
-
         let _ = s_to_client_from_root_manager.send(ToClient::NewFrame(frame0));
-        loop {
-            //Waiting before receiving new partial frames
-            let wait_duration = std::time::Duration::from_millis(100);
-            std::thread::sleep(wait_duration);
 
+        let mut loop_helper = LoopHelper::builder()
+            .build_with_target_rate(10.0_f64);
+        loop {
+            log::trace!("Root manager sleep");
+            loop_helper.loop_sleep();
+            loop_helper.loop_start();
+            log::trace!("Root manager receive");
             //Receiving Partial new frames
             let mut new_partial_frame = match r_from_frame_server.recv() {
                 Ok(frame_server::FromFrameServer::NewFrame(new_frame)) => new_frame,

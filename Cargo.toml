@@ -15,7 +15,7 @@ vulkan = ["wgpu/vulkan"]
 use_shaderc =["shaderc"]
 use_glsl_to_spirv =["glsl-to-spirv"]
 use_spirv =[]
-default = ["wgpu/vulkan","use_shaderc"]
+default = ["wgpu/vulkan","use_spirv"]
 
 [dependencies]
 wgpu = { version = "0.3.0" }
@@ -36,6 +36,8 @@ byteorder = "1.3.2"
 typename = "0.1.1"
 base-62 = "0.1.1"
 obj-rs = "0.5"
+
+spin_sleep = "0.3.7"
 
 [dependencies.imgui-winit-support]
 version = "0.2.1"

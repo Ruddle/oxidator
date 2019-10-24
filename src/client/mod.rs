@@ -21,6 +21,7 @@ use std::collections::{HashMap, HashSet};
 use std::time::Instant;
 use utils::time;
 use wgpu::{BufferMapAsyncResult, Extent3d, SwapChain, TextureFormat};
+use spin_sleep::LoopHelper;
 
 use winit::event::WindowEvent;
 
@@ -88,6 +89,8 @@ pub struct App {
     watcher: notify::RecommendedWatcher,
 
     mailbox: Vec<RenderEvent>,
+
+    loop_helper : LoopHelper,
 }
 
 impl App {
@@ -425,6 +428,9 @@ impl App {
             watcher,
 
             mailbox: Vec::new(),
+
+            loop_helper: LoopHelper::builder()
+                .build_with_target_rate(144.0)
         };
 
         (this)

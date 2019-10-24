@@ -12,22 +12,14 @@ use wgpu::{BufferMapAsyncResult, Extent3d};
 
 impl App {
     pub fn render(&mut self) {
+        log::trace!("sleep");
+        self.loop_helper.loop_sleep();
+        self.loop_helper.loop_start();
         log::trace!("render");
 
         let mut now = Instant::now();
         let mut delta = now - self.game_state.last_frame;
-        let last_compute_time = delta.clone();
 
-        //empiric, a feed back loop could find this value automatically
-        let oversleep = 60;
-        let min_us = 1000000_u64 / self.game_state.fps;
-        let min_wait_until_next_frame = std::time::Duration::from_micros(min_us - oversleep);
-        if min_wait_until_next_frame > delta {
-            std::thread::sleep(min_wait_until_next_frame - delta);
-        }
-
-        now = Instant::now();
-        delta = now - self.game_state.last_frame;
         self.game_state.last_frame = now;
         let last_compute_time_total = delta.clone();
         let delta_sim_sec = last_compute_time_total.as_secs_f32();
@@ -57,7 +49,7 @@ impl App {
                     let mut player_me = Player::new();
 
                     for i in (50..300).step_by(4) {
-                        for j in (100..500).step_by(4) {
+                        for j in (100..400).step_by(4) {
                             let m = mobile::KBot::new(Point3::new(i as f32, j as f32, 100.0));
                             player_me.kbots.insert(m.id);
                             self.game_state.kbots.insert(m.id, m);
@@ -74,7 +66,7 @@ impl App {
                     player_ennemy.team = 1;
 
                     for i in (320..570).step_by(4) {
-                        for j in (100..500).step_by(4) {
+                        for j in (100..400).step_by(4) {
                             let m = mobile::KBot::new(Point3::new(i as f32, j as f32, 100.0));
                             player_ennemy.kbots.insert(m.id);
                             self.game_state.kbots.insert(m.id, m);
@@ -584,6 +576,7 @@ impl App {
                 //         })
                 // }
 
+                let fps_before=  self.game_state.fps.clone();
                 let mut_fps = &mut self.game_state.fps;
                 let p = &self.game_state.frame_zero.frame_profiler;
                 let stats_window = imgui::Window::new(im_str!("Statistics"));
@@ -595,14 +588,14 @@ impl App {
                     .movable(false)
                     .build(&ui, || {
                         imgui::Slider::new(im_str!("fps"), 1..=480).build(&ui, mut_fps);
-                        ui.text(im_str!("Frametime: {}us", last_compute_time.as_micros()));
+                        ui.text(im_str!("Frametime: {}us", delta.as_micros()));
                         ui.text(im_str!(
                             " \" Capped: {}us",
                             last_compute_time_total.as_micros()
                         ));
 
                         ui.separator();
-                        ui.text(im_str!("renderer:               {:?}", last_compute_time));
+                        ui.text(im_str!("renderer:               {:?}", delta));
                         ui.text(im_str!("   interpolation:       {:?}", interp_duration));
                         ui.text(im_str!(
                             "   mobile_to_gpu:       {:?}",
@@ -643,6 +636,12 @@ impl App {
                             ui.text(im_str!(" {}: {:?}", name, dur));
                         }
                     });
+
+                use spin_sleep::LoopHelper;
+                if fps_before != *mut_fps{
+                    self.loop_helper= LoopHelper::builder()
+                        .build_with_target_rate(*mut_fps as f64)
+                }
 
                 match main_menu {
                     MainMode::Home => {
