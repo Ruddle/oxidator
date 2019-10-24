@@ -15,6 +15,8 @@ pub struct KBot {
     pub life: i32,
     pub max_life: i32,
 
+    pub grounded: bool,
+
     pub frame_last_shot: i32,
     pub reload_frame_count: i32,
 }
@@ -32,6 +34,7 @@ impl KBot {
             reload_frame_count: 10,
             life: 100,
             max_life: 100,
+            grounded: false,
         }
     }
 }

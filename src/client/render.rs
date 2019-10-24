@@ -534,7 +534,7 @@ impl App {
                 let p = &self.game_state.frame_zero.frame_profiler;
                 let stats_window = imgui::Window::new(im_str!("Statistics"));
                 stats_window
-                    .size([300.0, 380.0], imgui::Condition::FirstUseEver)
+                    .size([300.0, 400.0], imgui::Condition::FirstUseEver)
                     .position([3.0, 3.0], imgui::Condition::FirstUseEver)
                     .collapsed(true, imgui::Condition::FirstUseEver)
                     .resizable(true)

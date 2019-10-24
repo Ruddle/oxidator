@@ -10,7 +10,7 @@ pub enum FromFrameServer {
     NewFrame(Frame),
 }
 
-pub fn next_frame(mut old_frame: Frame) -> Frame {
+pub fn next_frame(old_frame: Frame) -> Frame {
     let mut frame_profiler = FrameProfiler::new();
     let start = std::time::Instant::now();
     log::debug!("Received frame {} to compute next frame", old_frame.number);
@@ -56,7 +56,7 @@ pub fn next_frame(mut old_frame: Frame) -> Frame {
 
     let start_update_units = Instant::now();
 
-    let profiles = group_behavior::Group::update_units(
+    group_behavior::Group::update_units(
         &mut frame_profiler,
         &mut frame.kbots,
         &mut frame.kinematic_projectiles,
