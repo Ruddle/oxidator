@@ -342,9 +342,8 @@ impl App {
 
         gpu.device.get_queue().submit(&[init_encoder.finish()]);
 
-        let mut game_state = game_state::State::new();
+        let game_state = game_state::State::new();
 
-        println!("Number of mobiles {}", game_state.kbots.len());
 
         let (receiver_notify, watcher) = {
             use crossbeam_channel::unbounded;
@@ -632,14 +631,14 @@ impl App {
         > = self.receiver_notify.try_recv();
         match msg {
             Ok(Ok(event)) => {
-                println!("notify {:?}", event);
+                log::trace!("notify {:?}", event);
 
                 if event.paths.iter().any(|p| {
                     p.file_name().iter().any(|name| {
                         name.to_os_string() == "post_ui.frag" || name.to_os_string() == "post.vert"
                     })
                 }) {
-                    println!("Reloading post.vert/post_ui.frag");
+                    log::trace!("Reloading post.vert/post_ui.frag");
                     self.postfx.reload_shader(
                         &self.gpu.device,
                         &self.bind_group_layout,
@@ -653,7 +652,7 @@ impl App {
                             || name.to_os_string() == "post.vert"
                     })
                 }) {
-                    println!("Reloading post.vert/post_fxaa.frag");
+                    log::trace!("Reloading post.vert/post_fxaa.frag");
                     self.postfxaa.reload_shader(
                         &self.gpu.device,
                         &self.bind_group_layout,
@@ -667,7 +666,7 @@ impl App {
                             || name.to_os_string() == "heightmap.vert"
                     })
                 }) {
-                    println!("Reloading heightmap.vert/heightmap.frag");
+                    log::trace!("Reloading heightmap.vert/heightmap.frag");
                     self.heightmap_gpu.reload_shader(
                         &self.gpu.device,
                         &self.bind_group_layout,
@@ -681,7 +680,7 @@ impl App {
                             || name.to_os_string() == "cube_instanced.vert"
                     })
                 }) {
-                    println!("Reloading cube_instanced.vert/cube_instanced.frag");
+                    log::trace!("Reloading cube_instanced.vert/cube_instanced.frag");
                     self.cube_gpu.reload_shader(
                         &self.gpu.device,
                         &self.bind_group_layout,
@@ -699,7 +698,7 @@ impl App {
                         name.to_os_string() == "arrow.frag" || name.to_os_string() == "arrow.vert"
                     })
                 }) {
-                    println!("Reloading arrow.vert/arrow.frag");
+                    log::trace!("Reloading arrow.vert/arrow.frag");
                     self.arrow_gpu.reload_shader(
                         &self.gpu.device,
                         &self.bind_group_layout,
@@ -713,13 +712,13 @@ impl App {
         let msgs: Vec<_> = self.receiver_to_client.try_iter().collect();
         for msg in msgs {
             {
-                log::trace!("receive: {:?}", msg);
-
                 match msg {
                     ToClient::MapReadAsyncMessage { vec, usage } => {
+                        log::trace!("receive: MapReadAsyncMessage");
                         self.map_read_async_msg(vec, usage);
                     }
                     ToClient::NewFrame(frame) => {
+                        log::trace!("receive: NewFrame");
                         self.game_state.handle_new_frame(frame);
                     }
                     _ => panic!(

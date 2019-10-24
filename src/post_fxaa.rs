@@ -167,7 +167,7 @@ impl crate::trait_gpu::TraitGpu for PostFxaa {
             format,
         ) {
             Ok(pipeline) => self.pipeline = pipeline,
-            Err(x) => println!("{}", x),
+            Err(x) => log::error!("{}", x),
         };
     }
 }

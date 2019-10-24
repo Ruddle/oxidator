@@ -94,7 +94,7 @@ pub fn create_vertex_index_rings(hsize: u32) -> (Vec<Vertex>, Vec<u32>) {
             _mip: m,
         }
     };
-    println!("{}", vertex_data.len());
+    log::trace!("{}", vertex_data.len());
 
     enum Pass {
         Step(i32),
@@ -128,11 +128,11 @@ pub fn create_vertex_index_rings(hsize: u32) -> (Vec<Vertex>, Vec<u32>) {
     for pass in passes.iter() {
         match pass {
             Pass::Trans { from, to } => {
-                println!("Pass::Trans {} {}", from, to);
+                log::trace!("Pass::Trans {} {}", from, to);
 
                 let m = (power_to_exp(*from) + power_to_exp(*to)) / 2.0;
 
-                println!("m {}", m);
+                log::trace!("m {}", m);
                 let i = start_min;
                 let j = start_min;
                 {
@@ -240,9 +240,9 @@ pub fn create_vertex_index_rings(hsize: u32) -> (Vec<Vertex>, Vec<u32>) {
         }
     }
 
-    println!("Passes Done");
-    println!("index_data size  {}", index_data.len());
-    println!("vertex_data size {}", vertex_data.len());
+    log::trace!("Passes Done");
+    log::trace!("index_data size  {}", index_data.len());
+    log::trace!("vertex_data size {}", vertex_data.len());
 
     {
         let mut symmetry_vertex_data_left = Vec::new();
@@ -318,9 +318,9 @@ pub fn create_vertex_index_rings(hsize: u32) -> (Vec<Vertex>, Vec<u32>) {
         index_data.extend(symmetry_index_data_down_and_left);
     }
 
-    println!("Symmetry Done");
-    println!("index_data size  {}", index_data.len());
-    println!("vertex_data size {}", vertex_data.len());
+    log::trace!("Symmetry Done");
+    log::trace!("index_data size  {}", index_data.len());
+    log::trace!("vertex_data size {}", vertex_data.len());
 
     let (vertex_data, index_data) = optimize_vertex_index(vertex_data, index_data);
 
@@ -333,9 +333,9 @@ pub fn optimize_vertex_index(
 ) -> (Vec<Vertex>, Vec<u32>) {
     let start = std::time::Instant::now();
 
-    println!("Before Optimisation");
-    println!("index_data size  {}", index_data.len());
-    println!("vertex_data size {}", vertex_data.len());
+    log::trace!("Before Optimisation");
+    log::trace!("index_data size  {}", index_data.len());
+    log::trace!("vertex_data size {}", vertex_data.len());
     let mut new_vertex_data: Vec<Vertex> = Vec::new();
 
     let mut map: HashMap<Vertex, Option<usize>> = HashMap::new();
@@ -357,10 +357,10 @@ pub fn optimize_vertex_index(
         }
     }
 
-    println!("Optimisation Done");
-    println!("index_data size  {}", index_data.len());
-    println!("vertex_data size {}", new_vertex_data.len());
-    println!("Optimisation took {}us", start.elapsed().as_micros());
+    log::trace!("Optimisation Done");
+    log::trace!("index_data size  {}", index_data.len());
+    log::trace!("vertex_data size {}", new_vertex_data.len());
+    log::trace!("Optimisation took {}us", start.elapsed().as_micros());
 
     (new_vertex_data, index_data)
 }

@@ -325,10 +325,10 @@ impl State {
         let (info, mut reader) = decoder.read_info().unwrap();
 
         // Display image metadata.
-        println!("info: {:?}", info.width);
-        println!("height: {:?}", info.height);
-        println!("bit depth: {:?}", info.bit_depth);
-        println!("buffer size: {:?}", info.buffer_size());
+        log::debug!("info: {:?}", info.width);
+        log::debug!("height: {:?}", info.height);
+        log::debug!("bit depth: {:?}", info.bit_depth);
+        log::debug!("buffer size: {:?}", info.buffer_size());
 
         // Allocate the output buffer.
         let mut buf = vec![0; info.buffer_size()];

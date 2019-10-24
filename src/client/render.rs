@@ -51,18 +51,24 @@ impl App {
                     to: MainMode::Play,
                 } => {
                     self.clear_from_play();
-                    self.game_state.position = Point3::new(200.0, 100.0, 50.0);
+                    self.game_state.position = Point3::new(300.0, 100.0, 50.0);
                     self.game_state.dir = Vector3::new(0.0, 0.3, -1.0);
 
                     let mut player_me = Player::new();
 
-                    for i in (150..300).step_by(2) {
-                        for j in (100..200).step_by(2) {
+                    for i in (150..300).step_by(4) {
+                        for j in (100..800).step_by(4) {
                             let m = mobile::KBot::new(Point3::new(i as f32, j as f32, 100.0));
                             player_me.kbots.insert(m.id);
                             self.game_state.kbots.insert(m.id, m);
                         }
                     }
+
+                    // {
+                    //     let m = mobile::KBot::new(Point3::new(100.0, 100.0, 100.0));
+                    //     player_me.kbots.insert(m.id);
+                    //     self.game_state.kbots.insert(m.id, m);
+                    // }
 
                     let mut player_ennemy = Player::new();
                     player_ennemy.team = 1;
@@ -74,6 +80,14 @@ impl App {
                             self.game_state.kbots.insert(m.id, m);
                         }
                     }
+
+                    // {
+                    //     let m = mobile::KBot::new(Point3::new(120.0, 100.0, 100.0));
+                    //     player_ennemy.kbots.insert(m.id);
+                    //     self.game_state.kbots.insert(m.id, m);
+                    // }
+
+                    log::info!("Starting a game with {} bots", self.game_state.kbots.len());
 
                     self.game_state.my_player_id = Some(player_me.id);
                     self.game_state.players.insert(player_me.id, player_me);
@@ -520,7 +534,7 @@ impl App {
                 let p = &self.game_state.frame_zero.frame_profiler;
                 let stats_window = imgui::Window::new(im_str!("Statistics"));
                 stats_window
-                    .size([270.0, 260.0], imgui::Condition::FirstUseEver)
+                    .size([300.0, 380.0], imgui::Condition::FirstUseEver)
                     .position([3.0, 3.0], imgui::Condition::FirstUseEver)
                     .collapsed(true, imgui::Condition::FirstUseEver)
                     .resizable(true)
@@ -551,10 +565,14 @@ impl App {
                         ui.text(im_str!("   3d_render_pass:      {:?}", us_3d_render_pass));
                         ui.separator();
 
-                        ui.text(im_str!(
-                            "logic:                  {:?}",
-                            p.get("total").unwrap()
-                        ));
+                        ui.text(im_str!("logic: {:?}", p.get("total").unwrap()));
+                        ProgressBar::new(p.get("total").unwrap().as_millis() as f32 / 100.0)
+                            .build(&ui);
+
+                        // ui.text(im_str!(
+                        //     "logic:                  {:?}",
+                        //     p.get("total").unwrap()
+                        // ));
 
                         let mut others =
                             p.hm.iter()

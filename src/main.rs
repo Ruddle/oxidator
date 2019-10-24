@@ -49,7 +49,7 @@ pub enum EventLoopMsg {
 }
 
 fn main() {
-    println!("dir: {:?}", std::env::current_dir().unwrap());
+    log::info!("dir: {:?}", std::env::current_dir().unwrap());
     env_logger::init();
 
     use crossbeam_channel::unbounded;

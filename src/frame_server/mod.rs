@@ -50,7 +50,7 @@ pub fn next_frame(mut old_frame: Frame) -> Frame {
         }
     }
 
-    frame_profiler.add("handle_events", start.elapsed());
+    frame_profiler.add("1 handle_events", start.elapsed());
 
     let mut arrows = Vec::new();
 
