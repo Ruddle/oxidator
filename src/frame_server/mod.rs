@@ -18,6 +18,7 @@ pub enum FromFrameServer {
 pub struct FrameServerCache {
     pub grid: Vec<Vec<Id<KBot>>>,
     pub small_grid: Vec<Vec<Id<KBot>>>,
+    pub heightmap_phy: Option<heightmap_phy::HeightmapPhy>,
 }
 
 impl FrameServerCache {
@@ -25,11 +26,12 @@ impl FrameServerCache {
         FrameServerCache {
             grid: Vec::new(),
             small_grid: Vec::new(),
+            heightmap_phy: None,
         }
     }
 
     pub fn next_frame(&mut self, old_frame: Frame) -> Frame {
-        let mut frame_profiler = FrameProfiler::new();
+        let mut frame_profiler = ProfilerMap::new();
         let start = std::time::Instant::now();
         log::debug!("Received frame {} to compute next frame", old_frame.number);
 
@@ -39,6 +41,7 @@ impl FrameServerCache {
         for event in old_frame.events.iter() {
             match event {
                 FrameEvent::ReplaceFrame(frame) => {
+                    self.heightmap_phy = frame.heightmap_phy.clone();
                     replacer = Some(frame.clone());
                     log::debug!("Replacing frame");
                 }
@@ -75,19 +78,20 @@ impl FrameServerCache {
 
         let start_update_units = Instant::now();
 
-        update_units(
-            &mut frame_profiler,
-            &mut frame.kbots,
-            &mut frame.kbots_dead,
-            &mut frame.kinematic_projectiles,
-            &frame.heightmap_phy,
-            &mut arrows,
-            frame.number,
-            &frame.players,
-            &mut self.grid,
-            &mut self.small_grid,
-        );
-
+        if let Some(heightmap) = &self.heightmap_phy {
+            update_units(
+                &mut frame_profiler,
+                &mut frame.kbots,
+                &mut frame.kbots_dead,
+                &mut frame.kinematic_projectiles,
+                heightmap,
+                &mut arrows,
+                frame.number,
+                &frame.players,
+                &mut self.grid,
+                &mut self.small_grid,
+            );
+        }
         frame_profiler.add("0 update_units", start_update_units.elapsed());
         frame_profiler.add("total", start.elapsed());
         Frame {
@@ -183,7 +187,7 @@ pub fn update_mobile_target(
 }
 
 pub fn update_units(
-    frame_profiler: &mut FrameProfiler,
+    frame_profiler: &mut ProfilerMap,
     kbots: &mut HashMap<Id<KBot>, KBot>,
     kbots_dead: &mut HashSet<Id<KBot>>,
     kinematic_projectiles: &mut HashMap<Id<KinematicProjectile>, KinematicProjectile>,
@@ -389,7 +393,7 @@ pub fn update_units(
     //AABB for kbot and proj
     {
         let start = std::time::Instant::now();
-        let cell_size = 2;
+        let cell_size = 4;
         let grid_w = (heightmap_phy.width / cell_size) as usize;
         let grid_h = (heightmap_phy.height / cell_size) as usize;
 
@@ -413,10 +417,10 @@ pub fn update_units(
             let min_y = (position.y - radius * 1.0).floor() as usize;
             let max_y = (position.y + radius * 1.0).ceil() as usize;
 
-            let min_x = (min_x / cell_size);
-            let max_x = ((max_x + 1) / cell_size);
-            let min_y = (min_y / cell_size);
-            let max_y = ((max_y + 1) / cell_size);
+            let min_x = min_x / cell_size;
+            let max_x = (max_x + 1) / cell_size;
+            let min_y = min_y / cell_size;
+            let max_y = (max_y + 1) / cell_size;
 
             for i in (min_x..=max_x).step_by(cell_size) {
                 for j in (min_y..=max_y).step_by(cell_size) {
@@ -508,7 +512,7 @@ pub fn update_units(
         let start = std::time::Instant::now();
         //TODO cache
 
-        let mut id_to_team: HashMap<Id<KBot>, u8> = HashMap::new();
+        let mut id_to_team: HashMap<Id<KBot>, u8> = HashMap::with_capacity(kbots.len());
 
         for team in teams.iter() {
             let team_players: Vec<_> = players.values().filter(|e| &e.team == team).collect();
@@ -520,24 +524,7 @@ pub fn update_units(
         }
 
         frame_profiler.add("05  id_to_team", start.elapsed());
-        let start = std::time::Instant::now();
-        let mut team_to_ennemy_grid: HashMap<u8, Vec<Vec<Id<KBot>>>> = HashMap::new();
 
-        for team in teams.iter() {
-            let grid_team: Vec<Vec<Id<KBot>>> = grid
-                .iter()
-                .map(|zone| {
-                    zone.iter()
-                        .filter(|kbot| id_to_team.get(kbot).unwrap() != team)
-                        .copied()
-                        .collect::<Vec<Id<KBot>>>()
-                })
-                .collect();
-
-            team_to_ennemy_grid.insert(*team, grid_team);
-        }
-
-        frame_profiler.add("06  team_to_ennemy_grid", start.elapsed());
         let start = std::time::Instant::now();
         struct Shot {
             bot: Id<KBot>,
@@ -551,18 +538,18 @@ pub fn update_units(
 
             let my_team = id_to_team.get(me).unwrap();
 
-            let ennemies_in_cell = &team_to_ennemy_grid.get(my_team).unwrap()[grid_pos];
+            // let ennemies_in_cell = &team_to_ennemy_grid.get(my_team).unwrap()[grid_pos];
 
-            // let mut neighbors_id: Vec<Id<KBot>> = grid[grid_pos].clone();
-            // let to_remove = neighbors_id.iter().position(|e| e == me).unwrap();
-            // neighbors_id.remove(to_remove);
+            let mut ennemies_in_cell: Vec<Id<KBot>> = grid[grid_pos].clone();
+            let to_remove = ennemies_in_cell.iter().position(|e| e == me).unwrap();
+            ennemies_in_cell.remove(to_remove);
 
             let can_shoot =// *my_team == 0&&
                  frame_count - me_kbot.frame_last_shot > me_kbot.reload_frame_count;
             if can_shoot {
                 //We choose the first ennemy in the cell, we could sort by distance or something else here
                 'meloop: for potential_ennemy in ennemies_in_cell {
-                    {
+                    if id_to_team.get(&potential_ennemy).unwrap() != my_team {
                         let ennemy_kbot = kbots.get(&potential_ennemy).unwrap();
                         if (ennemy_kbot.position.coords - me_kbot.position.coords).magnitude() < 6.0
                         {

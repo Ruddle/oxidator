@@ -141,3 +141,52 @@ fn main() {
         _ => {}
     });
 }
+
+use serde::{Deserialize, Serialize};
+
+#[derive(Serialize, Deserialize, PartialEq, Debug)]
+pub struct World {
+    pub a: String,
+    pub b: u8,
+}
+
+use std::io::prelude::*;
+use std::net::TcpListener;
+use std::net::TcpStream;
+
+pub fn client() {
+    let w = World {
+        a: "Stzefeof".to_owned(),
+        b: 244,
+    };
+
+    let vec = bincode::serialize(&w).unwrap();
+
+    let mut stream = TcpStream::connect("127.0.0.1:7878").unwrap();
+
+    let start = std::time::Instant::now();
+    let _ = stream.write_all(&vec); // ignore the Result
+                                    // let _ = stream.read(&mut [0; 128]); // ignore this too
+
+    println!("{:?}", vec.last().unwrap());
+    println!("took {:?}", start.elapsed());
+} // the stream is close
+
+pub fn server() {
+    let listener = TcpListener::bind("127.0.0.1:7878").unwrap();
+
+    for stream in listener.incoming() {
+        let mut stream = stream.unwrap();
+        println!("Connection established!");
+
+        let start = std::time::Instant::now();
+        let mut buffer: Vec<u8> = Vec::new();
+        let n = stream.read_to_end(&mut buffer).unwrap();
+        println!("The bytes: {:?}", n); //&buffer[..n]
+        println!("last {:?}", buffer.last().unwrap());
+        println!("took {:?}", start.elapsed());
+
+        let w: World = bincode::deserialize(&buffer[..]).unwrap();
+        println!("{:?}", w);
+    }
+}

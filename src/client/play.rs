@@ -8,7 +8,11 @@ use std::time::{Duration, Instant};
 use utils::*;
 
 impl App {
-    pub fn handle_play(&mut self, delta_sim_sec: f32) -> (Duration, Duration) {
+    pub fn handle_play(
+        &mut self,
+        delta_sim_sec: f32,
+        encoder: &mut wgpu::CommandEncoder,
+    ) -> (Duration, Duration) {
         //Interpolate
         let interp_duration = time(|| {
             self.game_state.interpolate();
@@ -69,13 +73,18 @@ impl App {
         //Upload to gpu
         let mobile_to_gpu_duration = time(|| {
             //Kbot
-            let mut positions = Vec::with_capacity(self.game_state.kbots.len() * 18);
+            self.vertex_attr_buffer_f32.clear();
             for mobile in self.game_state.kbots.values() {
                 let mat = Matrix4::face_towards(
                     &mobile.position,
                     &(mobile.position + mobile.dir),
                     &Vector3::new(0.0, 0.0, 1.0),
                 );
+
+                // let mat = Matrix4::new(1.0,0.0,0.0,0.0,
+                // 0.0,1.0,0.0,0.0,
+                // 0.0,0.0,1.0,0.0,
+                // 0.0,0.0,0.0,1.0);
 
                 let is_selected = if self.game_state.selected.contains(&mobile.id.value) {
                     1.0
@@ -91,17 +100,17 @@ impl App {
                     .unwrap()
                     .team;
 
-                positions.extend_from_slice(mat.as_slice());
-                positions.push(is_selected);
-                positions.push(team as f32)
+                self.vertex_attr_buffer_f32
+                    .extend_from_slice(mat.as_slice());
+                self.vertex_attr_buffer_f32.push(is_selected);
+                self.vertex_attr_buffer_f32.push(team as f32)
             }
 
             self.kbot_gpu
-                .update_instance(&positions[..], &self.gpu.device);
+                .update_instance_dirty(&self.vertex_attr_buffer_f32[..], &self.gpu.device);
 
             //Kinematic Projectile
-            let mut positions =
-                Vec::with_capacity(self.game_state.kinematic_projectiles.len() * 18);
+            self.vertex_attr_buffer_f32.clear();
             for mobile in self.game_state.kinematic_projectiles.values() {
                 let mat = Matrix4::face_towards(
                     &mobile.positions.iter().next().unwrap(),
@@ -117,16 +126,17 @@ impl App {
 
                 let team = -1.0;
 
-                positions.extend_from_slice(mat.as_slice());
-                positions.push(is_selected);
-                positions.push(team)
+                self.vertex_attr_buffer_f32
+                    .extend_from_slice(mat.as_slice());
+                self.vertex_attr_buffer_f32.push(is_selected);
+                self.vertex_attr_buffer_f32.push(team)
             }
 
             self.kinematic_projectile_gpu
-                .update_instance(&positions[..], &self.gpu.device);
+                .update_instance_dirty(&self.vertex_attr_buffer_f32[..], &self.gpu.device);
 
             //Arrow
-            let mut positions = Vec::with_capacity(self.game_state.frame_zero.arrows.len() * 20);
+            self.vertex_attr_buffer_f32.clear();
             for arrow in self.game_state.frame_zero.arrows.iter() {
                 let mat = Matrix4::face_towards(
                     &arrow.position,
@@ -134,17 +144,20 @@ impl App {
                     &Vector3::new(0.0, 0.0, 1.0),
                 );
 
-                positions.extend_from_slice(mat.as_slice());
-                positions.extend_from_slice(&arrow.color[..3]);
-                positions.push((arrow.end.coords - arrow.position.coords).magnitude());
+                self.vertex_attr_buffer_f32
+                    .extend_from_slice(mat.as_slice());
+                self.vertex_attr_buffer_f32
+                    .extend_from_slice(&arrow.color[..3]);
+                self.vertex_attr_buffer_f32
+                    .push((arrow.end.coords - arrow.position.coords).magnitude());
             }
 
             self.arrow_gpu
-                .update_instance(&positions[..], &self.gpu.device);
+                .update_instance(&self.vertex_attr_buffer_f32[..], &self.gpu.device);
 
             //Unit life
 
-            let mut buffer = Vec::with_capacity(self.game_state.in_screen.len() * 5);
+            self.vertex_attr_buffer_f32.clear();
             for (id, _) in self.game_state.in_screen.iter() {
                 if let Some(kbot) = self.game_state.kbots.get(id) {
                     let distance =
@@ -185,15 +198,17 @@ impl App {
                         let min = offset - half_size;
                         let max = offset + half_size;
                         let life = kbot.life as f32 / kbot.max_life as f32;
-                        buffer.extend_from_slice(min.as_slice());
-                        buffer.extend_from_slice(max.as_slice());
-                        buffer.push(life);
-                        buffer.push(alpha);
+                        self.vertex_attr_buffer_f32
+                            .extend_from_slice(min.as_slice());
+                        self.vertex_attr_buffer_f32
+                            .extend_from_slice(max.as_slice());
+                        self.vertex_attr_buffer_f32.push(life);
+                        self.vertex_attr_buffer_f32.push(alpha);
                     }
                 }
             }
             self.health_bar
-                .update_instance(&buffer[..], &self.gpu.device);
+                .update_instance(&self.vertex_attr_buffer_f32[..], &self.gpu.device);
         });
 
         (interp_duration, mobile_to_gpu_duration)

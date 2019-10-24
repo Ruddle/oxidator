@@ -12,17 +12,20 @@ use wgpu::{BufferMapAsyncResult, Extent3d};
 
 impl App {
     pub fn render(&mut self) {
+        let frame_time = self.game_state.last_frame.elapsed();
+        self.profiler.add("frame_time", frame_time);
+
         log::trace!("sleep");
         self.loop_helper.loop_sleep();
         self.loop_helper.loop_start();
         log::trace!("render");
 
-        let mut now = Instant::now();
-        let mut delta = now - self.game_state.last_frame;
+        let capped_frame_time = self.game_state.last_frame.elapsed();
 
-        self.game_state.last_frame = now;
-        let last_compute_time_total = delta.clone();
-        let delta_sim_sec = last_compute_time_total.as_secs_f32();
+        self.profiler.add("capped_frame_time", capped_frame_time);
+        self.game_state.last_frame = Instant::now();
+
+        let sim_sec = capped_frame_time.as_secs_f32();
 
         let mailbox = self.mailbox.clone();
         self.mailbox.clear();
@@ -95,9 +98,9 @@ impl App {
                         kinematic_projectiles: self.game_state.kinematic_projectiles.clone(),
                         events: Vec::new(),
                         arrows: Vec::new(),
-                        heightmap_phy: self.heightmap_gpu.phy.clone(),
+                        heightmap_phy: Some(self.heightmap_gpu.phy.clone()),
                         complete: true,
-                        frame_profiler: frame::FrameProfiler::new(),
+                        frame_profiler: frame::ProfilerMap::new(),
                     });
                     let _ = self
                         .sender_from_client
@@ -115,7 +118,13 @@ impl App {
                         .sender_from_client
                         .try_send(client::FromClient::Event(replacer));
                 }
-                _ => {}
+                RenderEvent::ChangeMode {
+                    from,
+                    to: MainMode::MultiplayerLobby,
+                } => {}
+                _ => {
+                    log::info!("Something else");
+                }
             }
         }
 
@@ -134,8 +143,9 @@ impl App {
             }
         }
 
+        let mode_with_camera = [MainMode::Play, MainMode::MapEditor];
         // Camera Movements
-        if self.main_menu != MainMode::Home {
+        if mode_with_camera.contains(&self.main_menu) {
             use winit::event::VirtualKeyCode as Key;
             let key_pressed = &self.input_state.key_pressed;
             let on = |vkc| key_pressed.contains(&vkc);
@@ -202,30 +212,29 @@ impl App {
                         new_dir = Some(new_camera_to_center);
                         let new_pos =
                             screen_center_world_pos - new_camera_to_center.normalize() * distance;
-                        offset += (new_pos - self.game_state.position.coords) / delta_sim_sec;
+                        offset += (new_pos - self.game_state.position.coords) / sim_sec;
                     }
                 } else {
                     if self.input_state.last_scroll > 0.0 {
-                        dir_offset.y += 0.010 / delta_sim_sec;
+                        dir_offset.y += 0.010 / sim_sec;
                     }
                     if self.input_state.last_scroll < 0.0 {
-                        dir_offset.z -= 0.010 / delta_sim_sec;
+                        dir_offset.z -= 0.010 / sim_sec;
                     }
                 }
             } else {
                 if let Some(mouse_world_pos) = self.game_state.mouse_world_pos {
                     let u = (mouse_world_pos - self.game_state.position.coords).normalize();
-                    offset += self.input_state.last_scroll * u * k * 0.75 * 0.320 / delta_sim_sec;
+                    offset += self.input_state.last_scroll * u * k * 0.75 * 0.320 / sim_sec;
                 } else {
-                    offset.z = -self.input_state.last_scroll * k * 0.75 * 0.20 / delta_sim_sec;
+                    offset.z = -self.input_state.last_scroll * k * 0.75 * 0.20 / sim_sec;
                 }
             }
 
             self.input_state.last_scroll = 0.0;
 
-            self.game_state.position += offset * delta_sim_sec;
-            self.game_state.dir =
-                (self.game_state.dir + dir_offset * 33.0 * delta_sim_sec).normalize();
+            self.game_state.position += offset * sim_sec;
+            self.game_state.dir = (self.game_state.dir + dir_offset * 33.0 * sim_sec).normalize();
 
             new_dir.map(|new_dir| {
                 self.game_state.dir = new_dir;
@@ -235,32 +244,12 @@ impl App {
 
             self.game_state.position_smooth += (self.game_state.position.coords
                 - self.game_state.position_smooth.coords)
-                * delta_sim_sec.min(0.033)
+                * sim_sec.min(0.033)
                 * 15.0;
 
-            self.game_state.dir_smooth += (self.game_state.dir - self.game_state.dir_smooth)
-                * delta_sim_sec.min(0.033)
-                * 15.0;
+            self.game_state.dir_smooth +=
+                (self.game_state.dir - self.game_state.dir_smooth) * sim_sec.min(0.033) * 15.0;
         }
-
-        // self.phy_state.step();
-        //Phy Drawing
-        // {
-        //     let cubes_t = self.phy_state.cubes_transform();
-        //     let mut positions = Vec::with_capacity(cubes_t.len() * 16);
-        //     for mat in cubes_t {
-        //         positions.extend_from_slice(mat.as_slice())
-        //     }
-
-        //     self.cube_gpu
-        //         .update_instance(&positions[..], &self.gpu.device);
-        // }
-
-        let (interp_duration, mobile_to_gpu_duration) = if self.main_menu == MainMode::Play {
-            self.handle_play(delta_sim_sec)
-        } else {
-            (Duration::default(), Duration::default())
-        };
 
         let heightmap_editor_duration = time(|| {
             if let MainMode::MapEditor = self.main_menu {
@@ -274,16 +263,31 @@ impl App {
             }
         });
 
+        self.profiler
+            .add("heightmap_editor", heightmap_editor_duration);
+
         //Render
         let mut encoder_render = self
             .gpu
             .device
             .create_command_encoder(&wgpu::CommandEncoderDescriptor { todo: 0 });
 
+        let (interp_duration, mobile_to_gpu_duration) = if self.main_menu == MainMode::Play {
+            self.handle_play(sim_sec, &mut encoder_render)
+        } else {
+            (Duration::default(), Duration::default())
+        };
+
+        self.profiler.add("interp", interp_duration);
+        self.profiler.add("mobile_to_gpu", mobile_to_gpu_duration);
+
         let heightmap_gpu_step_duration = time(|| {
             self.heightmap_gpu
                 .step(&self.gpu.device, &mut encoder_render);
         });
+
+        self.profiler
+            .add("heightmap_gpu_step", heightmap_gpu_step_duration);
 
         let cursor_sample_position = self
             .gpu
@@ -405,9 +409,186 @@ impl App {
             &mut encoder_render,
         );
 
-        let frame = &self.gpu.swap_chain.get_next_texture();
+        //Imgui
+        let start = Instant::now();
 
-        now = Instant::now();
+        log::trace!("imgui render");
+        self.imgui_wrap
+            .platform
+            .prepare_frame(self.imgui_wrap.imgui.io_mut(), &self.gpu.window)
+            .expect("Failed to prepare frame");
+
+        let ui: Ui = self.imgui_wrap.imgui.frame();
+        {
+            let main_menu = &mut self.main_menu;
+
+            {
+                let fps_before = self.game_state.fps.clone();
+                let mut_fps = &mut self.game_state.fps;
+                let profiler_logic = &self.game_state.frame_zero.frame_profiler;
+                let profiler_render = &self.profiler;
+                let stats_window = imgui::Window::new(im_str!("Statistics"));
+                stats_window
+                    .size([300.0, 400.0], imgui::Condition::FirstUseEver)
+                    .position([3.0, 3.0], imgui::Condition::FirstUseEver)
+                    .collapsed(true, imgui::Condition::FirstUseEver)
+                    .resizable(true)
+                    .movable(false)
+                    .build(&ui, || {
+                        imgui::Slider::new(im_str!("fps"), 1..=480).build(&ui, mut_fps);
+
+                        ui.text(im_str!(
+                            "render: {:?}",
+                            profiler_render.get("frame_time").unwrap()
+                        ));
+                        ProgressBar::new(
+                            profiler_render.get("frame_time").unwrap().as_secs_f32()
+                                / (1.0 / *mut_fps as f32),
+                        )
+                        .build(&ui);
+                        let mut others = profiler_render
+                            .hm
+                            .iter()
+                            .filter(|(n, d)| *n != "frame_time")
+                            .collect::<Vec<_>>();
+                        others.sort_by_key(|e| e.0);
+                        for (name, dur) in others.iter() {
+                            let name: String = format!("{}                          ", name)
+                                .chars()
+                                .take(23)
+                                .collect::<Vec<char>>()
+                                .into_iter()
+                                .collect();
+                            ui.text(im_str!(" {}: {:?}", name, dur));
+                        }
+
+                        ui.separator();
+
+                        ui.text(im_str!("logic: {:?}", profiler_logic.get("total").unwrap()));
+                        ProgressBar::new(
+                            profiler_logic.get("total").unwrap().as_millis() as f32 / 100.0,
+                        )
+                        .build(&ui);
+
+                        let mut others = profiler_logic
+                            .hm
+                            .iter()
+                            .filter(|(n, d)| *n != "total")
+                            .collect::<Vec<_>>();
+                        others.sort_by_key(|e| e.0);
+                        for (name, dur) in others.iter() {
+                            let name: String = format!("{}                          ", name)
+                                .chars()
+                                .take(23)
+                                .collect::<Vec<char>>()
+                                .into_iter()
+                                .collect();
+                            ui.text(im_str!(" {}: {:?}", name, dur));
+                        }
+                    });
+
+                if fps_before != *mut_fps {
+                    self.loop_helper = LoopHelper::builder().build_with_target_rate(*mut_fps as f64)
+                }
+
+                match main_menu {
+                    MainMode::Home => {
+                        let w = 216.0;
+                        let h = 324.0;
+                        let home_window = imgui::Window::new(im_str!("Home"));
+
+                        let mut next_mode = MainMode::Home;
+                        let mut exit = false;
+                        home_window
+                            // .size([w, h], imgui::Condition::Always)
+                            .position(
+                                [
+                                    (self.gpu.sc_desc.width as f32 - w) / 2.0,
+                                    (self.gpu.sc_desc.height as f32 - h) / 2.0,
+                                ],
+                                imgui::Condition::Always,
+                            )
+                            .title_bar(false)
+                            .always_auto_resize(true)
+                            .resizable(false)
+                            .movable(false)
+                            .scroll_bar(false)
+                            .collapsible(false)
+                            .build(&ui, || {
+                                if ui.button(im_str!("Play"), [200.0_f32, 100.0]) {
+                                    next_mode = MainMode::Play;
+                                }
+                                if ui.button(im_str!("Map Editor"), [200.0_f32, 100.0]) {
+                                    next_mode = MainMode::MapEditor;
+                                }
+                                if ui.button(im_str!("Multiplayer"), [200.0_f32, 100.0]) {
+                                    next_mode = MainMode::MultiplayerLobby;
+                                }
+                                if ui.button(im_str!("Exit"), [200.0_f32, 100.0]) {
+                                    exit = true;
+                                }
+                            });
+
+                        if exit {
+                            self.sender_to_event_loop.send(EventLoopMsg::Stop).unwrap();
+                        }
+                        if self.main_menu != next_mode {
+                            self.mailbox.push(RenderEvent::ChangeMode {
+                                from: self.main_menu,
+                                to: next_mode,
+                            });
+                            self.main_menu = next_mode;
+                        }
+                    }
+                    MainMode::Play => {}
+                    MainMode::MapEditor => {
+                        self.game_state
+                            .heightmap_editor
+                            .draw_ui(&ui, &mut self.heightmap_gpu);
+                    }
+                    MainMode::MultiplayerLobby => {
+                        let w = 216.0;
+                        let h = 324.0;
+                        let home_window = imgui::Window::new(im_str!("Multiplayer Lobby"));
+
+                        let mut next_mode = MainMode::MultiplayerLobby;
+                        home_window
+                            .size([w, h], imgui::Condition::Always)
+                            .position(
+                                [
+                                    (self.gpu.sc_desc.width as f32 - w) / 2.0,
+                                    (self.gpu.sc_desc.height as f32 - h) / 2.0,
+                                ],
+                                imgui::Condition::Always,
+                            )
+                            .title_bar(false)
+                            .resizable(false)
+                            .movable(false)
+                            .collapsible(false)
+                            .build(&ui, || {
+                                if ui.button(im_str!("Back"), [200.0_f32, 100.0]) {
+                                    next_mode = MainMode::Home;
+                                }
+                            });
+
+                        if self.main_menu != next_mode {
+                            self.mailbox.push(RenderEvent::ChangeMode {
+                                from: self.main_menu,
+                                to: next_mode,
+                            });
+                            self.main_menu = next_mode;
+                        }
+                    }
+                }
+            }
+            self.imgui_wrap
+                .platform
+                .prepare_render(&ui, &self.gpu.window);
+        }
+        self.profiler.add("imgui_render", start.elapsed());
+
+        let frame = &self.gpu.swap_chain.get_next_texture();
+        let now = Instant::now();
         //Pass
         {
             log::trace!("begin_render_pass");
@@ -532,184 +713,21 @@ impl App {
             self.health_bar.render(&mut rpass, &self.bind_group);
         }
 
-        let us_3d_render_pass = now.elapsed();
+        let render_pass_3D = now.elapsed();
 
-        //Imgui
-        {
-            log::trace!("imgui render");
-            self.imgui_wrap
-                .platform
-                .prepare_frame(self.imgui_wrap.imgui.io_mut(), &self.gpu.window)
-                .expect("Failed to prepare frame");
+        self.profiler.add("render_pass_3D", render_pass_3D);
 
-            let ui: Ui = self.imgui_wrap.imgui.frame();
+        self.imgui_wrap
+            .renderer
+            .render(ui, &self.gpu.device, &mut encoder_render, &frame.view)
+            .expect("Rendering failed");
 
-            let main_menu = &mut self.main_menu;
-
-            {
-                // //Unit life
-                // for (id, screen_pos) in self.game_state.in_screen.iter() {
-                //     let title = im_str!("{}", id);
-                //     let life = self.game_state.kbots.get(id).unwrap().life as f32;
-                //     let life_window = imgui::Window::new(title.as_ref());
-                //     life_window
-                //         .size([26.0, 2.0], imgui::Condition::Always)
-                //         .position(
-                //             [
-                //                 (screen_pos.x * 0.5 + 0.5) * self.gpu.sc_desc.width as f32 - 13.0,
-                //                 (screen_pos.y * 0.5 + 0.5) * self.gpu.sc_desc.height as f32
-                //                     - 1.0
-                //                     - 40.0,
-                //             ],
-                //             imgui::Condition::Always,
-                //         )
-                //         .collapsed(false, imgui::Condition::FirstUseEver)
-                //         .resizable(false)
-                //         .movable(false)
-                //         .draw_background(false)
-                //         .scroll_bar(false)
-                //         .no_inputs()
-                //         .title_bar(false)
-                //         .collapsible(false)
-                //         .build(&ui, || {
-                //             ProgressBar::new(life / 100.0).size([26.0, 2.0]).build(&ui);
-                //         })
-                // }
-
-                let fps_before=  self.game_state.fps.clone();
-                let mut_fps = &mut self.game_state.fps;
-                let p = &self.game_state.frame_zero.frame_profiler;
-                let stats_window = imgui::Window::new(im_str!("Statistics"));
-                stats_window
-                    .size([300.0, 400.0], imgui::Condition::FirstUseEver)
-                    .position([3.0, 3.0], imgui::Condition::FirstUseEver)
-                    .collapsed(true, imgui::Condition::FirstUseEver)
-                    .resizable(true)
-                    .movable(false)
-                    .build(&ui, || {
-                        imgui::Slider::new(im_str!("fps"), 1..=480).build(&ui, mut_fps);
-                        ui.text(im_str!("Frametime: {}us", delta.as_micros()));
-                        ui.text(im_str!(
-                            " \" Capped: {}us",
-                            last_compute_time_total.as_micros()
-                        ));
-
-                        ui.separator();
-                        ui.text(im_str!("renderer:               {:?}", delta));
-                        ui.text(im_str!("   interpolation:       {:?}", interp_duration));
-                        ui.text(im_str!(
-                            "   mobile_to_gpu:       {:?}",
-                            mobile_to_gpu_duration
-                        ));
-                        ui.text(im_str!(
-                            "   heightmap_editor:    {:?}",
-                            heightmap_editor_duration
-                        ));
-                        ui.text(im_str!(
-                            "   heightmap_step:      {:?}",
-                            heightmap_gpu_step_duration
-                        ));
-                        ui.text(im_str!("   3d_render_pass:      {:?}", us_3d_render_pass));
-                        ui.separator();
-
-                        ui.text(im_str!("logic: {:?}", p.get("total").unwrap()));
-                        ProgressBar::new(p.get("total").unwrap().as_millis() as f32 / 100.0)
-                            .build(&ui);
-
-                        // ui.text(im_str!(
-                        //     "logic:                  {:?}",
-                        //     p.get("total").unwrap()
-                        // ));
-
-                        let mut others =
-                            p.hm.iter()
-                                .filter(|(n, d)| *n != "total")
-                                .collect::<Vec<_>>();
-                        others.sort_by_key(|e| e.0);
-                        for (name, dur) in others.iter() {
-                            let name: String = format!("{}                          ", name)
-                                .chars()
-                                .take(23)
-                                .collect::<Vec<char>>()
-                                .into_iter()
-                                .collect();
-                            ui.text(im_str!(" {}: {:?}", name, dur));
-                        }
-                    });
-
-                use spin_sleep::LoopHelper;
-                if fps_before != *mut_fps{
-                    self.loop_helper= LoopHelper::builder()
-                        .build_with_target_rate(*mut_fps as f64)
-                }
-
-                match main_menu {
-                    MainMode::Home => {
-                        let w = 216.0;
-                        let h = 324.0;
-                        let home_window = imgui::Window::new(im_str!("Home"));
-
-                        let mut next_mode = MainMode::Home;
-                        let mut exit = false;
-                        home_window
-                            .size([w, h], imgui::Condition::Always)
-                            .position(
-                                [
-                                    (self.gpu.sc_desc.width as f32 - w) / 2.0,
-                                    (self.gpu.sc_desc.height as f32 - h) / 2.0,
-                                ],
-                                imgui::Condition::Always,
-                            )
-                            .title_bar(false)
-                            .resizable(false)
-                            .movable(false)
-                            .collapsible(false)
-                            .build(&ui, || {
-                                if ui.button(im_str!("Play"), [200.0_f32, 100.0]) {
-                                    next_mode = MainMode::Play;
-                                }
-                                if ui.button(im_str!("Map Editor"), [200.0_f32, 100.0]) {
-                                    next_mode = MainMode::MapEditor;
-                                }
-                                if ui.button(im_str!("Exit"), [200.0_f32, 100.0]) {
-                                    exit = true;
-                                }
-                            });
-
-                        if exit {
-                            self.sender_to_event_loop.send(EventLoopMsg::Stop).unwrap();
-                        }
-                        if self.main_menu != next_mode {
-                            self.mailbox.push(RenderEvent::ChangeMode {
-                                from: self.main_menu,
-                                to: next_mode,
-                            });
-                            self.main_menu = next_mode;
-                        }
-                    }
-                    MainMode::Play => {}
-                    MainMode::MapEditor => {
-                        self.game_state
-                            .heightmap_editor
-                            .draw_ui(&ui, &mut self.heightmap_gpu);
-                    }
-                }
-
-                // self.phy_state.draw_ui(&ui);
-            }
-            self.imgui_wrap
-                .platform
-                .prepare_render(&ui, &self.gpu.window);
-            self.imgui_wrap
-                .renderer
-                .render(ui, &self.gpu.device, &mut encoder_render, &frame.view)
-                .expect("Rendering failed");
-        }
-
+        let start = Instant::now();
         self.gpu
             .device
             .get_queue()
             .submit(&[encoder_render.finish()]);
+        self.profiler.add("device queue submit", start.elapsed());
 
         if let Some(id) = self.game_state.my_player_id {
             let player_input = FrameEvent::PlayerInput {

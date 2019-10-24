@@ -181,24 +181,56 @@ impl ModelGpu {
         rpass.draw_indexed(0..self.index_count as u32, 0, 0..self.instance_count as u32);
     }
 
-    pub fn update_instance(&mut self, instance_attr: &[f32], device: &wgpu::Device) {
+    pub fn update_instance_dirty(&mut self, instance_attr: &[f32], device: &wgpu::Device) {
         log::trace!("ModelGpu update_instance");
         let temp_buf = device
-            .create_buffer_mapped(
-                instance_attr.len(),
-                wgpu::BufferUsage::VERTEX, // | wgpu::BufferUsage::COPY_SRC,
-            )
+            .create_buffer_mapped(instance_attr.len(), wgpu::BufferUsage::VERTEX)
             .fill_from_slice(instance_attr);
 
         std::mem::replace(&mut self.instance_buf, temp_buf);
         self.instance_count = instance_attr.len() as u32 / 18;
-        //        encoder.copy_buffer_to_buffer(
-        //            &temp_buf,
-        //            0,
-        //            &self.instance_buf,
-        //            0,
-        //            positions.len() as u64 * 4,
-        //        );
+    }
+
+    pub fn update_instance(
+        &mut self,
+        instance_attr: &[f32],
+        device: &wgpu::Device,
+        encoder: &mut wgpu::CommandEncoder,
+    ) {
+        log::trace!("ModelGpu update_instance");
+
+        for (i, chunk) in instance_attr.chunks(1800).enumerate() {
+            let temp_buf = device
+                .create_buffer_mapped(
+                    chunk.len(),
+                    wgpu::BufferUsage::VERTEX | wgpu::BufferUsage::COPY_SRC,
+                )
+                .fill_from_slice(chunk);
+
+            encoder.copy_buffer_to_buffer(
+                &temp_buf,
+                0,
+                &self.instance_buf,
+                i as u64 * 1800_u64,
+                chunk.len() as u64 * 4,
+            );
+        }
+        // let temp_buf = device
+        //     .create_buffer_mapped(
+        //         instance_attr.len(),
+        //         wgpu::BufferUsage::VERTEX | wgpu::BufferUsage::COPY_SRC,
+        //     )
+        //     .fill_from_slice(instance_attr);
+
+        // encoder.copy_buffer_to_buffer(
+        //     &temp_buf,
+        //     0,
+        //     &self.instance_buf,
+        //     0,
+        //     instance_attr.len() as u64 * 4,
+        // );
+
+        self.instance_count = 0*instance_attr.len() as u32 / 18;
     }
 }
 

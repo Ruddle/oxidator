@@ -17,11 +17,11 @@ mod render;
 
 use crate::heightmap_phy;
 use log::info;
+use spin_sleep::LoopHelper;
 use std::collections::{HashMap, HashSet};
 use std::time::Instant;
 use utils::time;
 use wgpu::{BufferMapAsyncResult, Extent3d, SwapChain, TextureFormat};
-use spin_sleep::LoopHelper;
 
 use winit::event::WindowEvent;
 
@@ -45,6 +45,7 @@ pub enum MainMode {
     Home,
     Play,
     MapEditor,
+    MultiplayerLobby,
 }
 
 pub struct App {
@@ -61,6 +62,7 @@ pub struct App {
     kbot_gpu: ModelGpu,
     arrow_gpu: ArrowGpu,
     kinematic_projectile_gpu: ModelGpu,
+    vertex_attr_buffer_f32: Vec<f32>,
 
     bind_group: wgpu::BindGroup,
     bind_group_layout: wgpu::BindGroupLayout,
@@ -90,7 +92,8 @@ pub struct App {
 
     mailbox: Vec<RenderEvent>,
 
-    loop_helper : LoopHelper,
+    loop_helper: LoopHelper,
+    profiler: frame::ProfilerMap,
 }
 
 impl App {
@@ -406,6 +409,8 @@ impl App {
             kinematic_projectile_gpu,
             arrow_gpu,
             heightmap_gpu,
+            vertex_attr_buffer_f32: Vec::new(),
+
             first_color_att_view,
             forward_depth: depth_texture.create_default_view(),
             position_att_view,
@@ -429,8 +434,8 @@ impl App {
 
             mailbox: Vec::new(),
 
-            loop_helper: LoopHelper::builder()
-                .build_with_target_rate(144.0)
+            loop_helper: LoopHelper::builder().build_with_target_rate(144.0),
+            profiler: frame::ProfilerMap::new(),
         };
 
         (this)

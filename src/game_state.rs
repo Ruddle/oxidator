@@ -101,7 +101,9 @@ impl State {
         self.server_sec =
             (self.frame_zero.number as f32 * i0 + self.frame_minus_one.number as f32 * im) / 10.0;
 
-        self.kbots = HashMap::with_capacity(self.frame_zero.kbots.len());
+        log::trace!("server_sec {}", self.server_sec);
+
+        self.kbots.clear();
         for kbot_0 in self.frame_zero.kbots.values() {
             let to_insert = {
                 if let Some(kbot_m) = self.frame_minus_one.kbots.get(&kbot_0.id) {
@@ -126,8 +128,7 @@ impl State {
             self.kbots.insert(to_insert.id, to_insert);
         }
 
-        self.kinematic_projectiles =
-            HashMap::with_capacity(self.frame_zero.kinematic_projectiles.len());
+        self.kinematic_projectiles.clear();
         for kine_0 in self.frame_zero.kinematic_projectiles.values() {
             let to_insert = {
                 if let Some(kine_m) = self.frame_minus_one.kinematic_projectiles.get(&kine_0.id) {

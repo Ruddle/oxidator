@@ -42,12 +42,12 @@ pub enum FrameEvent {
 }
 
 #[derive(Clone, Debug)]
-pub struct FrameProfiler {
+pub struct ProfilerMap {
     pub hm: HashMap<String, std::time::Duration>,
 }
-impl FrameProfiler {
+impl ProfilerMap {
     pub fn new() -> Self {
-        FrameProfiler { hm: HashMap::new() }
+        ProfilerMap { hm: HashMap::new() }
     }
     pub fn add(&mut self, s: &str, duration: Duration) {
         self.hm.insert(s.to_owned(), duration);
@@ -66,9 +66,9 @@ pub struct Frame {
     pub kinematic_projectiles: HashMap<Id<KinematicProjectile>, KinematicProjectile>,
     pub arrows: Vec<Arrow>,
     pub events: Vec<FrameEvent>,
-    pub heightmap_phy: heightmap_phy::HeightmapPhy,
+    pub heightmap_phy: Option<heightmap_phy::HeightmapPhy>,
     pub complete: bool,
-    pub frame_profiler: FrameProfiler,
+    pub frame_profiler: ProfilerMap,
 }
 
 impl Frame {
@@ -81,9 +81,9 @@ impl Frame {
             kinematic_projectiles: HashMap::new(),
             events: Vec::new(),
             arrows: Vec::new(),
-            heightmap_phy: heightmap_phy::HeightmapPhy::new(16, 16),
+            heightmap_phy: None,
             complete: true,
-            frame_profiler: FrameProfiler::new(),
+            frame_profiler: ProfilerMap::new(),
         }
     }
 }
