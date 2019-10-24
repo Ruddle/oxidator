@@ -25,7 +25,7 @@ void main() {
     float dist = length(mouse_pos_world - pos);
     float distance_to_sphere  = length(10.0 - dist);
     float base = clamp(1-distance_to_sphere,0.0,1.0);
-    float alpha=  pow(base,2.0);
+    float alpha=  pow(base*0.3,2.0);
 
     // //Unit selection
     bool is_selected_area = pos_attachment.a >= 0.99;
