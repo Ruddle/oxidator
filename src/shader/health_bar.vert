@@ -18,7 +18,6 @@ void main() {
     v_life = life;
     v_alpha = alpha;
 
-
     vec2 tc = vec2(0.0);
     switch(gl_VertexIndex) {
         case 0: tc = vec2(1.0, 0.0); break;
@@ -29,7 +28,6 @@ void main() {
     v_TexCoord = tc;
 
     vec2 pos =   vec2(0.0)  ;
-    
      switch(gl_VertexIndex) {
         case 0: pos = vec2(max.x, min.y); break;
         case 1: pos = vec2(max.x, max.y); break;
@@ -37,6 +35,5 @@ void main() {
         case 3: pos = vec2(min.x, max.y); break;
     }
 
-   
     gl_Position = vec4(pos , 0.5, 1.0);
 }

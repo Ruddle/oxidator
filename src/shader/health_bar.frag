@@ -15,15 +15,9 @@ layout(set = 0, binding = 3) uniform Locals {
 };
 
 void main() {
-
-
-
-    // vec3 color = vec3(pow(1.0- v_life,1),pow(v_life,1),0.0);
-
     vec3 color = vec3(pow(1.0- v_life,0.3),pow(v_life,1.0),0.0);
     if (v_TexCoord.x > v_life){
         color= vec3(0);
     }
-
     o_Target = vec4(color,v_alpha);
 }

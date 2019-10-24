@@ -7,7 +7,7 @@ mod frame_server;
 mod game_state;
 mod glsl_compiler;
 mod gpu;
-mod group_behavior;
+
 mod health_bar;
 mod heightmap;
 mod heightmap_editor;
@@ -34,9 +34,9 @@ extern crate typename;
 extern crate base_62;
 extern crate spin_sleep;
 
+use spin_sleep::LoopHelper;
 use winit::event::Event;
 use winit::event_loop::ControlFlow;
-use spin_sleep::LoopHelper;
 #[derive(Debug)]
 pub enum ToClient {
     WindowPassing(winit::window::Window),
@@ -65,14 +65,16 @@ fn main() {
     let (s_from_frame_server, r_from_frame_server) = unbounded::<frame_server::FromFrameServer>();
 
     //Frame server
-    std::thread::spawn(move || loop {
-        match r_to_frame_server.recv() {
-            Ok(frame_server::ToFrameServer::AskNextFrameMsg { old_frame }) => {
-                let next_frame = frame_server::next_frame(old_frame);
-                let _ =
-                    s_from_frame_server.send(frame_server::FromFrameServer::NewFrame(next_frame));
+    std::thread::spawn(move || {
+        let mut fsc = frame_server::FrameServerCache::new();
+        for msg in r_to_frame_server.iter() {
+            match msg {
+                frame_server::ToFrameServer::AskNextFrameMsg { old_frame } => {
+                    let next_frame = fsc.next_frame(old_frame);
+                    let _ = s_from_frame_server
+                        .send(frame_server::FromFrameServer::NewFrame(next_frame));
+                }
             }
-            _ => {}
         }
     });
 
@@ -84,8 +86,7 @@ fn main() {
         });
         let _ = s_to_client_from_root_manager.send(ToClient::NewFrame(frame0));
 
-        let mut loop_helper = LoopHelper::builder()
-            .build_with_target_rate(10.0_f64);
+        let mut loop_helper = LoopHelper::builder().build_with_target_rate(10.0_f64);
         loop {
             log::trace!("Root manager sleep");
             loop_helper.loop_sleep();
