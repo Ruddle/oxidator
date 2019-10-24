@@ -213,10 +213,10 @@ impl App {
                     }
                 } else {
                     if self.input_state.last_scroll > 0.0 {
-                        dir_offset.y += 1.0 / delta_sim_sec;
+                        dir_offset.y += 0.010 / delta_sim_sec;
                     }
                     if self.input_state.last_scroll < 0.0 {
-                        dir_offset.z -= 1.0 / delta_sim_sec;
+                        dir_offset.z -= 0.010 / delta_sim_sec;
                     }
                 }
             } else {
