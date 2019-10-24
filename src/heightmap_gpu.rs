@@ -622,14 +622,6 @@ impl HeightmapGpu {
         encoder.copy_buffer_to_buffer(&uniform_buf, 0, &self.uniform_buf, 0, 64);
     }
 
-    pub fn get_z(&self, x: f32, y: f32) -> f32 {
-        self.phy.z(x, y)
-    }
-
-    pub fn get_z_linear(&self, x: f32, y: f32) -> f32 {
-        self.phy.z_linear(x, y)
-    }
-
     pub fn step(&mut self, device: &Device, encoder: &mut CommandEncoder) {
         let mut update_left = UPDATE_PER_STEP;
         if self.mip4_to_update {

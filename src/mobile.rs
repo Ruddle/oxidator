@@ -31,7 +31,7 @@ impl KBot {
             id: utils::rand_id(),
             radius: 0.5,
             frame_last_shot: 0,
-            reload_frame_count: 10,
+            reload_frame_count: 3,
             life: 100,
             max_life: 100,
             grounded: false,

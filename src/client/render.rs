@@ -56,8 +56,8 @@ impl App {
 
                     let mut player_me = Player::new();
 
-                    for i in (150..300).step_by(4) {
-                        for j in (100..800).step_by(4) {
+                    for i in (50..300).step_by(4) {
+                        for j in (100..500).step_by(4) {
                             let m = mobile::KBot::new(Point3::new(i as f32, j as f32, 100.0));
                             player_me.kbots.insert(m.id);
                             self.game_state.kbots.insert(m.id, m);
@@ -73,8 +73,8 @@ impl App {
                     let mut player_ennemy = Player::new();
                     player_ennemy.team = 1;
 
-                    for i in (320..420).step_by(4) {
-                        for j in (100..200).step_by(4) {
+                    for i in (320..570).step_by(4) {
+                        for j in (100..500).step_by(4) {
                             let m = mobile::KBot::new(Point3::new(i as f32, j as f32, 100.0));
                             player_ennemy.kbots.insert(m.id);
                             self.game_state.kbots.insert(m.id, m);
@@ -99,6 +99,7 @@ impl App {
                         number: 0,
                         players: self.game_state.players.clone(),
                         kbots: self.game_state.kbots.clone(),
+                        kbots_dead: HashSet::new(),
                         kinematic_projectiles: self.game_state.kinematic_projectiles.clone(),
                         events: Vec::new(),
                         arrows: Vec::new(),
@@ -151,7 +152,7 @@ impl App {
             let mut dir_offset = self.game_state.dir.clone();
             let mut new_dir = None;
 
-            let camera_ground_height = self.heightmap_gpu.get_z(
+            let camera_ground_height = self.heightmap_gpu.phy.z(
                 self.game_state
                     .position
                     .x
@@ -515,6 +516,30 @@ impl App {
                 &self.first_color_att_view,
             );
         }
+
+        //Custom Ui pass
+        {
+            log::trace!("begin_post_render_pass");
+            let mut rpass = encoder_render.begin_render_pass(&wgpu::RenderPassDescriptor {
+                color_attachments: &[wgpu::RenderPassColorAttachmentDescriptor {
+                    attachment: &frame.view,
+                    resolve_target: None,
+                    load_op: wgpu::LoadOp::Load,
+                    store_op: wgpu::StoreOp::Store,
+                    clear_color: wgpu::Color {
+                        r: 1.0,
+                        g: 0.2,
+                        b: 0.3,
+                        a: 1.0,
+                    },
+                }],
+
+                depth_stencil_attachment: None,
+            });
+
+            self.health_bar.render(&mut rpass, &self.bind_group);
+        }
+
         let us_3d_render_pass = now.elapsed();
 
         //Imgui
@@ -530,6 +555,35 @@ impl App {
             let main_menu = &mut self.main_menu;
 
             {
+                // //Unit life
+                // for (id, screen_pos) in self.game_state.in_screen.iter() {
+                //     let title = im_str!("{}", id);
+                //     let life = self.game_state.kbots.get(id).unwrap().life as f32;
+                //     let life_window = imgui::Window::new(title.as_ref());
+                //     life_window
+                //         .size([26.0, 2.0], imgui::Condition::Always)
+                //         .position(
+                //             [
+                //                 (screen_pos.x * 0.5 + 0.5) * self.gpu.sc_desc.width as f32 - 13.0,
+                //                 (screen_pos.y * 0.5 + 0.5) * self.gpu.sc_desc.height as f32
+                //                     - 1.0
+                //                     - 40.0,
+                //             ],
+                //             imgui::Condition::Always,
+                //         )
+                //         .collapsed(false, imgui::Condition::FirstUseEver)
+                //         .resizable(false)
+                //         .movable(false)
+                //         .draw_background(false)
+                //         .scroll_bar(false)
+                //         .no_inputs()
+                //         .title_bar(false)
+                //         .collapsible(false)
+                //         .build(&ui, || {
+                //             ProgressBar::new(life / 100.0).size([26.0, 2.0]).build(&ui);
+                //         })
+                // }
+
                 let mut_fps = &mut self.game_state.fps;
                 let p = &self.game_state.frame_zero.frame_profiler;
                 let stats_window = imgui::Window::new(im_str!("Statistics"));

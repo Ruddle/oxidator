@@ -13,6 +13,7 @@ impl App {
         self.game_state.kbots.clear();
         self.game_state.selected.clear();
         self.game_state.kinematic_projectiles.clear();
+        self.game_state.in_screen.clear();
         self.kbot_gpu.update_instance(&[], &self.gpu.device);
     }
 }

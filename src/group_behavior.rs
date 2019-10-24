@@ -33,8 +33,8 @@ impl Group {
                         spot.push(
                             mouse_pos_world
                                 + Vector3::new(
-                                    i as f32 - formation_w as f32 / 2.0,
-                                    j as f32 - formation_w as f32 / 2.0,
+                                    i as f32 + 0.5 - formation_w as f32 / 2.0,
+                                    j as f32 + 0.5 - formation_w as f32 / 2.0,
                                     0.0,
                                 ) * 4.0,
                         )
@@ -97,6 +97,7 @@ impl Group {
     pub fn update_units(
         frame_profiler: &mut FrameProfiler,
         kbots: &mut HashMap<Id<KBot>, KBot>,
+        kbots_dead: &mut HashSet<Id<KBot>>,
         kinematic_projectiles: &mut HashMap<Id<KinematicProjectile>, KinematicProjectile>,
         heightmap_phy: &heightmap_phy::HeightmapPhy,
         arrows: &mut Vec<Arrow>,
@@ -341,7 +342,7 @@ impl Group {
             let start = std::time::Instant::now();
             //Projectile move compute
             {
-                let mut to_remove = HashSet::new();
+                let mut proj_to_remove = HashSet::new();
                 for proj in kinematic_projectiles.values_mut() {
                     let current_pos = proj.positions.iter().next().unwrap();
                     let next_pos = proj.positions.iter().skip(1).next();
@@ -394,11 +395,11 @@ impl Group {
 
                     proj.positions = proj.positions.clone().into_iter().skip(1).collect();
                     if proj.positions.len() == 0 {
-                        to_remove.insert(proj.id);
+                        proj_to_remove.insert(proj.id);
                     }
                 }
 
-                for r in to_remove {
+                for r in proj_to_remove {
                     kinematic_projectiles.remove(&r);
                 }
             }
@@ -501,6 +502,17 @@ impl Group {
                 kinematic_projectiles.insert(proj.id, proj);
             }
             frame_profiler.add("07  kbot_fire", start.elapsed());
+        }
+
+        //Remove dead kbot
+        for (id, kbot) in kbots.iter() {
+            if kbot.life <= 0 {
+                kbots_dead.insert(*id);
+            }
+        }
+
+        for id in kbots_dead.iter() {
+            kbots.remove(id);
         }
     }
 }

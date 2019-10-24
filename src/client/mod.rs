@@ -69,6 +69,7 @@ pub struct App {
 
     postfx: post_fx::PostFx,
     postfxaa: post_fxaa::PostFxaa,
+    health_bar: health_bar::HealthBarGpu,
 
     game_state: game_state::State,
     input_state: input_state::InputState,
@@ -310,6 +311,8 @@ impl App {
             &bind_group_layout,
         );
 
+        let health_bar = health_bar::HealthBarGpu::new(&gpu.device, format, &bind_group_layout);
+
         let depth_texture = gpu.device.create_texture(&wgpu::TextureDescriptor {
             size: wgpu::Extent3d {
                 width: gpu.sc_desc.width,
@@ -343,7 +346,6 @@ impl App {
         gpu.device.get_queue().submit(&[init_encoder.finish()]);
 
         let game_state = game_state::State::new();
-
 
         let (receiver_notify, watcher) = {
             use crossbeam_channel::unbounded;
@@ -408,6 +410,7 @@ impl App {
 
             postfx,
             postfxaa,
+            health_bar,
 
             game_state,
             input_state: input_state::InputState::new(),
@@ -700,6 +703,20 @@ impl App {
                 }) {
                     log::trace!("Reloading arrow.vert/arrow.frag");
                     self.arrow_gpu.reload_shader(
+                        &self.gpu.device,
+                        &self.bind_group_layout,
+                        self.gpu.sc_desc.format,
+                    );
+                }
+
+                if event.paths.iter().any(|p| {
+                    p.file_name().iter().any(|name| {
+                        name.to_os_string() == "health_bar.frag"
+                            || name.to_os_string() == "health_bar.vert"
+                    })
+                }) {
+                    log::info!("Reloading health_bar.vert/health_bar.frag");
+                    self.health_bar.reload_shader(
                         &self.gpu.device,
                         &self.bind_group_layout,
                         self.gpu.sc_desc.format,

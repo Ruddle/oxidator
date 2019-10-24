@@ -8,6 +8,7 @@ mod game_state;
 mod glsl_compiler;
 mod gpu;
 mod group_behavior;
+mod health_bar;
 mod heightmap;
 mod heightmap_editor;
 mod heightmap_gpu;

@@ -4,7 +4,7 @@ use crate::frame::Frame;
 use crate::heightmap_editor;
 use crate::mobile;
 use crate::utils;
-use na::{Point3, Vector3};
+use na::{Point3, Vector2, Vector3};
 use std::collections::{HashMap, HashSet};
 use std::time::Instant;
 use utils::*;
@@ -32,6 +32,9 @@ pub struct State {
     //Interpolated
     pub kbots: HashMap<Id<KBot>, KBot>,
     pub kinematic_projectiles: HashMap<Id<KinematicProjectile>, KinematicProjectile>,
+    pub server_sec: f32,
+
+    pub in_screen: Vec<(Id<KBot>, Vector2<f32>)>,
     pub selected: HashSet<IdValue>,
 
     pub start_time: Instant,
@@ -63,6 +66,9 @@ impl State {
 
             kbots: HashMap::new(),
             kinematic_projectiles: HashMap::new(),
+            server_sec: 0.0,
+
+            in_screen: Vec::new(),
             selected: HashSet::new(),
 
             players: HashMap::new(),
@@ -77,6 +83,12 @@ impl State {
     pub fn handle_new_frame(&mut self, frame: Frame) {
         self.frame_zero_time_received = Instant::now();
         self.frame_minus_one = std::mem::replace(&mut self.frame_zero, frame);
+
+        self.selected = self
+            .selected
+            .difference(&self.frame_zero.kbots_dead.iter().map(|e| e.value).collect())
+            .copied()
+            .collect();
     }
 
     pub fn interpolate(&mut self) {
@@ -86,15 +98,21 @@ impl State {
         let i0 = lambda;
         let im = 1.0 - lambda;
 
+        self.server_sec =
+            (self.frame_zero.number as f32 * i0 + self.frame_minus_one.number as f32 * im) / 10.0;
+
         self.kbots = HashMap::with_capacity(self.frame_zero.kbots.len());
         for kbot_0 in self.frame_zero.kbots.values() {
             let to_insert = {
                 if let Some(kbot_m) = self.frame_minus_one.kbots.get(&kbot_0.id) {
                     let position = kbot_0.position * i0 + (im * kbot_m.position).coords;
                     let dir = kbot_0.dir * i0 + kbot_m.dir * im;
+                    let life = (kbot_0.life as f64 * i0 as f64 + kbot_m.life as f64 * im as f64)
+                        .round() as i32;
                     let kbot = KBot {
                         position,
                         dir,
+                        life,
                         ..*kbot_0
                     };
 

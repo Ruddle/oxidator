@@ -30,6 +30,7 @@ pub fn next_frame(old_frame: Frame) -> Frame {
 
     let mut frame = replacer.unwrap_or(old_frame);
     frame.number += 1;
+    frame.kbots_dead.clear();
 
     for event in frame.events {
         match event {
@@ -59,6 +60,7 @@ pub fn next_frame(old_frame: Frame) -> Frame {
     group_behavior::Group::update_units(
         &mut frame_profiler,
         &mut frame.kbots,
+        &mut frame.kbots_dead,
         &mut frame.kinematic_projectiles,
         &frame.heightmap_phy,
         &mut arrows,

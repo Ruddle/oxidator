@@ -15,7 +15,7 @@ vulkan = ["wgpu/vulkan"]
 use_shaderc =["shaderc"]
 use_glsl_to_spirv =["glsl-to-spirv"]
 use_spirv =[]
-default = ["wgpu/vulkan","use_spirv"]
+default = ["wgpu/vulkan","use_shaderc"]
 
 [dependencies]
 wgpu = { version = "0.3.0" }
