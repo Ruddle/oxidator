@@ -1,9 +1,9 @@
-use crate::glsl_compiler;
+use super::glsl_compiler;
 use crate::model;
 use wgpu::Device;
 use wgpu::{BindGroup, BindGroupLayout, RenderPass, TextureFormat};
 
-pub struct ModelGpu {
+pub struct ArrowGpu {
     vertex_buf: wgpu::Buffer,
     index_buf: wgpu::Buffer,
     index_count: usize,
@@ -12,14 +12,14 @@ pub struct ModelGpu {
     pipeline: wgpu::RenderPipeline,
 }
 
-impl ModelGpu {
+impl ArrowGpu {
     pub fn new(
         triangle_list: &model::TriangleList,
         device: &Device,
         format: TextureFormat,
         main_bind_group_layout: &BindGroupLayout,
     ) -> Self {
-        log::trace!("ModelGpu new");
+        log::trace!("ArrowGpu new");
         // Create the vertex and index buffers
         let model::TriangleList {
             vertex_data,
@@ -44,7 +44,7 @@ impl ModelGpu {
 
         let pipeline = Self::create_pipeline(device, main_bind_group_layout, format).unwrap();;
 
-        ModelGpu {
+        ArrowGpu {
             vertex_buf,
             index_buf,
             index_count: index_data.len(),
@@ -64,8 +64,8 @@ impl ModelGpu {
         });
         let vertex_size = std::mem::size_of::<model::Vertex>();
         // Create the render pipeline
-        let vs_bytes = glsl_compiler::load("./src/shader/cube_instanced.vert").unwrap();
-        let fs_bytes = glsl_compiler::load("./src/shader/cube_instanced.frag").unwrap();
+        let vs_bytes = glsl_compiler::load("./src/shader/arrow.vert")?;
+        let fs_bytes = glsl_compiler::load("./src/shader/arrow.frag")?;
 
         let vs_module = device.create_shader_module(&vs_bytes);
         let fs_module = device.create_shader_module(&fs_bytes);
@@ -129,7 +129,7 @@ impl ModelGpu {
                     ],
                 },
                 wgpu::VertexBufferDescriptor {
-                    stride: (4 * 18) as wgpu::BufferAddress,
+                    stride: (4 * 20) as wgpu::BufferAddress,
                     step_mode: wgpu::InputStepMode::Instance,
                     attributes: &[
                         wgpu::VertexAttributeDescriptor {
@@ -153,14 +153,9 @@ impl ModelGpu {
                             shader_location: 5,
                         },
                         wgpu::VertexAttributeDescriptor {
-                            format: wgpu::VertexFormat::Float,
+                            format: wgpu::VertexFormat::Float4,
                             offset: 4 * 16,
                             shader_location: 6,
-                        },
-                        wgpu::VertexAttributeDescriptor {
-                            format: wgpu::VertexFormat::Float,
-                            offset: 4 * 17,
-                            shader_location: 7,
                         },
                     ],
                 },
@@ -173,7 +168,7 @@ impl ModelGpu {
     }
 
     pub fn render(&self, rpass: &mut RenderPass, main_bind_group: &BindGroup) {
-        log::trace!("ModelGpu render");
+        log::trace!("ArrowGpu render");
         rpass.set_pipeline(&self.pipeline);
         rpass.set_bind_group(0, main_bind_group, &[]);
         rpass.set_index_buffer(&self.index_buf, 0);
@@ -181,60 +176,18 @@ impl ModelGpu {
         rpass.draw_indexed(0..self.index_count as u32, 0, 0..self.instance_count as u32);
     }
 
-    pub fn update_instance_dirty(&mut self, instance_attr: &[f32], device: &wgpu::Device) {
-        log::trace!("ModelGpu update_instance");
+    pub fn update_instance(&mut self, instance_attr: &[f32], device: &wgpu::Device) {
+        log::trace!("ArrowGpu update_instance");
         let temp_buf = device
             .create_buffer_mapped(instance_attr.len(), wgpu::BufferUsage::VERTEX)
             .fill_from_slice(instance_attr);
 
         std::mem::replace(&mut self.instance_buf, temp_buf);
-        self.instance_count = instance_attr.len() as u32 / 18;
-    }
-
-    pub fn update_instance(
-        &mut self,
-        instance_attr: &[f32],
-        device: &wgpu::Device,
-        encoder: &mut wgpu::CommandEncoder,
-    ) {
-        log::trace!("ModelGpu update_instance");
-
-        for (i, chunk) in instance_attr.chunks(1800).enumerate() {
-            let temp_buf = device
-                .create_buffer_mapped(
-                    chunk.len(),
-                    wgpu::BufferUsage::VERTEX | wgpu::BufferUsage::COPY_SRC,
-                )
-                .fill_from_slice(chunk);
-
-            encoder.copy_buffer_to_buffer(
-                &temp_buf,
-                0,
-                &self.instance_buf,
-                i as u64 * 1800_u64,
-                chunk.len() as u64 * 4,
-            );
-        }
-        // let temp_buf = device
-        //     .create_buffer_mapped(
-        //         instance_attr.len(),
-        //         wgpu::BufferUsage::VERTEX | wgpu::BufferUsage::COPY_SRC,
-        //     )
-        //     .fill_from_slice(instance_attr);
-
-        // encoder.copy_buffer_to_buffer(
-        //     &temp_buf,
-        //     0,
-        //     &self.instance_buf,
-        //     0,
-        //     instance_attr.len() as u64 * 4,
-        // );
-
-        self.instance_count = 0*instance_attr.len() as u32 / 18;
+        self.instance_count = instance_attr.len() as u32 / 20;
     }
 }
 
-impl crate::trait_gpu::TraitGpu for ModelGpu {
+impl super::trait_gpu::TraitGpu for ArrowGpu {
     fn reload_shader(
         &mut self,
         device: &Device,

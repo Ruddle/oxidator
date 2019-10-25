@@ -57,7 +57,7 @@ impl App {
                         .map(|(i, _)| i.value)
                         .collect();
 
-                    log::info!("Selection took {}us", start_sel.elapsed().as_micros());
+                    log::trace!("Selection took {}us", start_sel.elapsed().as_micros());
 
                     self.game_state.selected = selected;
                 } else if self

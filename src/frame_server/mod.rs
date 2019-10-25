@@ -3,6 +3,7 @@ use crate::frame::*;
 use crate::heightmap_phy;
 use crate::mobile::*;
 use crate::utils::*;
+use crossbeam_channel::{Receiver, Sender};
 use na::{Matrix4, Point3, Vector2, Vector3};
 use std::collections::{HashMap, HashSet};
 use std::time::Instant;
@@ -22,6 +23,46 @@ pub struct FrameServerCache {
 }
 
 impl FrameServerCache {
+    pub fn spawn(
+        r_to_frame_server: Receiver<ToFrameServer>,
+        s_from_frame_server: Sender<FromFrameServer>,
+    ) -> () {
+        std::thread::spawn(move || {
+            let mut fsc = FrameServerCache::new();
+            for msg in r_to_frame_server.iter() {
+                match msg {
+                    ToFrameServer::DataToComputeNextFrame(DataToComputeNextFrame {
+                        old_frame,
+                        events,
+                    }) => {
+                        let next_frame = fsc.next_frame(old_frame, events);
+                        // let vec = bincode::serialize(&next_frame).unwrap();
+                        // log::info!("Frame is {} bytes", vec.len());
+                        // let mut vec = Vec::new();
+                        // for k in next_frame.kbots.values() {
+                        //     vec.push(k.clone());
+                        // }
+                        // let fu = frame::FrameUpdate { kbots: vec };
+                        // let vec = bincode::serialize(&fu).unwrap();
+                        // log::info!("FrameUpdate is {} bytes", vec.len());
+                        // let dur = utils::time(|| {
+                        //     use flate2::write::ZlibEncoder;
+                        //     use flate2::Compression;
+                        //     use std::io::prelude::*;
+                        //     let mut e = ZlibEncoder::new(Vec::new(), Compression::new(1));
+                        //     e.write_all(&vec);
+                        //     let compressed_bytes = e.finish().unwrap();
+                        //     log::info!("Compressed is {} bytes", compressed_bytes.len());
+                        // });
+                        // log::info!("compression took {:?}", dur);
+
+                        let _ = s_from_frame_server.send(FromFrameServer::NewFrame(next_frame));
+                    }
+                }
+            }
+        });
+    }
+
     pub fn new() -> Self {
         FrameServerCache {
             grid: Vec::new(),

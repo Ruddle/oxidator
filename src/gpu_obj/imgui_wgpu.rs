@@ -75,8 +75,8 @@ impl Renderer {
         clear_color: Option<Color>,
     ) -> Renderer {
         let (vs_code, fs_code) = get_program_link();
-        let vs_raw = crate::glsl_compiler::load(vs_code).unwrap();
-        let fs_raw = crate::glsl_compiler::load(fs_code).unwrap();
+        let vs_raw = super::glsl_compiler::load(vs_code).unwrap();
+        let fs_raw = super::glsl_compiler::load(fs_code).unwrap();
         Self::new_impl(imgui, device, format, clear_color, vs_raw, fs_raw)
     }
 

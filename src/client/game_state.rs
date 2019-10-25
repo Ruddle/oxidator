@@ -1,7 +1,7 @@
 extern crate nalgebra as na;
 use crate::frame;
 use crate::frame::Frame;
-use crate::heightmap_editor;
+use super::heightmap_editor;
 use crate::mobile;
 use crate::utils;
 use na::{Point3, Vector2, Vector3};

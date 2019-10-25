@@ -28,11 +28,17 @@ impl NetServer {
 
             for stream in listener.incoming() {
                 let mut stream = stream.unwrap();
-                println!("Connection established!");
+                log::info!("Connection established!");
 
                 //Client msg -> s_from
 
                 // r_to -> New frame to broadcast
+
+                //Example
+                // let mut buffer: Vec<u8> = Vec::new();
+                // let n = stream.read_to_end(&mut buffer).unwrap();
+
+                //let _ = stream.write_all(&vec); // ignore the Result
             }
         });
         NetServer { s: s_to, r: r_from }
@@ -42,5 +48,5 @@ impl NetServer {
         Vec::new()
     }
 
-    pub fn broadcast(&mut self, data: DataToComputeNextFrame) {}
+    pub fn broadcast_data_to_compute_next_frame(&mut self, data: DataToComputeNextFrame) {}
 }

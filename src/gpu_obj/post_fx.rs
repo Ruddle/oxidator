@@ -1,4 +1,4 @@
-use crate::glsl_compiler;
+use super::glsl_compiler;
 use wgpu::Device;
 use wgpu::{BindGroup, BindGroupLayout, RenderPass, TextureFormat, TextureView};
 
@@ -151,7 +151,7 @@ impl PostFx {
     }
 }
 
-impl crate::trait_gpu::TraitGpu for PostFx {
+impl super::trait_gpu::TraitGpu for PostFx {
     fn reload_shader(
         &mut self,
         device: &Device,

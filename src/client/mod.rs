@@ -2,15 +2,21 @@ use crate::*;
 
 use na::{Isometry3, Matrix4, Point3, Vector2, Vector3, Vector4};
 
-use crate::imgui_wgpu::Renderer;
-use crate::trait_gpu::TraitGpu;
-use arrow_gpu::ArrowGpu;
-use gpu;
-use heightmap_gpu::HeightmapGpu;
+use gpu_obj::imgui_wgpu::Renderer;
+
+use gpu_obj::arrow_gpu::ArrowGpu;
+use gpu_obj::gpu;
+use gpu_obj::heightmap_gpu::HeightmapGpu;
+use gpu_obj::model_gpu::ModelGpu;
+use gpu_obj::trait_gpu::TraitGpu;
 use imgui::*;
 use imgui_winit_support;
 use imgui_winit_support::WinitPlatform;
-use model_gpu::ModelGpu;
+mod camera;
+mod game_state;
+
+mod heightmap_editor;
+mod input_state;
 mod misc;
 mod play;
 mod render;
@@ -25,11 +31,18 @@ use wgpu::{BufferMapAsyncResult, Extent3d, SwapChain, TextureFormat};
 
 use winit::event::WindowEvent;
 
+pub struct StartClient {
+    pub bind: String,
+}
+
+pub struct StartServer {
+    pub bind: String,
+}
+
 pub enum FromClient {
     PlayerInput(frame::FrameEvent),
-    StartServer{
-        bind : String
-    }
+    StartServer(StartServer),
+    StartClient(StartClient),
 }
 
 struct ImguiWrap {
@@ -73,9 +86,9 @@ pub struct App {
     ub_camera_mat: wgpu::Buffer,
     ub_misc: wgpu::Buffer,
 
-    postfx: post_fx::PostFx,
-    postfxaa: post_fxaa::PostFxaa,
-    health_bar: health_bar::HealthBarGpu,
+    postfx: gpu_obj::post_fx::PostFx,
+    postfxaa: gpu_obj::post_fxaa::PostFxaa,
+    health_bar: gpu_obj::health_bar::HealthBarGpu,
 
     game_state: game_state::State,
     input_state: input_state::InputState,
@@ -148,7 +161,7 @@ impl App {
 
         // Create the texture
         let size = 256u32;
-        let texels = fake_texels::create_texels(size as usize);
+        let texels = procedural_texels::create_texels(size as usize);
         let texture_extent = wgpu::Extent3d {
             width: size,
             height: size,
@@ -320,7 +333,8 @@ impl App {
             &bind_group_layout,
         );
 
-        let health_bar = health_bar::HealthBarGpu::new(&gpu.device, format, &bind_group_layout);
+        let health_bar =
+            gpu_obj::health_bar::HealthBarGpu::new(&gpu.device, format, &bind_group_layout);
 
         let depth_texture = gpu.device.create_texture(&wgpu::TextureDescriptor {
             size: wgpu::Extent3d {
@@ -391,9 +405,13 @@ impl App {
 
         let first_color_att_view = first_color_att.create_default_view();
 
-        let postfx =
-            post_fx::PostFx::new(&gpu.device, &bind_group_layout, format, &position_att_view);
-        let postfxaa = post_fxaa::PostFxaa::new(
+        let postfx = gpu_obj::post_fx::PostFx::new(
+            &gpu.device,
+            &bind_group_layout,
+            format,
+            &position_att_view,
+        );
+        let postfxaa = gpu_obj::post_fxaa::PostFxaa::new(
             &gpu.device,
             &bind_group_layout,
             format,

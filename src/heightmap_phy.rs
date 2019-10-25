@@ -1,4 +1,3 @@
-use crate::heightmap;
 use serde::{Deserialize, Serialize};
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct HeightmapPhy {
@@ -19,7 +18,12 @@ impl HeightMapPhyUsize for HeightmapPhy {
 
 impl HeightmapPhy {
     pub fn new(width: usize, height: usize) -> Self {
-        let texels = heightmap::create_texels(width as u32, height as u32, 0.0);
+        let mut texels = Vec::with_capacity((width * height) as usize);
+        for j in 0..height {
+            for i in 0..width {
+                texels.push(0.0);
+            }
+        }
         HeightmapPhy {
             texels,
             width,
@@ -27,11 +31,12 @@ impl HeightmapPhy {
         }
     }
 
+    //nearest interpolation
     pub fn z(&self, x: f32, y: f32) -> f32 {
         let i = x as usize + (y as usize) * self.width as usize;
         self.texels[i]
     }
-
+    //linear interpolation
     pub fn z_linear(&self, x: f32, y: f32) -> f32 {
         let imin = x.trunc() as usize;
         let imax = imin + 1;

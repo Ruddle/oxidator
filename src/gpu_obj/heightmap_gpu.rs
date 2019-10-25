@@ -1,5 +1,5 @@
-use crate::glsl_compiler;
-use crate::heightmap;
+use super::glsl_compiler;
+use super::heightmap_helper;
 use crate::heightmap_phy;
 
 use wgpu::{BindGroup, BindGroupLayout, RenderPass, RenderPipeline, Texture, TextureFormat};
@@ -39,7 +39,7 @@ impl HeightmapGpu {
         log::trace!("HeightmapGpu new");
         let texture_view_checker = {
             let size = 2u32;
-            let texels = crate::fake_texels::checker(size as usize);
+            let texels = crate::procedural_texels::checker(size as usize);
             let texture_extent = wgpu::Extent3d {
                 width: size,
                 height: size,
@@ -392,7 +392,8 @@ impl HeightmapGpu {
             ],
         });
 
-        let (vertex_data, height_index_data) = heightmap::create_vertex_index_rings(ring_size);
+        let (vertex_data, height_index_data) =
+            heightmap_helper::create_vertex_index_rings(ring_size);
         //            heightmap::create_vertices_indices(width, height, 0.0);
         let vertex_buf = device
             .create_buffer_mapped(vertex_data.len(), wgpu::BufferUsage::VERTEX)
@@ -507,7 +508,7 @@ impl HeightmapGpu {
             }),
             index_format: wgpu::IndexFormat::Uint32,
             vertex_buffers: &[wgpu::VertexBufferDescriptor {
-                stride: std::mem::size_of::<heightmap::Vertex>() as wgpu::BufferAddress,
+                stride: std::mem::size_of::<heightmap_helper::Vertex>() as wgpu::BufferAddress,
                 step_mode: wgpu::InputStepMode::Vertex,
                 attributes: &[
                     wgpu::VertexAttributeDescriptor {
@@ -875,7 +876,7 @@ impl HeightmapGpu {
     }
 }
 
-impl crate::trait_gpu::TraitGpu for HeightmapGpu {
+impl super::trait_gpu::TraitGpu for HeightmapGpu {
     fn reload_shader(
         &mut self,
         device: &Device,

@@ -1,6 +1,6 @@
-mod glsl_compiler;
+use super::glsl_compiler;
 
-use crate::glsl_compiler::*;
+use super::glsl_compiler::*;
 
 use std::fs::{self, DirEntry};
 use std::io;

@@ -2,7 +2,7 @@ use imgui::*;
 use na::Vector3;
 use std::collections::HashSet;
 
-use crate::heightmap_gpu;
+use crate::gpu_obj::heightmap_gpu;
 use noise::{NoiseFn, Seedable};
 
 #[derive(PartialEq, Clone, Copy)]
