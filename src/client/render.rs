@@ -96,15 +96,13 @@ impl App {
                         kbots: self.game_state.kbots.clone(),
                         kbots_dead: HashSet::new(),
                         kinematic_projectiles: self.game_state.kinematic_projectiles.clone(),
-                        events: Vec::new(),
                         arrows: Vec::new(),
                         heightmap_phy: Some(self.heightmap_gpu.phy.clone()),
-                        complete: true,
                         frame_profiler: frame::ProfilerMap::new(),
                     });
                     let _ = self
                         .sender_from_client
-                        .try_send(client::FromClient::Event(replacer));
+                        .try_send(client::FromClient::PlayerInput(replacer));
                 }
 
                 RenderEvent::ChangeMode {
@@ -116,7 +114,7 @@ impl App {
                     let replacer = FrameEvent::ReplaceFrame(frame::Frame::new());
                     let _ = self
                         .sender_from_client
-                        .try_send(client::FromClient::Event(replacer));
+                        .try_send(client::FromClient::PlayerInput(replacer));
                 }
                 RenderEvent::ChangeMode {
                     from,
@@ -729,17 +727,22 @@ impl App {
             .submit(&[encoder_render.finish()]);
         self.profiler.add("device queue submit", start.elapsed());
 
-        if let Some(id) = self.game_state.my_player_id {
-            let player_input = FrameEvent::PlayerInput {
+        if let (true, Some(id), Some(mouse_world_pos)) = (
+            self.input_state
+                .mouse_trigger
+                .contains(&winit::event::MouseButton::Right),
+            self.game_state.my_player_id,
+            self.game_state.mouse_world_pos,
+        ) {
+            let player_input = FrameEvent::MoveOrder {
                 id,
-                input_state: self.input_state.clone(),
                 selected: self.game_state.selected.clone(),
-                mouse_world_pos: self.game_state.mouse_world_pos,
+                mouse_world_pos,
             };
 
             let _ = self
                 .sender_from_client
-                .try_send(client::FromClient::Event(player_input));
+                .try_send(client::FromClient::PlayerInput(player_input));
         }
 
         self.input_state.update();

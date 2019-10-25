@@ -44,13 +44,13 @@ impl State {
         let noise_freq = &mut self.noise_freq;
         let noise_seed: &mut i32 = &mut (self.noise.seed() as i32);
         let mut update_noise = false;
-        let mut save = false;
+
         let min_z = &mut self.min_z;
         let max_z = &mut self.max_z;
         let edit_height_window = imgui::Window::new(im_str!("Heightmap editor"));
         edit_height_window
             .size([400.0, 300.0], imgui::Condition::FirstUseEver)
-            .position([3.0, 206.0], imgui::Condition::FirstUseEver)
+            .position([3.0, 415.0], imgui::Condition::FirstUseEver)
             .collapsed(false, imgui::Condition::FirstUseEver)
             .build(&ui, || {
                 ui.radio_button(im_str!("Raise/Lower"), mode, Mode::Raise);

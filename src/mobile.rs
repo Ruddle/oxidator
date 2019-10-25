@@ -1,9 +1,10 @@
 use crate::utils;
 use na::{Point3, Vector3};
+use serde::{Deserialize, Serialize};
 use typename::TypeName;
 use utils::Id;
 
-#[derive(Clone, TypeName, Debug)]
+#[derive(Clone, TypeName, Debug, Serialize, Deserialize, PartialEq)]
 pub struct KBot {
     pub position: Point3<f32>,
     pub speed: Vector3<f32>,
@@ -39,7 +40,7 @@ impl KBot {
     }
 }
 
-#[derive(Clone, TypeName, Debug)]
+#[derive(Clone, TypeName, Debug, Serialize, Deserialize, PartialEq)]
 pub struct KinematicProjectile {
     pub id: Id<KinematicProjectile>,
     pub positions: Vec<Point3<f32>>,
@@ -60,7 +61,7 @@ impl KinematicProjectile {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct Arrow {
     pub position: Point3<f32>,
     pub end: Point3<f32>,

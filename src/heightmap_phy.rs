@@ -1,6 +1,6 @@
 use crate::heightmap;
-
-#[derive(Clone, Debug)]
+use serde::{Deserialize, Serialize};
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct HeightmapPhy {
     pub texels: Vec<f32>,
     pub width: usize,

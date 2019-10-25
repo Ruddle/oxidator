@@ -12,9 +12,11 @@ metal = ["wgpu/metal"]
 dx11 = ["wgpu/dx11"]
 dx12 = ["wgpu/dx12"]
 vulkan = ["wgpu/vulkan"]
+#Choose one method of loading spirv out of the three. use_spirv use the precompiled shaders, but do not support hotreloading.
 use_shaderc =["shaderc"]
 use_glsl_to_spirv =["glsl-to-spirv"]
 use_spirv =[]
+
 default = ["wgpu/vulkan","use_spirv"]
 
 [dependencies]
@@ -28,7 +30,7 @@ raw-window-handle = "0.1"
 imgui = "0.2.1"
 shaderc = {version = "0.6", optional = true} 
 noise = "0.6.0"
-nalgebra = "0.18"
+nalgebra = {version=  "0.18", features= ["serde-serialize"]}
 crossbeam-channel = "0.3"
 rand = "0.7.2"
 notify = "=5.0.0-pre.1"
@@ -40,6 +42,7 @@ spin_sleep = "0.3.7"
 
 serde = { version = "1.0", features = ["derive"] }
 bincode = "1.2.0"
+flate2 = "1.0"
 
 [dependencies.imgui-winit-support]
 version = "0.2.1"

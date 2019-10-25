@@ -8,7 +8,7 @@ use std::collections::{HashMap, HashSet};
 use std::time::Instant;
 
 pub enum ToFrameServer {
-    AskNextFrameMsg { old_frame: Frame },
+    DataToComputeNextFrame(DataToComputeNextFrame),
 }
 
 pub enum FromFrameServer {
@@ -30,15 +30,15 @@ impl FrameServerCache {
         }
     }
 
-    pub fn next_frame(&mut self, old_frame: Frame) -> Frame {
+    pub fn next_frame(&mut self, old_frame: Frame, events: Vec<FrameEvent>) -> Frame {
         let mut frame_profiler = ProfilerMap::new();
         let start = std::time::Instant::now();
         log::debug!("Received frame {} to compute next frame", old_frame.number);
 
-        log::debug!("Event {}", old_frame.events.len());
+        log::debug!("Event {}", events.len());
 
         let mut replacer = None;
-        for event in old_frame.events.iter() {
+        for event in events.iter() {
             match event {
                 FrameEvent::ReplaceFrame(frame) => {
                     self.heightmap_phy = frame.heightmap_phy.clone();
@@ -52,21 +52,16 @@ impl FrameServerCache {
         let mut frame = replacer.unwrap_or(old_frame);
         frame.number += 1;
         frame.kbots_dead.clear();
+        frame.heightmap_phy = None;
 
-        for event in frame.events {
+        for event in events {
             match event {
-                FrameEvent::PlayerInput {
+                FrameEvent::MoveOrder {
                     id,
-                    input_state,
                     selected,
                     mouse_world_pos,
                 } => {
-                    update_mobile_target(
-                        &input_state.mouse_trigger,
-                        mouse_world_pos,
-                        &selected,
-                        &mut frame.kbots,
-                    );
+                    update_mobile_target(mouse_world_pos, &selected, &mut frame.kbots);
                 }
                 _ => {}
             }
@@ -96,8 +91,6 @@ impl FrameServerCache {
         frame_profiler.add("total", start.elapsed());
         Frame {
             number: frame.number,
-            events: Vec::new(),
-            complete: false,
             frame_profiler,
             arrows,
             ..frame
@@ -106,83 +99,74 @@ impl FrameServerCache {
 }
 
 pub fn update_mobile_target(
-    mouse_trigger: &HashSet<winit::event::MouseButton>,
-    mouse_world_pos: Option<Vector3<f32>>,
+    mouse_world_pos: Vector3<f32>,
     selected: &HashSet<IdValue>,
     kbots: &mut HashMap<Id<KBot>, KBot>,
 ) {
-    match (
-        mouse_trigger.contains(&winit::event::MouseButton::Right),
-        mouse_world_pos,
-    ) {
-        (true, Some(mouse_pos_world)) => {
-            let selected_count = selected.len();
-            let formation_w = (selected_count as f32).sqrt().ceil() as i32;
+    let selected_count = selected.len();
+    let formation_w = (selected_count as f32).sqrt().ceil() as i32;
 
-            let mut spot = Vec::<Vector3<f32>>::new();
-            for i in 0..formation_w {
-                for j in 0..formation_w {
-                    spot.push(
-                        mouse_pos_world
-                            + Vector3::new(
-                                i as f32 + 0.5 - formation_w as f32 / 2.0,
-                                j as f32 + 0.5 - formation_w as f32 / 2.0,
-                                0.0,
-                            ) * 4.0,
-                    )
-                }
-            }
-
-            let mut center = Vector3::new(0.0, 0.0, 0.0);
-            let mut tap = 0.0;
-
-            let mut id_to_pos = Vec::new();
-            for &s in selected.iter() {
-                if let Some(mobile) = kbots.get(&Id::new(s)) {
-                    id_to_pos.push((mobile.id, mobile.position.coords));
-                    center += mobile.position.coords;
-                    tap += 1.0;
-                }
-            }
-            center /= tap;
-
-            let axis = (mouse_pos_world - center).normalize();
-
-            let mut projected_spot: Vec<_> = spot
-                .iter()
-                .enumerate()
-                .map(|(index, v)| (index, v.dot(&axis)))
-                .collect();
-
-            projected_spot.sort_by(|(_, proj), (_, proj2)| {
-                if proj > proj2 {
-                    std::cmp::Ordering::Greater
-                } else {
-                    std::cmp::Ordering::Less
-                }
-            });
-
-            let mut id_to_proj: Vec<_> = id_to_pos
-                .iter()
-                .map(|(index, v)| (index, v.dot(&axis)))
-                .collect();
-
-            id_to_proj.sort_by(|(_, proj), (_, proj2)| {
-                if proj > proj2 {
-                    std::cmp::Ordering::Greater
-                } else {
-                    std::cmp::Ordering::Less
-                }
-            });
-
-            for ((id, _), (spot_id, _)) in id_to_proj.iter().zip(&projected_spot[..]) {
-                if let Some(mobile) = kbots.get_mut(id) {
-                    log::trace!("New order for {}", mobile.id);
-                    mobile.target = Some(Point3::<f32>::from(spot[*spot_id]));
-                }
-            }
+    let mut spot = Vec::<Vector3<f32>>::new();
+    for i in 0..formation_w {
+        for j in 0..formation_w {
+            spot.push(
+                mouse_world_pos
+                    + Vector3::new(
+                        i as f32 + 0.5 - formation_w as f32 / 2.0,
+                        j as f32 + 0.5 - formation_w as f32 / 2.0,
+                        0.0,
+                    ) * 4.0,
+            )
         }
-        _ => {}
+    }
+
+    let mut center = Vector3::new(0.0, 0.0, 0.0);
+    let mut tap = 0.0;
+
+    let mut id_to_pos = Vec::new();
+    for &s in selected.iter() {
+        if let Some(mobile) = kbots.get(&Id::new(s)) {
+            id_to_pos.push((mobile.id, mobile.position.coords));
+            center += mobile.position.coords;
+            tap += 1.0;
+        }
+    }
+    center /= tap;
+
+    let axis = (mouse_world_pos - center).normalize();
+
+    let mut projected_spot: Vec<_> = spot
+        .iter()
+        .enumerate()
+        .map(|(index, v)| (index, v.dot(&axis)))
+        .collect();
+
+    projected_spot.sort_by(|(_, proj), (_, proj2)| {
+        if proj > proj2 {
+            std::cmp::Ordering::Greater
+        } else {
+            std::cmp::Ordering::Less
+        }
+    });
+
+    let mut id_to_proj: Vec<_> = id_to_pos
+        .iter()
+        .map(|(index, v)| (index, v.dot(&axis)))
+        .collect();
+
+    id_to_proj.sort_by(|(_, proj), (_, proj2)| {
+        if proj > proj2 {
+            std::cmp::Ordering::Greater
+        } else {
+            std::cmp::Ordering::Less
+        }
+    });
+
+    for ((id, _), (spot_id, _)) in id_to_proj.iter().zip(&projected_spot[..]) {
+        if let Some(mobile) = kbots.get_mut(id) {
+            log::trace!("New order for {}", mobile.id);
+            mobile.target = Some(Point3::<f32>::from(spot[*spot_id]));
+        }
     }
 }
 

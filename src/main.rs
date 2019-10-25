@@ -19,6 +19,7 @@ mod mobile;
 mod model;
 mod model_gpu;
 
+mod net_server;
 mod post_fx;
 mod post_fxaa;
 mod trait_gpu;
@@ -33,16 +34,13 @@ extern crate shaderc;
 extern crate typename;
 extern crate base_62;
 extern crate spin_sleep;
-
+use crossbeam_channel::unbounded;
 use spin_sleep::LoopHelper;
 use winit::event::Event;
 use winit::event_loop::ControlFlow;
 #[derive(Debug)]
 pub enum ToClient {
-    WindowPassing(winit::window::Window),
-    EventMessage { event: Event<()> },
     MapReadAsyncMessage { vec: Vec<f32>, usage: String },
-    Render,
     NewFrame(frame::Frame),
 }
 
@@ -54,8 +52,7 @@ fn main() {
     log::info!("dir: {:?}", std::env::current_dir().unwrap());
     env_logger::init();
 
-    use crossbeam_channel::unbounded;
-    let (s_to_client, r_to_client) = crossbeam_channel::unbounded::<ToClient>();
+    let (s_to_client, r_to_client) = unbounded::<ToClient>();
 
     let s_to_client_from_root_manager = s_to_client.clone();
 
@@ -69,8 +66,30 @@ fn main() {
         let mut fsc = frame_server::FrameServerCache::new();
         for msg in r_to_frame_server.iter() {
             match msg {
-                frame_server::ToFrameServer::AskNextFrameMsg { old_frame } => {
-                    let next_frame = fsc.next_frame(old_frame);
+                frame_server::ToFrameServer::DataToComputeNextFrame(
+                    frame::DataToComputeNextFrame { old_frame, events },
+                ) => {
+                    let next_frame = fsc.next_frame(old_frame, events);
+                    // let vec = bincode::serialize(&next_frame).unwrap();
+                    // log::info!("Frame is {} bytes", vec.len());
+                    // let mut vec = Vec::new();
+                    // for k in next_frame.kbots.values() {
+                    //     vec.push(k.clone());
+                    // }
+                    // let fu = frame::FrameUpdate { kbots: vec };
+                    // let vec = bincode::serialize(&fu).unwrap();
+                    // log::info!("FrameUpdate is {} bytes", vec.len());
+                    // let dur = utils::time(|| {
+                    //     use flate2::write::ZlibEncoder;
+                    //     use flate2::Compression;
+                    //     use std::io::prelude::*;
+                    //     let mut e = ZlibEncoder::new(Vec::new(), Compression::new(1));
+                    //     e.write_all(&vec);
+                    //     let compressed_bytes = e.finish().unwrap();
+                    //     log::info!("Compressed is {} bytes", compressed_bytes.len());
+                    // });
+                    // log::info!("compression took {:?}", dur);
+
                     let _ = s_from_frame_server
                         .send(frame_server::FromFrameServer::NewFrame(next_frame));
                 }
@@ -80,10 +99,15 @@ fn main() {
 
     //Root manager
     std::thread::spawn(move || {
+        use net_server::NetServer;
+        let mut server: Option<NetServer> = None;
         let frame0 = frame::Frame::new();
-        let _ = s_to_frame_server.send(frame_server::ToFrameServer::AskNextFrameMsg {
-            old_frame: frame0.clone(),
-        });
+        let _ = s_to_frame_server.send(frame_server::ToFrameServer::DataToComputeNextFrame(
+            frame::DataToComputeNextFrame {
+                old_frame: frame0.clone(),
+                events: Vec::new(),
+            },
+        ));
         let _ = s_to_client_from_root_manager.send(ToClient::NewFrame(frame0));
 
         let mut loop_helper = LoopHelper::builder().build_with_target_rate(10.0_f64);
@@ -92,26 +116,58 @@ fn main() {
             loop_helper.loop_sleep();
             loop_helper.loop_start();
             log::trace!("Root manager receive");
-            //Receiving Partial new frames
-            let mut new_partial_frame = match r_from_frame_server.recv() {
+            //Receiving new frame
+            let frame = match r_from_frame_server.recv() {
                 Ok(frame_server::FromFrameServer::NewFrame(new_frame)) => new_frame,
-                _ => panic!("No frame from frame_server"),
+                _ => panic!("frame_server disconnected"),
             };
 
-            let client_events: Vec<_> = r_from_client
-                .try_iter()
-                .map(|client::FromClient::Event(event)| event)
+            //Receiving player event
+            let client_events: Vec<_> = r_from_client.try_iter().collect();
+
+            //Collect multiplayer start
+            if let Some(bind) = client_events
+                .iter()
+                .flat_map(|e| match e {
+                    client::FromClient::StartServer { bind } => Some(bind),
+                    _ => None,
+                })
+                .next()
+            {
+                server = Some(NetServer::new(bind));
+            }
+
+            //Collect player input from local player
+            let mut player_inputs: Vec<frame::FrameEvent> = client_events
+                .iter()
+                .flat_map(|e| match e {
+                    client::FromClient::PlayerInput(event) => Some(event.clone()),
+                    _ => None,
+                })
                 .collect();
 
-            new_partial_frame.events.extend(client_events);
-            //Frame is now complete and ready to be sent
-            let full_frame = new_partial_frame;
+            //Extend with remote players
+            if let Some(server) = &mut server {
+                player_inputs.extend(server.collect_remote_players_inputs());
+            }
 
-            //Sending frame
-            let _ = s_to_frame_server.send(frame_server::ToFrameServer::AskNextFrameMsg {
-                old_frame: full_frame.clone(),
-            });
-            let _ = s_to_client_from_root_manager.send(ToClient::NewFrame(full_frame));
+            let data_to_compute_next_frame = frame::DataToComputeNextFrame {
+                old_frame: frame.clone(),
+                events: player_inputs,
+            };
+
+            //Frame is now complete and ready to be sent
+
+            //Broadcast to remotes
+            if let Some(server) = &mut server {
+                server.broadcast(data_to_compute_next_frame.clone());
+            }
+
+            //Sending to local frame_server and local client
+            let _ = s_to_frame_server.send(frame_server::ToFrameServer::DataToComputeNextFrame(
+                data_to_compute_next_frame,
+            ));
+            let _ = s_to_client_from_root_manager.send(ToClient::NewFrame(frame));
         }
     });
 

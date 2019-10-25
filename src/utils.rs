@@ -1,11 +1,11 @@
+use base_62::base62;
 use rand::seq::SliceRandom;
 use rand::thread_rng;
+use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::fmt;
 use std::hash::Hash;
 use std::hash::Hasher;
-
-use base_62::base62;
 
 const ID_CHARS: [char; 62] = [
     'A', 'Z', 'E', 'R', 'T', 'Y', 'U', 'I', 'O', 'P', 'Q', 'S', 'D', 'F', 'G', 'H', 'J', 'K', 'L',
@@ -21,7 +21,7 @@ trait IdBase {
 
 pub type IdValue = u32;
 
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct Id<T> {
     pub value: IdValue,
     phantom: std::marker::PhantomData<T>,

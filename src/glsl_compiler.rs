@@ -91,9 +91,16 @@ pub fn load(rel_path: &str) -> Result<Vec<u32>> {
 
 #[cfg(feature = "use_spirv")]
 pub fn load(rel_path: &str) -> Result<Vec<u32>> {
-    let path = &format!("{}.spirv", rel_path);
-    let spirv_path = std::path::Path::new(path);
-    log::debug!("spirv : reading {:?}", spirv_path);
+    let glsl_path = std::path::Path::new(rel_path);
+    let file_name = glsl_path.file_name().unwrap();
+    let ext = glsl_path.extension().unwrap().to_str().unwrap();
+
+    let mut spirv_path = glsl_path.to_path_buf().parent().unwrap().to_path_buf();
+    spirv_path.push("compiled");
+    spirv_path.push(file_name);
+    let spirv_path = spirv_path.with_extension(format!("{}.spirv", ext));
+
+    log::trace!("spirv : reading {:?}", spirv_path);
     let spirv = std::fs::read(spirv_path).unwrap();
 
     use std::convert::TryInto;

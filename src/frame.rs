@@ -11,8 +11,9 @@ use std::time::Instant;
 use utils::*;
 
 use mobile::*;
+use serde::{Deserialize, Serialize};
 
-#[derive(Clone, TypeName, Debug)]
+#[derive(Clone, TypeName, Debug, Serialize, Deserialize, PartialEq)]
 pub struct Player {
     pub id: Id<Player>,
     pub kbots: HashSet<Id<KBot>>,
@@ -30,18 +31,17 @@ impl Player {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub enum FrameEvent {
-    PlayerInput {
+    MoveOrder {
         id: Id<Player>,
-        input_state: input_state::InputState,
         selected: HashSet<IdValue>,
-        mouse_world_pos: Option<Vector3<f32>>,
+        mouse_world_pos: Vector3<f32>,
     },
     ReplaceFrame(Frame),
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct ProfilerMap {
     pub hm: HashMap<String, std::time::Duration>,
 }
@@ -57,7 +57,18 @@ impl ProfilerMap {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+pub struct DataToComputeNextFrame {
+    pub old_frame: Frame,
+    pub events: Vec<FrameEvent>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+pub struct FrameUpdate {
+    pub kbots: Vec<KBot>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct Frame {
     pub number: i32,
     pub players: HashMap<Id<Player>, Player>,
@@ -65,9 +76,8 @@ pub struct Frame {
     pub kbots_dead: HashSet<Id<KBot>>,
     pub kinematic_projectiles: HashMap<Id<KinematicProjectile>, KinematicProjectile>,
     pub arrows: Vec<Arrow>,
-    pub events: Vec<FrameEvent>,
+
     pub heightmap_phy: Option<heightmap_phy::HeightmapPhy>,
-    pub complete: bool,
     pub frame_profiler: ProfilerMap,
 }
 
@@ -79,10 +89,8 @@ impl Frame {
             kbots: HashMap::new(),
             kbots_dead: HashSet::new(),
             kinematic_projectiles: HashMap::new(),
-            events: Vec::new(),
             arrows: Vec::new(),
             heightmap_phy: None,
-            complete: true,
             frame_profiler: ProfilerMap::new(),
         }
     }

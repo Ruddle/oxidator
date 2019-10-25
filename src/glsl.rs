@@ -12,14 +12,20 @@ fn main() {
 
     let path = std::path::Path::new("./src/shader/");
     let cb = |de: &DirEntry| {
-        let path = de.path();
-        let ext = path.extension().unwrap().to_str().unwrap();
+        let path_to_read = de.path();
+        let ext = path_to_read.extension().unwrap().to_str().unwrap();
 
         if !ext.contains("spirv") {
-            println!("{:?}", de);
-            let spirv = glsl_compiler::load(de.path().to_str().unwrap()).unwrap();
+            println!("compiling {:?}", path_to_read);
+            let spirv = glsl_compiler::load(path_to_read.to_str().unwrap()).unwrap();
 
-            let path2 = path.with_extension(format!("{}.spirv", ext));
+            let file_name = path_to_read.file_name().unwrap();
+            let mut path_to_write = path_to_read.parent().unwrap().to_path_buf();
+            path_to_write.push("compiled");
+            path_to_write.push(file_name);
+            let path_to_write = path_to_write.with_extension(format!("{}.spirv", ext));
+
+            println!("write to {:?}", path_to_write);
 
             let slice_u8: Vec<u8> = spirv
                 .iter()
@@ -27,7 +33,7 @@ fn main() {
                 .flatten()
                 .collect();
 
-            std::fs::write(path2, slice_u8).unwrap();
+            std::fs::write(path_to_write, slice_u8).unwrap();
         }
     };
     visit_dirs(path, &cb).unwrap();

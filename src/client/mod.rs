@@ -26,7 +26,10 @@ use wgpu::{BufferMapAsyncResult, Extent3d, SwapChain, TextureFormat};
 use winit::event::WindowEvent;
 
 pub enum FromClient {
-    Event(frame::FrameEvent),
+    PlayerInput(frame::FrameEvent),
+    StartServer{
+        bind : String
+    }
 }
 
 struct ImguiWrap {
@@ -643,6 +646,7 @@ impl App {
             notify::Result<notify::event::Event>,
             crossbeam_channel::TryRecvError,
         > = self.receiver_notify.try_recv();
+
         match msg {
             Ok(Ok(event)) => {
                 log::trace!("notify {:?}", event);
@@ -749,9 +753,6 @@ impl App {
                         log::trace!("receive: NewFrame");
                         self.game_state.handle_new_frame(frame);
                     }
-                    _ => panic!(
-                        "receiver_to_client should not receive EventMessage or WindowPassing"
-                    ),
                 }
             }
         }
