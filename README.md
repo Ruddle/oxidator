@@ -4,6 +4,14 @@ A real time strategy game/engine written with Rust and WebGPU.
 Eventually it will be able to run in a web browser thanks to WebGPU.
 This project is inspired by Total Annihilation, Supreme Commander, [Spring Engine](https://springrts.com/) and [Zero-k](https://zero-k.info/).
 
+## Demo
+
+![Map editor](etc/map_editor.gif)
+Map editor [HQ version](https://streamable.com/q0odh)
+
+![Play mode](etc/play.gif)
+Gameplay (35000 units) [HQ version](https://streamable.com/38lop)
+
 ## Goal
 
 The ultimate goal is to provide a modern, carefully crafted, minimal and highly constrained set of tools for players/designers to create mods (game variant) without programming knowledge. 
@@ -29,7 +37,7 @@ the test for this goal would be to be able implement a [Zero-k](https://zero-k.i
 
 * General purpose modding/ turing complete scripting language.
 
-* Low latency server: the increase in dev time between 10ms latency and 100ms is huge. Not worth the effort given that I want people from all around the world to play together. Also I want games to be about strategy, not action per minute (I am getting to old for this ^^).
+* Low latency server: the increase in dev time between 10ms latency and 100ms is huge. Not worth the effort given that I want people from all around the world to play together. Also I want games to be about strategy, not action per minute (I am getting too old for this ^^).
 
 * Hosted simulation server. I am broke, people will have to host their own server to play with others (that would just mean clicking the host button in the multi lobby, and having sufficient bandwidth). the online repository will help with discovery though.  
 
@@ -65,7 +73,8 @@ the test for this goal would be to be able implement a [Zero-k](https://zero-k.i
     - [ ] ability to draw on the map, and tag place/units
 - Rendering 
     - [x] basic display of 3D models (with instancing)
-    - [x] basic display a heightmap (with Geometry Clipmaps) 
+    - [x] basic display a heightmap (with a poor man's [Geometry Clipmaps](https://developer.nvidia.com/gpugems/GPUGems2/gpugems2_chapter02.html)) 
+    - [x] fxaa (from [this blog](http://blog.simonrodriguez.fr/articles/30-07-2016_implementing_fxaa.html))
     - [ ] materials
     - [ ] particles
     - [ ] sounds
@@ -80,7 +89,7 @@ the test for this goal would be to be able implement a [Zero-k](https://zero-k.i
     - [ ] user-defined AI for units (follow target, formation, flee, target selection etc)
     - [ ] construction 
     - [ ] resource counting
-    - [ ] integrating pathfinding (I already have a working flowfield pathfinding [here](https://github.com/Ruddle/rustfield))
+    - [ ] integrating pathfinding (I already built a working flowfield pathfinding [here](https://github.com/Ruddle/rustfield))
     
 - UI
     - [x] select units
@@ -95,7 +104,7 @@ the test for this goal would be to be able implement a [Zero-k](https://zero-k.i
 
  * Windows (dx12 and vulkan)
  * Linux (vulkan)
- * Mac Untested (*should work on Mac by enabling the feature "metal"*)
+ * Mac Untested (*should work by enabling the feature "metal"*)
 
 All thanks to WebGPU and [wgpu-rs](https://github.com/gfx-rs/wgpu-rs) (and [winit](https://github.com/rust-windowing/winit)). No efforts was made by me in this regard. If anything I posted a stupid issue there that was solved in 0.03 second.
  
