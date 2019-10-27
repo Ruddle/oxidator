@@ -1,6 +1,6 @@
 use super::client::*;
 use crate::frame;
-use crate::frame::FrameEvent;
+use crate::frame::FrameEventFromPlayer;
 use crate::frame::Player;
 use crate::*;
 use imgui::*;
@@ -45,64 +45,87 @@ impl App {
                     from,
                     to: MainMode::Play,
                 } => {
-                    self.clear_from_play();
-                    self.game_state.position = Point3::new(300.0, 100.0, 50.0);
-                    self.game_state.dir = Vector3::new(0.0, 0.3, -1.0);
+                    match self.net_mode {
+                        NetMode::Offline | NetMode::Server => {
+                            self.clear_from_play();
+                            self.game_state.position = Point3::new(300.0, 100.0, 50.0);
+                            self.game_state.dir = Vector3::new(0.0, 0.3, -1.0);
 
-                    let mut player_me = Player::new();
+                            let mut player_me = Player::new();
 
-                    for i in (50..300).step_by(4) {
-                        for j in (100..400).step_by(4) {
-                            let m = mobile::KBot::new(Point3::new(i as f32, j as f32, 100.0));
-                            player_me.kbots.insert(m.id);
-                            self.game_state.kbots.insert(m.id, m);
+                            for i in (100..300).step_by(4) {
+                                for j in (100..300).step_by(4) {
+                                    let m =
+                                        mobile::KBot::new(Point3::new(i as f32, j as f32, 100.0));
+                                    player_me.kbots.insert(m.id);
+                                    self.game_state.kbots.insert(m.id, m);
+                                }
+                            }
+
+                            // {
+                            //     let m = mobile::KBot::new(Point3::new(100.0, 100.0, 100.0));
+                            //     player_me.kbots.insert(m.id);
+                            //     self.game_state.kbots.insert(m.id, m);
+                            // }
+
+                            let mut player_ennemy = Player::new();
+                            player_ennemy.team = 1;
+
+                            for i in (320..520).step_by(4) {
+                                for j in (100..300).step_by(4) {
+                                    let m =
+                                        mobile::KBot::new(Point3::new(i as f32, j as f32, 100.0));
+                                    player_ennemy.kbots.insert(m.id);
+                                    self.game_state.kbots.insert(m.id, m);
+                                }
+                            }
+
+                            // {
+                            //     let m = mobile::KBot::new(Point3::new(120.0, 100.0, 100.0));
+                            //     player_ennemy.kbots.insert(m.id);
+                            //     self.game_state.kbots.insert(m.id, m);
+                            // }
+
+                            log::info!("Starting a game with {} bots", self.game_state.kbots.len());
+
+                            self.game_state.my_player_id = Some(player_me.id);
+                            self.game_state.players.insert(player_me.id, player_me);
+                            self.game_state
+                                .players
+                                .insert(player_ennemy.id, player_ennemy);
+
+                            let replacer = FrameEventFromPlayer::ReplaceFrame(frame::Frame {
+                                number: 0,
+                                players: self.game_state.players.clone(),
+                                kbots: self.game_state.kbots.clone(),
+                                kbots_dead: HashSet::new(),
+                                kinematic_projectiles: self
+                                    .game_state
+                                    .kinematic_projectiles
+                                    .clone(),
+                                arrows: Vec::new(),
+                                heightmap_phy: Some(self.heightmap_gpu.phy.clone()),
+                                frame_profiler: frame::ProfilerMap::new(),
+                            });
+                            let _ = self
+                                .sender_from_client_to_manager
+                                .try_send(client::FromClient::PlayerInput(replacer));
+                        }
+
+                        NetMode::Client => {
+                            self.clear_from_play();
+                            self.game_state.position = Point3::new(300.0, 100.0, 50.0);
+                            self.game_state.dir = Vector3::new(0.0, 0.3, -1.0);
+                            self.game_state.my_player_id = self
+                                .game_state
+                                .frame_zero
+                                .players
+                                .values()
+                                .filter(|p| p.team == 1)
+                                .map(|p| p.id.clone())
+                                .next();
                         }
                     }
-
-                    // {
-                    //     let m = mobile::KBot::new(Point3::new(100.0, 100.0, 100.0));
-                    //     player_me.kbots.insert(m.id);
-                    //     self.game_state.kbots.insert(m.id, m);
-                    // }
-
-                    let mut player_ennemy = Player::new();
-                    player_ennemy.team = 1;
-
-                    for i in (320..570).step_by(4) {
-                        for j in (100..400).step_by(4) {
-                            let m = mobile::KBot::new(Point3::new(i as f32, j as f32, 100.0));
-                            player_ennemy.kbots.insert(m.id);
-                            self.game_state.kbots.insert(m.id, m);
-                        }
-                    }
-
-                    // {
-                    //     let m = mobile::KBot::new(Point3::new(120.0, 100.0, 100.0));
-                    //     player_ennemy.kbots.insert(m.id);
-                    //     self.game_state.kbots.insert(m.id, m);
-                    // }
-
-                    log::info!("Starting a game with {} bots", self.game_state.kbots.len());
-
-                    self.game_state.my_player_id = Some(player_me.id);
-                    self.game_state.players.insert(player_me.id, player_me);
-                    self.game_state
-                        .players
-                        .insert(player_ennemy.id, player_ennemy);
-
-                    let replacer = FrameEvent::ReplaceFrame(frame::Frame {
-                        number: 0,
-                        players: self.game_state.players.clone(),
-                        kbots: self.game_state.kbots.clone(),
-                        kbots_dead: HashSet::new(),
-                        kinematic_projectiles: self.game_state.kinematic_projectiles.clone(),
-                        arrows: Vec::new(),
-                        heightmap_phy: Some(self.heightmap_gpu.phy.clone()),
-                        frame_profiler: frame::ProfilerMap::new(),
-                    });
-                    let _ = self
-                        .sender_from_client
-                        .try_send(client::FromClient::PlayerInput(replacer));
                 }
 
                 RenderEvent::ChangeMode {
@@ -111,10 +134,15 @@ impl App {
                 } => {
                     self.game_state.position = Point3::new(200.0, 100.0, 50.0);
                     self.game_state.dir = Vector3::new(0.0, 0.3, -1.0);
-                    let replacer = FrameEvent::ReplaceFrame(frame::Frame::new());
-                    let _ = self
-                        .sender_from_client
-                        .try_send(client::FromClient::PlayerInput(replacer));
+                    match self.net_mode {
+                        NetMode::Offline | NetMode::Server => {
+                            let replacer = FrameEventFromPlayer::ReplaceFrame(frame::Frame::new());
+                            let _ = self
+                                .sender_from_client_to_manager
+                                .try_send(client::FromClient::PlayerInput(replacer));
+                        }
+                        NetMode::Client => {}
+                    }
                 }
                 RenderEvent::ChangeMode {
                     from,
@@ -421,6 +449,7 @@ impl App {
             let main_menu = &mut self.main_menu;
 
             {
+                //Stat
                 let fps_before = self.game_state.fps.clone();
                 let mut_fps = &mut self.game_state.fps;
                 let profiler_logic = &self.game_state.frame_zero.frame_profiler;
@@ -489,6 +518,28 @@ impl App {
                     self.loop_helper = LoopHelper::builder().build_with_target_rate(*mut_fps as f64)
                 }
 
+                //Global info
+                if let Some(global_info) = self.global_info {
+                    let w = 300.0;
+                    let h = 200.0;
+
+                    let info_window = imgui::Window::new(im_str!("Global info"));
+
+                    info_window
+                        .size([w, h], imgui::Condition::FirstUseEver)
+                        .position(
+                            [self.gpu.sc_desc.width as f32 - w, 0.0],
+                            imgui::Condition::Always,
+                        )
+                        .collapsed(true, imgui::Condition::FirstUseEver)
+                        .resizable(true)
+                        .movable(false)
+                        .build(&ui, || {
+                            ui.text(im_str!("{:#?}", global_info));
+                        });
+                }
+
+                //Main menu
                 match main_menu {
                     MainMode::Home => {
                         let w = 216.0;
@@ -549,25 +600,76 @@ impl App {
                         let h = 324.0;
                         let home_window = imgui::Window::new(im_str!("Multiplayer Lobby"));
 
+                        let mut create_server = false;
+                        let mut create_client = false;
+                        let mut disconnect_server = false;
+                        let mut disconnect_client = false;
                         let mut next_mode = MainMode::MultiplayerLobby;
-                        home_window
-                            .size([w, h], imgui::Condition::Always)
-                            .position(
-                                [
-                                    (self.gpu.sc_desc.width as f32 - w) / 2.0,
-                                    (self.gpu.sc_desc.height as f32 - h) / 2.0,
-                                ],
-                                imgui::Condition::Always,
-                            )
-                            .title_bar(false)
-                            .resizable(false)
-                            .movable(false)
-                            .collapsible(false)
-                            .build(&ui, || {
-                                if ui.button(im_str!("Back"), [200.0_f32, 100.0]) {
-                                    next_mode = MainMode::Home;
-                                }
+                        if let Some(global_info) = self.global_info {
+                            home_window
+                                .size([w, h], imgui::Condition::Always)
+                                .position(
+                                    [
+                                        (self.gpu.sc_desc.width as f32 - w) / 2.0,
+                                        (self.gpu.sc_desc.height as f32 - h) / 2.0,
+                                    ],
+                                    imgui::Condition::Always,
+                                )
+                                .title_bar(false)
+                                .resizable(false)
+                                .movable(false)
+                                .collapsible(false)
+                                .build(&ui, || {
+                                    if global_info.net_server.is_none()
+                                        && global_info.net_client.is_none()
+                                    {
+                                        create_server =
+                                            ui.button(im_str!("Start server"), [200.0_f32, 100.0]);
+                                        create_client =
+                                            ui.button(im_str!("Start client"), [200.0_f32, 100.0]);
+                                    } else if global_info.net_server.is_some() {
+                                        disconnect_server = ui.button(
+                                            im_str!("Disconnect server"),
+                                            [200.0_f32, 100.0],
+                                        );
+                                    } else if global_info.net_client.is_some() {
+                                        disconnect_client = ui.button(
+                                            im_str!("Disconnect client"),
+                                            [200.0_f32, 100.0],
+                                        );
+                                    }
+
+                                    if ui.button(im_str!("Back"), [200.0_f32, 100.0]) {
+                                        next_mode = MainMode::Home;
+                                    }
+                                });
+                        }
+
+                        if create_server {
+                            self.net_mode = NetMode::Server;
+                            let e = client::FromClient::StartServer(client::StartServer {
+                                bind: "127.0.0.1:4567".to_owned(),
                             });
+                            let _ = self.sender_from_client_to_manager.try_send(e);
+                        }
+
+                        if create_client {
+                            self.net_mode = NetMode::Client;
+                            let e = client::FromClient::StartClient(client::StartClient {
+                                bind: "127.0.0.1:4567".to_owned(),
+                            });
+                            let _ = self.sender_from_client_to_manager.try_send(e);
+                        }
+                        if disconnect_server {
+                            self.net_mode = NetMode::Offline;
+                            let e = client::FromClient::DisconnectServer;
+                            let _ = self.sender_from_client_to_manager.try_send(e);
+                        }
+                        if disconnect_client {
+                            self.net_mode = NetMode::Offline;
+                            let e = client::FromClient::DisconnectClient;
+                            let _ = self.sender_from_client_to_manager.try_send(e);
+                        }
 
                         if self.main_menu != next_mode {
                             self.mailbox.push(RenderEvent::ChangeMode {
@@ -734,14 +836,16 @@ impl App {
             self.game_state.my_player_id,
             self.game_state.mouse_world_pos,
         ) {
-            let player_input = FrameEvent::MoveOrder {
+            let player_input = FrameEventFromPlayer::MoveOrder {
                 id,
                 selected: self.game_state.selected.clone(),
                 mouse_world_pos,
             };
 
+            log::info!("Move order from {}", id);
+
             let _ = self
-                .sender_from_client
+                .sender_from_client_to_manager
                 .try_send(client::FromClient::PlayerInput(player_input));
         }
 

@@ -44,7 +44,7 @@ impl error::Error for ShaderCompilationError {
 #[cfg(feature = "use_glsl_to_spirv")]
 pub fn load(rel_path: &str) -> Result<Vec<u32>> {
     let stage = str_to_shader_stage(rel_path);
-    log::debug!("glsl_to_spirv : compiling {}", rel_path);
+    log::info!("glsl_to_spirv : compiling {}", rel_path);
     let glsl_code = std::fs::read_to_string(std::path::Path::new(rel_path)).unwrap();
     let ty = match stage {
         ShaderStage::Vertex => glsl_to_spirv::ShaderType::Vertex,
@@ -68,7 +68,7 @@ pub fn load(rel_path: &str) -> Result<Vec<u32>> {
 #[cfg(feature = "use_shaderc")]
 pub fn load(rel_path: &str) -> Result<Vec<u32>> {
     let stage = str_to_shader_stage(rel_path);
-    log::debug!("shaderc : compiling {}", rel_path);
+    log::info!("shaderc : compiling {}", rel_path);
     let glsl_code = std::fs::read_to_string(std::path::Path::new(rel_path)).unwrap();
 
     let ty = match stage {

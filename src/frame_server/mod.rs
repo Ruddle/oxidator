@@ -71,20 +71,20 @@ impl FrameServerCache {
         }
     }
 
-    pub fn next_frame(&mut self, old_frame: Frame, events: Vec<FrameEvent>) -> Frame {
+    pub fn next_frame(&mut self, old_frame: Frame, events: Vec<FrameEventFromPlayer>) -> Frame {
         let mut frame_profiler = ProfilerMap::new();
         let start = std::time::Instant::now();
-        log::debug!("Received frame {} to compute next frame", old_frame.number);
+        log::trace!("Received frame {} to compute next frame", old_frame.number);
 
-        log::debug!("Event {}", events.len());
+        log::trace!("Event {}", events.len());
 
         let mut replacer = None;
         for event in events.iter() {
             match event {
-                FrameEvent::ReplaceFrame(frame) => {
+                FrameEventFromPlayer::ReplaceFrame(frame) => {
                     self.heightmap_phy = frame.heightmap_phy.clone();
                     replacer = Some(frame.clone());
-                    log::debug!("Replacing frame");
+                    log::trace!("Replacing frame");
                 }
                 _ => {}
             }
@@ -97,7 +97,7 @@ impl FrameServerCache {
 
         for event in events {
             match event {
-                FrameEvent::MoveOrder {
+                FrameEventFromPlayer::MoveOrder {
                     id,
                     selected,
                     mouse_world_pos,

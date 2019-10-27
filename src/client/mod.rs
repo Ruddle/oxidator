@@ -40,9 +40,11 @@ pub struct StartServer {
 }
 
 pub enum FromClient {
-    PlayerInput(frame::FrameEvent),
+    PlayerInput(frame::FrameEventFromPlayer),
     StartServer(StartServer),
     StartClient(StartClient),
+    DisconnectServer,
+    DisconnectClient,
 }
 
 struct ImguiWrap {
@@ -62,6 +64,13 @@ pub enum MainMode {
     Play,
     MapEditor,
     MultiplayerLobby,
+}
+
+#[derive(PartialEq, Clone, Copy)]
+pub enum NetMode {
+    Offline,
+    Server,
+    Client,
 }
 
 pub struct App {
@@ -95,13 +104,14 @@ pub struct App {
     imgui_wrap: ImguiWrap,
 
     main_menu: MainMode,
+    net_mode: NetMode,
 
     sender_to_client: crossbeam_channel::Sender<ToClient>,
     receiver_to_client: crossbeam_channel::Receiver<ToClient>,
 
     sender_to_event_loop: crossbeam_channel::Sender<EventLoopMsg>,
 
-    sender_from_client: crossbeam_channel::Sender<FromClient>,
+    sender_from_client_to_manager: crossbeam_channel::Sender<FromClient>,
 
     receiver_notify: crossbeam_channel::Receiver<notify::Result<notify::event::Event>>,
     watcher: notify::RecommendedWatcher,
@@ -110,6 +120,7 @@ pub struct App {
 
     loop_helper: LoopHelper,
     profiler: frame::ProfilerMap,
+    global_info: Option<manager::GlobalInfo>,
 }
 
 impl App {
@@ -119,7 +130,7 @@ impl App {
         receiver_to_client: crossbeam_channel::Receiver<ToClient>,
 
         sender_to_event_loop: crossbeam_channel::Sender<EventLoopMsg>,
-        sender_from_client: crossbeam_channel::Sender<FromClient>,
+        sender_from_client_to_manager: crossbeam_channel::Sender<FromClient>,
     ) -> (Self) {
         log::trace!("App init");
 
@@ -445,11 +456,12 @@ impl App {
             input_state: input_state::InputState::new(),
             imgui_wrap,
             main_menu: MainMode::Home,
+            net_mode: NetMode::Offline,
 
             sender_to_client,
             receiver_to_client,
             sender_to_event_loop,
-            sender_from_client,
+            sender_from_client_to_manager,
             receiver_notify,
             watcher,
 
@@ -457,6 +469,7 @@ impl App {
 
             loop_helper: LoopHelper::builder().build_with_target_rate(144.0),
             profiler: frame::ProfilerMap::new(),
+            global_info: None,
         };
 
         (this)
@@ -674,7 +687,7 @@ impl App {
                         name.to_os_string() == "post_ui.frag" || name.to_os_string() == "post.vert"
                     })
                 }) {
-                    log::trace!("Reloading post.vert/post_ui.frag");
+                    log::info!("Reloading post.vert/post_ui.frag");
                     self.postfx.reload_shader(
                         &self.gpu.device,
                         &self.bind_group_layout,
@@ -688,7 +701,7 @@ impl App {
                             || name.to_os_string() == "post.vert"
                     })
                 }) {
-                    log::trace!("Reloading post.vert/post_fxaa.frag");
+                    log::info!("Reloading post.vert/post_fxaa.frag");
                     self.postfxaa.reload_shader(
                         &self.gpu.device,
                         &self.bind_group_layout,
@@ -702,7 +715,7 @@ impl App {
                             || name.to_os_string() == "heightmap.vert"
                     })
                 }) {
-                    log::trace!("Reloading heightmap.vert/heightmap.frag");
+                    log::info!("Reloading heightmap.vert/heightmap.frag");
                     self.heightmap_gpu.reload_shader(
                         &self.gpu.device,
                         &self.bind_group_layout,
@@ -716,7 +729,7 @@ impl App {
                             || name.to_os_string() == "cube_instanced.vert"
                     })
                 }) {
-                    log::trace!("Reloading cube_instanced.vert/cube_instanced.frag");
+                    log::info!("Reloading cube_instanced.vert/cube_instanced.frag");
                     self.cube_gpu.reload_shader(
                         &self.gpu.device,
                         &self.bind_group_layout,
@@ -734,7 +747,7 @@ impl App {
                         name.to_os_string() == "arrow.frag" || name.to_os_string() == "arrow.vert"
                     })
                 }) {
-                    log::trace!("Reloading arrow.vert/arrow.frag");
+                    log::info!("Reloading arrow.vert/arrow.frag");
                     self.arrow_gpu.reload_shader(
                         &self.gpu.device,
                         &self.bind_group_layout,
@@ -768,9 +781,9 @@ impl App {
                         self.map_read_async_msg(vec, usage);
                     }
                     ToClient::NewFrame(frame) => {
-                        log::trace!("receive: NewFrame");
                         self.game_state.handle_new_frame(frame);
                     }
+                    ToClient::GlobalInfo(global_info) => self.global_info = Some(global_info),
                 }
             }
         }

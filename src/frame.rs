@@ -32,7 +32,7 @@ impl Player {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
-pub enum FrameEvent {
+pub enum FrameEventFromPlayer {
     MoveOrder {
         id: Id<Player>,
         selected: HashSet<IdValue>,
@@ -60,7 +60,7 @@ impl ProfilerMap {
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct DataToComputeNextFrame {
     pub old_frame: Frame,
-    pub events: Vec<FrameEvent>,
+    pub events: Vec<FrameEventFromPlayer>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]

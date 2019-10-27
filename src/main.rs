@@ -6,6 +6,7 @@ mod heightmap_phy;
 mod manager;
 mod mobile;
 mod model;
+mod net_client;
 mod net_server;
 mod procedural_texels;
 mod utils;
@@ -27,6 +28,7 @@ use winit::event_loop::ControlFlow;
 pub enum ToClient {
     MapReadAsyncMessage { vec: Vec<f32>, usage: String },
     NewFrame(frame::Frame),
+    GlobalInfo(manager::GlobalInfo),
 }
 
 pub enum EventLoopMsg {
@@ -35,22 +37,24 @@ pub enum EventLoopMsg {
 
 fn main() {
     env_logger::init();
-    log::info!("dir: {:?}", std::env::current_dir().unwrap());
+    do_the_thing();
+}
 
+fn do_the_thing() {
     let (s_to_frame_server, r_to_frame_server) = unbounded::<frame_server::ToFrameServer>();
     let (s_from_frame_server, r_from_frame_server) = unbounded::<frame_server::FromFrameServer>();
 
     let frame_server =
         frame_server::FrameServerCache::spawn(r_to_frame_server, s_from_frame_server);
 
-    let (s_from_client, r_from_client) = unbounded::<client::FromClient>();
+    let (s_from_client_to_manager, r_from_client_to_manager) = unbounded::<client::FromClient>();
     let (s_to_client, r_to_client) = unbounded::<ToClient>();
     let s_to_client_from_manager = s_to_client.clone();
     let manager = manager::Manager::new(
         s_to_client_from_manager,
         s_to_frame_server,
         r_from_frame_server,
-        r_from_client,
+        r_from_client_to_manager,
     );
 
     let (s_to_event_loop, r_to_event_loop) = unbounded::<EventLoopMsg>();
@@ -61,7 +65,7 @@ fn main() {
         s_to_client,
         r_to_client,
         s_to_event_loop,
-        s_from_client,
+        s_from_client_to_manager,
     );
 
     event_loop.run(move |event, _, control_flow| match event {

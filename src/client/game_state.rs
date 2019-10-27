@@ -1,7 +1,7 @@
 extern crate nalgebra as na;
+use super::heightmap_editor;
 use crate::frame;
 use crate::frame::Frame;
-use super::heightmap_editor;
 use crate::mobile;
 use crate::utils;
 use na::{Point3, Vector2, Vector3};
@@ -81,6 +81,8 @@ impl State {
     }
 
     pub fn handle_new_frame(&mut self, frame: Frame) {
+        let time_between = self.frame_zero_time_received.elapsed();
+        log::trace!("receive: NewFrame after {:?}", time_between);
         self.frame_zero_time_received = Instant::now();
         self.frame_minus_one = std::mem::replace(&mut self.frame_zero, frame);
 
