@@ -1,5 +1,5 @@
 use crate::utils;
-use na::{Point3, Vector3};
+use na::{Matrix4, Point3, Vector3};
 use serde::{Deserialize, Serialize};
 use typename::TypeName;
 use utils::Id;
@@ -7,6 +7,7 @@ use utils::Id;
 #[derive(Clone, TypeName, Debug, Serialize, Deserialize, PartialEq)]
 pub struct KBot {
     pub position: Point3<f32>,
+    pub trans: Option<Matrix4<f32>>,
     pub speed: Vector3<f32>,
     pub dir: Vector3<f32>,
     pub target: Option<Point3<f32>>,
@@ -15,6 +16,7 @@ pub struct KBot {
     pub radius: f32,
     pub life: i32,
     pub max_life: i32,
+    pub team: i32,
 
     pub grounded: bool,
 
@@ -27,6 +29,8 @@ impl KBot {
         KBot {
             position,
             speed: Vector3::new(0.0, 0.0, 0.0),
+            trans: None,
+            team: 0,
             dir: Vector3::new(1.0, 0.0, 0.0),
             target: None,
             id: utils::rand_id(),

@@ -121,6 +121,7 @@ pub struct App {
     loop_helper: LoopHelper,
     profiler: frame::ProfilerMap,
     global_info: Option<manager::GlobalInfo>,
+    threadpool: rayon::ThreadPool,
 }
 
 impl App {
@@ -470,6 +471,10 @@ impl App {
             loop_helper: LoopHelper::builder().build_with_target_rate(144.0),
             profiler: frame::ProfilerMap::new(),
             global_info: None,
+            threadpool: rayon::ThreadPoolBuilder::new()
+                // .num_threads(8)
+                .build()
+                .unwrap(),
         };
 
         (this)

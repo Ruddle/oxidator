@@ -73,8 +73,9 @@ impl App {
 
                             for i in (320..520).step_by(4) {
                                 for j in (100..300).step_by(4) {
-                                    let m =
+                                    let mut m =
                                         mobile::KBot::new(Point3::new(i as f32, j as f32, 100.0));
+                                    m.team = 1;
                                     player_ennemy.kbots.insert(m.id);
                                     self.game_state.kbots.insert(m.id, m);
                                 }
@@ -298,14 +299,9 @@ impl App {
             .device
             .create_command_encoder(&wgpu::CommandEncoderDescriptor { todo: 0 });
 
-        let (interp_duration, mobile_to_gpu_duration) = if self.main_menu == MainMode::Play {
+        if self.main_menu == MainMode::Play {
             self.handle_play(sim_sec, &mut encoder_render)
-        } else {
-            (Duration::default(), Duration::default())
-        };
-
-        self.profiler.add("interp", interp_duration);
-        self.profiler.add("mobile_to_gpu", mobile_to_gpu_duration);
+        }
 
         let heightmap_gpu_step_duration = time(|| {
             self.heightmap_gpu

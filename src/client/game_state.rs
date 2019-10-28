@@ -4,7 +4,7 @@ use crate::frame;
 use crate::frame::Frame;
 use crate::mobile;
 use crate::utils;
-use na::{Point3, Vector2, Vector3};
+use na::{Matrix4, Point3, Vector2, Vector3};
 use std::collections::{HashMap, HashSet};
 use std::time::Instant;
 use utils::*;
@@ -93,7 +93,7 @@ impl State {
             .collect();
     }
 
-    pub fn interpolate(&mut self) {
+    pub fn interpolate(&mut self, threadpool: &rayon::ThreadPool, view_proj: &Matrix4<f32>) {
         let elapsed = self.frame_zero_time_received.elapsed().as_secs_f64();
         //elapsed normalize between 0 and 1 if frame arrives every 100ms (0.1s)
         let lambda = (elapsed / 0.1) as f32;
@@ -105,30 +105,63 @@ impl State {
 
         log::trace!("server_sec {}", self.server_sec);
 
-        self.kbots.clear();
-        for kbot_0 in self.frame_zero.kbots.values() {
-            let to_insert = {
-                if let Some(kbot_m) = self.frame_minus_one.kbots.get(&kbot_0.id) {
-                    let position = kbot_0.position * i0 + (im * kbot_m.position).coords;
-                    let dir = kbot_0.dir * i0 + kbot_m.dir * im;
-                    let life = (kbot_0.life as f64 * i0 as f64 + kbot_m.life as f64 * im as f64)
-                        .round() as i32;
-                    let kbot = KBot {
-                        position,
-                        dir,
-                        life,
-                        ..*kbot_0
-                    };
+        use rayon::prelude::*;
 
-                    kbot
-                } else {
-                    //No interpolation possible, taking last data point
-                    kbot_0.clone()
-                }
-            };
+        self.in_screen.clear();
 
-            self.kbots.insert(to_insert.id, to_insert);
+        fn test_screen(
+            id: Id<KBot>,
+            position: Point3<f32>,
+            view_proj: &Matrix4<f32>,
+        ) -> Option<(Id<KBot>, Vector2<f32>)> {
+            let p = position.to_homogeneous();
+            let r = view_proj * p;
+            //Keeping those of the clipped space in screen (-1 1, -1 1 , 0 1)
+            if r.z > 0.0 && r.x < r.w && r.x > -r.w && r.y < r.w && r.y > -r.w {
+                Some((id, Vector2::new(r.x / r.w, r.y / r.w)))
+            } else {
+                None
+            }
         }
+
+        let mut kbots = self.frame_zero.kbots.clone();
+
+        let mut in_screen: Vec<_> = Vec::new();
+        threadpool.install(|| {
+            in_screen = kbots
+                .par_iter_mut()
+                .map(|(_, kbot_0)| {
+                    if let Some(kbot_m) = self.frame_minus_one.kbots.get(&kbot_0.id) {
+                        let position = kbot_0.position * i0 + (im * kbot_m.position).coords;
+                        let dir = kbot_0.dir * i0 + kbot_m.dir * im;
+                        let mat = Matrix4::face_towards(
+                            &position,
+                            &(position + dir),
+                            &Vector3::new(0.0, 0.0, 1.0),
+                        );
+                        let trans = Some(mat);
+                        kbot_0.position = position;
+                        kbot_0.dir = dir;
+                        kbot_0.trans = trans;
+                    } else {
+                        let mat = Matrix4::face_towards(
+                            &kbot_0.position,
+                            &(kbot_0.position + kbot_0.dir),
+                            &Vector3::new(0.0, 0.0, 1.0),
+                        );
+
+                        let trans = Some(mat);
+                        kbot_0.trans = trans;
+                    }
+
+                    test_screen(kbot_0.id, kbot_0.position, view_proj)
+                })
+                .collect();
+        });
+
+        self.kbots = kbots;
+
+        self.in_screen = in_screen.iter().flatten().copied().collect();
 
         self.kinematic_projectiles.clear();
         for kine_0 in self.frame_zero.kinematic_projectiles.values() {

@@ -29,7 +29,6 @@ pub enum FromNetServerInner {
 pub struct NetServer {
     s_inner: Sender<ToNetServerInner>,
     r_inner: Receiver<FromNetServerInner>,
-    //TODO UPDATE NetServerInfo
     info: NetServerInfo,
     r_info: Receiver<NetServerInfo>,
 }

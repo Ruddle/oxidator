@@ -30,7 +30,6 @@ pub enum FromNetClientInner {
 pub struct NetClient {
     s: Sender<ToNetClientInner>,
     r: Receiver<FromNetClientInner>,
-    //TODO UPDATE NetServerInfo
     info: NetClientInfo,
     r_info: Receiver<NetClientInfo>,
     s_kill: Sender<()>,

@@ -19,6 +19,7 @@ extern crate shaderc;
 #[macro_use]
 extern crate typename;
 extern crate base_62;
+extern crate rayon;
 extern crate spin_sleep;
 use crossbeam_channel::unbounded;
 use spin_sleep::LoopHelper;

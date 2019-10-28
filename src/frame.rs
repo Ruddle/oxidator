@@ -49,6 +49,23 @@ impl ProfilerMap {
     pub fn new() -> Self {
         ProfilerMap { hm: HashMap::new() }
     }
+    pub fn mix(&mut self, s: &str, duration: Duration, last_ratio: u32) {
+        match self.hm.get_mut(&s.to_owned()) {
+            Some(val) => {
+                *val = val
+                    .checked_mul(last_ratio)
+                    .unwrap()
+                    .checked_add(duration)
+                    .unwrap()
+                    .checked_div(last_ratio + 1)
+                    .unwrap();
+            }
+            None => {
+                self.hm.insert(s.to_owned(), duration);
+            }
+        }
+    }
+
     pub fn add(&mut self, s: &str, duration: Duration) {
         self.hm.insert(s.to_owned(), duration);
     }

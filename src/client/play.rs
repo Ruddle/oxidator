@@ -8,38 +8,39 @@ use std::time::{Duration, Instant};
 use utils::*;
 
 impl App {
-    pub fn handle_play(
-        &mut self,
-        delta_sim_sec: f32,
-        encoder: &mut wgpu::CommandEncoder,
-    ) -> (Duration, Duration) {
-        //Interpolate
-        let interp_duration = time(|| {
-            self.game_state.interpolate();
-        });
-
+    pub fn handle_play(&mut self, delta_sim_sec: f32, encoder: &mut wgpu::CommandEncoder) {
         let view_proj = camera::create_view_proj(
             self.gpu.sc_desc.width as f32 / self.gpu.sc_desc.height as f32,
             &self.game_state.position_smooth,
             &self.game_state.dir_smooth,
         );
+        //Interpolate
+        let interp_duration = time(|| {
+            self.game_state.interpolate(&self.threadpool, &view_proj);
+        });
+
         // Projecting on screen
-        {
-            self.game_state.in_screen = self
-                .game_state
-                .kbots
-                .iter()
-                .flat_map(|(id, e)| {
-                    let p = e.position.to_homogeneous();
-                    let r = view_proj * p;
-                    //Keeping those of the clipped space in screen (-1 1, -1 1 , 0 1)
-                    if r.z > 0.0 && r.x < r.w && r.x > -r.w && r.y < r.w && r.y > -r.w {
-                        Some((*id, Vector2::new(r.x / r.w, r.y / r.w)))
-                    } else {
-                        None
-                    }
-                })
-                .collect();
+        let projecting_screen = time(|| {
+            // let kbots = &self.game_state.kbots;
+
+            // let mut in_screen: Vec<_> = Vec::new();
+
+            // in_screen = kbots
+            //     .iter()
+            //     .flat_map(|(id, e)| {
+            //         let p = e.position.to_homogeneous();
+            //         let r = view_proj * p;
+            //         //Keeping those of the clipped space in screen (-1 1, -1 1 , 0 1)
+            //         if r.z > 0.0 && r.x < r.w && r.x > -r.w && r.y < r.w && r.y > -r.w {
+            //             Some((*id, Vector2::new(r.x / r.w, r.y / r.w)))
+            //         } else {
+            //             None
+            //         }
+            //     })
+            //     .collect();
+
+            // self.game_state.in_screen = in_screen;
+
             if let Some(me) = self.game_state.my_player() {
                 //Selection square
                 if let input_state::Drag::End { x0, y0, x1, y1 } = self.input_state.drag {
@@ -68,47 +69,34 @@ impl App {
                     self.game_state.selected.clear();
                 }
             }
-        }
+        });
 
         //Upload to gpu
         let mobile_to_gpu_duration = time(|| {
-            //Kbot
-            self.vertex_attr_buffer_f32.clear();
-            for mobile in self.game_state.kbots.values() {
-                let mat = Matrix4::face_towards(
-                    &mobile.position,
-                    &(mobile.position + mobile.dir),
-                    &Vector3::new(0.0, 0.0, 1.0),
-                );
+            {
+                //Kbot
+                self.vertex_attr_buffer_f32.clear();
 
-                // let mat = Matrix4::new(1.0,0.0,0.0,0.0,
-                // 0.0,1.0,0.0,0.0,
-                // 0.0,0.0,1.0,0.0,
-                // 0.0,0.0,0.0,1.0);
+                for mobile in self.game_state.kbots.values()
+                // .filter(|e| screen_set.contains(&e.id))
+                {
+                    let mat = mobile.trans.unwrap();
+                    let is_selected = if self.game_state.selected.contains(&mobile.id.value) {
+                        1.0
+                    } else {
+                        0.0
+                    };
+                    let team = mobile.team;
 
-                let is_selected = if self.game_state.selected.contains(&mobile.id.value) {
-                    1.0
-                } else {
-                    0.0
-                };
+                    self.vertex_attr_buffer_f32
+                        .extend_from_slice(mat.as_slice());
+                    self.vertex_attr_buffer_f32.push(is_selected);
+                    self.vertex_attr_buffer_f32.push(team as f32)
+                }
 
-                let team = self
-                    .game_state
-                    .players
-                    .values()
-                    .find(|e| e.kbots.contains(&mobile.id))
-                    .unwrap()
-                    .team;
-
-                self.vertex_attr_buffer_f32
-                    .extend_from_slice(mat.as_slice());
-                self.vertex_attr_buffer_f32.push(is_selected);
-                self.vertex_attr_buffer_f32.push(team as f32)
+                self.kbot_gpu
+                    .update_instance_dirty(&self.vertex_attr_buffer_f32[..], &self.gpu.device);
             }
-
-            self.kbot_gpu
-                .update_instance_dirty(&self.vertex_attr_buffer_f32[..], &self.gpu.device);
-
             //Kinematic Projectile
             self.vertex_attr_buffer_f32.clear();
             for mobile in self.game_state.kinematic_projectiles.values() {
@@ -211,6 +199,10 @@ impl App {
                 .update_instance(&self.vertex_attr_buffer_f32[..], &self.gpu.device);
         });
 
-        (interp_duration, mobile_to_gpu_duration)
+        self.profiler.mix("interp", interp_duration, 20);
+        self.profiler
+            .mix("mobile_to_gpu", mobile_to_gpu_duration, 20);
+        self.profiler
+            .mix("projecting_screen", projecting_screen, 20);
     }
 }
