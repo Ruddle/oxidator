@@ -280,12 +280,12 @@ impl App {
             platform.attach_window(
                 imgui.io_mut(),
                 &gpu.window,
-                imgui_winit_support::HiDpiMode::Default,
+                imgui_winit_support::HiDpiMode::Rounded,
             );
             imgui.set_ini_filename(None);
 
             let font_size = (13.0 * gpu.hidpi_factor) as f32;
-            imgui.io_mut().font_global_scale = (1.0 / gpu.hidpi_factor) as f32;
+            imgui.io_mut().font_global_scale = (1.0) as f32;
 
             imgui.fonts().add_font(&[FontSource::DefaultFontData {
                 config: Some(imgui::FontConfig {
@@ -601,6 +601,7 @@ impl App {
                 }
 
                 WindowEvent::CursorMoved { position, .. } => {
+                    let position = position.to_physical(self.gpu.hidpi_factor);
                     self.input_state.cursor_pos = (position.x as u32, position.y as u32);
                     match self.input_state.drag {
                         input_state::Drag::Start { x0, y0 }
