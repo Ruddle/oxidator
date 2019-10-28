@@ -109,7 +109,7 @@ impl NetServer {
 
                 //Info update
                 info.number_of_client_connected = net_streams.len();
-                s_info.try_send(info);
+                s_info.try_send(info).unwrap();
             }
         });
         NetServer {

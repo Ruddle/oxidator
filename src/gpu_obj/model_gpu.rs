@@ -230,7 +230,7 @@ impl ModelGpu {
         //     instance_attr.len() as u64 * 4,
         // );
 
-        self.instance_count = 0 * instance_attr.len() as u32 / 18;
+        self.instance_count = instance_attr.len() as u32 / 18;
     }
 }
 

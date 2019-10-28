@@ -1,6 +1,7 @@
 mod client;
 mod frame;
 mod frame_server;
+mod glsl;
 mod gpu_obj;
 mod heightmap_phy;
 mod manager;
@@ -10,7 +11,6 @@ mod net_client;
 mod net_server;
 mod procedural_texels;
 mod utils;
-
 extern crate byteorder;
 extern crate crossbeam_channel;
 extern crate nalgebra as na;
@@ -35,10 +35,16 @@ pub enum ToClient {
 pub enum EventLoopMsg {
     Stop,
 }
-
+use std::env;
 fn main() {
     env_logger::init();
-    do_the_thing();
+    if let Some(x) = env::args().skip(1).next() {
+        if x == "compile" {
+            glsl::compile_all_glsl();
+        }
+    } else {
+        do_the_thing();
+    }
 }
 
 fn do_the_thing() {

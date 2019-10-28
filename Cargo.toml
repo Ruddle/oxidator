@@ -55,9 +55,5 @@ features = ["winit-20"]
 name = "oxidator"
 path = "src/main.rs"
 
-[[bin]]
-name = "glsl"
-path = "src/client/glsl.rs"
-
 [profile.release]
 #lto = true

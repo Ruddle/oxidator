@@ -1,6 +1,5 @@
 extern crate nalgebra as na;
 use super::heightmap_editor;
-use crate::frame;
 use crate::frame::Frame;
 use crate::mobile;
 use crate::utils;
@@ -195,11 +194,5 @@ impl State {
         self.my_player_id
             .map(|id| self.players.get(&id))
             .unwrap_or(None)
-    }
-    pub fn my_player_mut(&mut self) -> Option<&mut Player> {
-        match self.my_player_id {
-            Some(id) => self.players.get_mut(&id),
-            None => None,
-        }
     }
 }

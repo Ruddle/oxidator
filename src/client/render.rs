@@ -401,7 +401,7 @@ impl App {
         let ub_misc = self
             .gpu
             .device
-            .create_buffer_mapped(8, wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::COPY_DST)
+            .create_buffer_mapped(10, wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::COPY_DST)
             .fill_from_slice(&[
                 self.input_state.cursor_pos.0 as f32,
                 self.input_state.cursor_pos.1 as f32,
@@ -411,9 +411,11 @@ impl App {
                 1.0 / self.gpu.sc_desc.height as f32,
                 start_drag.0,
                 start_drag.1,
+                self.game_state.heightmap_editor.pen_radius as f32,
+                self.game_state.heightmap_editor.pen_strength as f32,
             ]);
 
-        encoder_render.copy_buffer_to_buffer(&ub_misc, 0, &self.ub_misc, 0, 8 * 4);
+        encoder_render.copy_buffer_to_buffer(&ub_misc, 0, &self.ub_misc, 0, 10 * 4);
 
         self.heightmap_gpu.update_uniform(
             &self.gpu.device,
@@ -711,7 +713,7 @@ impl App {
                             r: -1.0,
                             g: -1.0,
                             b: -1.0,
-                            a: 0.0,
+                            a: -1.0,
                         },
                     },
                 ],
@@ -778,12 +780,8 @@ impl App {
                 depth_stencil_attachment: None,
             });
 
-            self.postfxaa.render(
-                &mut rpass,
-                &self.gpu.device,
-                &self.bind_group,
-                &self.first_color_att_view,
-            );
+            self.postfxaa
+                .render(&mut rpass, &self.gpu.device, &self.bind_group);
         }
 
         //Custom Ui pass

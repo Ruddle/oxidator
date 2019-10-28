@@ -241,8 +241,8 @@ impl App {
         //2 resolution
         let ub_misc = gpu
             .device
-            .create_buffer_mapped(8, wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::COPY_DST)
-            .fill_from_slice(&[0.0_f32, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]);
+            .create_buffer_mapped(10, wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::COPY_DST)
+            .fill_from_slice(&[0.0_f32, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]);
 
         // Create bind group
         let bind_group = gpu.device.create_bind_group(&wgpu::BindGroupDescriptor {
@@ -267,7 +267,7 @@ impl App {
                     binding: 3,
                     resource: wgpu::BindingResource::Buffer {
                         buffer: &ub_misc,
-                        range: 0..(8 * 4),
+                        range: 0..(10 * 4),
                     },
                 },
             ],
@@ -287,6 +287,8 @@ impl App {
 
             let font_size = (13.0 * gpu.hidpi_factor) as f32;
             imgui.io_mut().font_global_scale = (1.0) as f32;
+
+            imgui.io_mut().mouse_draw_cursor = true;
 
             imgui.fonts().add_font(&[FontSource::DefaultFontData {
                 config: Some(imgui::FontConfig {

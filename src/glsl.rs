@@ -1,13 +1,10 @@
-use super::glsl_compiler;
-
-use super::glsl_compiler::*;
-
+use crate::gpu_obj::glsl_compiler;
 use std::fs::{self, DirEntry};
 use std::io;
 use std::path::Path;
 use std::slice;
 
-fn main() {
+pub fn compile_all_glsl() {
     println!("Compile all glsl");
 
     let path = std::path::Path::new("./src/shader/");

@@ -143,7 +143,6 @@ impl PostFxaa {
         rpass: &mut RenderPass,
         device: &Device,
         main_bind_group: &BindGroup,
-        last_pass_view: &TextureView,
     ) {
         log::trace!("PostFxaa render");
         rpass.set_pipeline(&self.pipeline);
