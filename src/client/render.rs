@@ -54,7 +54,7 @@ impl App {
                             let mut player_me = Player::new();
 
                             for i in (100..300).step_by(4) {
-                                for j in (100..1600).step_by(4) {
+                                for j in (100..500).step_by(4) {
                                     let m =
                                         mobile::KBot::new(Point3::new(i as f32, j as f32, 100.0));
                                     player_me.kbots.insert(m.id);
@@ -72,7 +72,7 @@ impl App {
                             player_ennemy.team = 1;
 
                             for i in (320..520).step_by(4) {
-                                for j in (100..1600).step_by(4) {
+                                for j in (100..500).step_by(4) {
                                     let mut m =
                                         mobile::KBot::new(Point3::new(i as f32, j as f32, 100.0));
                                     m.team = 1;
@@ -105,6 +105,7 @@ impl App {
                                     .kinematic_projectiles
                                     .clone(),
                                 arrows: Vec::new(),
+                                explosions: Vec::new(),
                                 heightmap_phy: Some(self.heightmap_gpu.phy.clone()),
                                 frame_profiler: frame::ProfilerMap::new(),
                             });
@@ -811,6 +812,7 @@ impl App {
 
             self.health_bar.render(&mut rpass, &self.bind_group);
             self.unit_icon.render(&mut rpass, &self.bind_group);
+            self.explosion_gpu.render(&mut rpass, &self.bind_group);
         }
 
         let render_pass_3d = now.elapsed();

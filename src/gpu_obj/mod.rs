@@ -1,4 +1,5 @@
 pub mod arrow_gpu;
+pub mod explosion;
 pub mod glsl_compiler;
 pub mod gpu;
 pub mod health_bar;

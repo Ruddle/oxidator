@@ -5,6 +5,13 @@ use typename::TypeName;
 use utils::Id;
 
 #[derive(Clone, TypeName, Debug, Serialize, Deserialize, PartialEq)]
+pub struct ExplosionEvent {
+    pub position: Point3<f32>,
+    pub size: f32,
+    pub life_time: f32,
+}
+
+#[derive(Clone, TypeName, Debug, Serialize, Deserialize, PartialEq)]
 pub struct KBot {
     pub position: Point3<f32>,
     pub trans: Option<Matrix4<f32>>,

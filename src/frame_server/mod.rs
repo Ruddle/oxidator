@@ -94,6 +94,7 @@ impl FrameServerCache {
         frame.number += 1;
         frame.kbots_dead.clear();
         frame.heightmap_phy = None;
+        frame.explosions.clear();
 
         for event in events {
             match event {
@@ -126,6 +127,7 @@ impl FrameServerCache {
                 &frame.players,
                 &mut self.grid,
                 &mut self.small_grid,
+                &mut frame.explosions,
             );
         }
         frame_profiler.add("0 update_units", start_update_units.elapsed());
@@ -222,6 +224,7 @@ pub fn update_units(
     players: &HashMap<Id<Player>, Player>,
     grid: &mut Vec<Vec<Id<KBot>>>,
     small_grid: &mut Vec<Vec<Id<KBot>>>,
+    explosions: &mut Vec<ExplosionEvent>,
 ) {
     let start = std::time::Instant::now();
     let cell_size = 4;
@@ -509,8 +512,14 @@ pub fn update_units(
 
                             // println!("Distance {}", distance_to_target);
                             if distance_to_target < (kbot.radius + proj.radius) {
+                                //Colission between Kbot and projectile
                                 kbot.life = (kbot.life - 10).max(0);
                                 proj.positions = Vec::new();
+                                explosions.push(ExplosionEvent {
+                                    position: Point3::from(current_interp),
+                                    size: 0.5,
+                                    life_time: 0.8,
+                                });
                                 break 'interp;
                             }
                         }
@@ -614,6 +623,12 @@ pub fn update_units(
     for (id, kbot) in kbots.iter() {
         if kbot.life <= 0 {
             kbots_dead.insert(*id);
+
+            explosions.push(ExplosionEvent {
+                position: Point3::from(kbot.position),
+                size: 1.0,
+                life_time: 1.2,
+            });
         }
     }
 

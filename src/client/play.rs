@@ -201,7 +201,7 @@ impl App {
                 self.vertex_attr_buffer_f32
                     .extend_from_slice(kbot.screen_pos.as_slice());
                 //TODO f(distance) instead of 20.0
-                let size = ((1.0 / (kbot.distance_to_camera / unit_icon_distance)) * 10.0).max(4.0);
+                let size = ((1.0 / (kbot.distance_to_camera / unit_icon_distance)) * 15.0).max(4.0);
                 self.vertex_attr_buffer_f32.push(size);
 
                 let is_selected = self.game_state.selected.contains(&kbot.id.value);
@@ -209,6 +209,35 @@ impl App {
                 self.vertex_attr_buffer_f32.push(team);
             }
             self.unit_icon
+                .update_instance(&self.vertex_attr_buffer_f32[..], &self.gpu.device);
+
+            //Explosions
+            self.vertex_attr_buffer_f32.clear();
+            for explosion in self.game_state.explosions.iter() {
+                let screen_pos = view_proj * explosion.position.to_homogeneous();
+                if screen_pos.z > 0.0
+                    && screen_pos.x > -screen_pos.w
+                    && screen_pos.x < screen_pos.w
+                    && screen_pos.y > -screen_pos.w
+                    && screen_pos.y < screen_pos.w
+                {
+                    let distance =
+                        (self.game_state.position_smooth.coords - explosion.position.coords).norm();
+                    self.vertex_attr_buffer_f32
+                        .push(screen_pos.x / screen_pos.w);
+                    self.vertex_attr_buffer_f32
+                        .push(screen_pos.y / screen_pos.w);
+                    self.vertex_attr_buffer_f32
+                        .push(explosion.size * 2500.0 / distance);
+
+                    self.vertex_attr_buffer_f32.push(
+                        (self.game_state.server_sec - explosion.born_sec)
+                            / (explosion.death_sec - explosion.born_sec),
+                    );
+                    self.vertex_attr_buffer_f32.push(explosion.seed);
+                }
+            }
+            self.explosion_gpu
                 .update_instance(&self.vertex_attr_buffer_f32[..], &self.gpu.device);
         });
 

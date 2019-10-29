@@ -11,6 +11,15 @@ use utils::*;
 use crate::frame::Player;
 use mobile::*;
 
+#[derive(Clone, Copy, Debug)]
+pub struct Explosion {
+    pub position: Point3<f32>,
+    pub born_sec: f32,
+    pub death_sec: f32,
+    pub size: f32,
+    pub seed: f32,
+}
+
 pub struct State {
     pub position: Point3<f32>,
     pub dir: Vector3<f32>,
@@ -31,6 +40,8 @@ pub struct State {
     //Interpolated
     pub kbots: HashMap<Id<KBot>, KBot>,
     pub kinematic_projectiles: HashMap<Id<KinematicProjectile>, KinematicProjectile>,
+
+    pub explosions: Vec<Explosion>,
     pub server_sec: f32,
 
     pub selected: HashSet<IdValue>,
@@ -67,6 +78,8 @@ impl State {
 
             kbots: HashMap::new(),
             kinematic_projectiles: HashMap::new(),
+
+            explosions: Vec::new(),
             server_sec: 0.0,
 
             selected: HashSet::new(),
@@ -86,6 +99,20 @@ impl State {
         log::trace!("receive: NewFrame after {:?}", time_between);
         self.frame_zero_time_received = Instant::now();
         self.frame_minus_one = std::mem::replace(&mut self.frame_zero, frame);
+
+        let sec = self.frame_zero.number as f32 / 10.0;
+        let mut seed = sec * 3.141592;
+
+        for explosion in self.frame_zero.explosions.iter() {
+            seed += 1.0;
+            self.explosions.push(Explosion {
+                position: explosion.position,
+                born_sec: sec,
+                death_sec: sec + explosion.life_time,
+                size: explosion.size,
+                seed,
+            });
+        }
 
         self.selected = self
             .selected
@@ -125,6 +152,13 @@ impl State {
         }
 
         let mut kbots = self.frame_zero.kbots.clone();
+
+        self.explosions = self
+            .explosions
+            .iter()
+            .copied()
+            .filter(|e| e.death_sec > self.server_sec)
+            .collect();
 
         threadpool.install(|| {
             kbots.par_iter_mut().for_each(|(_, kbot_0)| {

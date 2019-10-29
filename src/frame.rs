@@ -93,7 +93,7 @@ pub struct Frame {
     pub kbots_dead: HashSet<Id<KBot>>,
     pub kinematic_projectiles: HashMap<Id<KinematicProjectile>, KinematicProjectile>,
     pub arrows: Vec<Arrow>,
-
+    pub explosions: Vec<ExplosionEvent>,
     pub heightmap_phy: Option<heightmap_phy::HeightmapPhy>,
     pub frame_profiler: ProfilerMap,
 }
@@ -107,6 +107,7 @@ impl Frame {
             kbots_dead: HashSet::new(),
             kinematic_projectiles: HashMap::new(),
             arrows: Vec::new(),
+            explosions: Vec::new(),
             heightmap_phy: None,
             frame_profiler: ProfilerMap::new(),
         }

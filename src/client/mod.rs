@@ -99,6 +99,7 @@ pub struct App {
     postfxaa: gpu_obj::post_fxaa::PostFxaa,
     health_bar: gpu_obj::health_bar::HealthBarGpu,
     unit_icon: gpu_obj::unit_icon::UnitIconGpu,
+    explosion_gpu: gpu_obj::explosion::ExplosionGpu,
 
     game_state: game_state::State,
     input_state: input_state::InputState,
@@ -354,6 +355,13 @@ impl App {
         let unit_icon =
             gpu_obj::unit_icon::UnitIconGpu::new(&gpu.device, format, &bind_group_layout);
 
+        let explosion_gpu = gpu_obj::explosion::ExplosionGpu::new(
+            &mut init_encoder,
+            &gpu.device,
+            format,
+            &bind_group_layout,
+        );
+
         let depth_texture = gpu.device.create_texture(&wgpu::TextureDescriptor {
             size: wgpu::Extent3d {
                 width: gpu.sc_desc.width,
@@ -459,6 +467,7 @@ impl App {
             postfxaa,
             health_bar,
             unit_icon,
+            explosion_gpu,
 
             game_state,
             input_state: input_state::InputState::new(),
@@ -790,6 +799,20 @@ impl App {
                 }) {
                     log::info!("Reloading unit_icon.vert/unit_icon.frag");
                     self.unit_icon.reload_shader(
+                        &self.gpu.device,
+                        &self.bind_group_layout,
+                        self.gpu.sc_desc.format,
+                    );
+                }
+
+                if event.paths.iter().any(|p| {
+                    p.file_name().iter().any(|name| {
+                        name.to_os_string() == "explosion.frag"
+                            || name.to_os_string() == "explosion.vert"
+                    })
+                }) {
+                    log::info!("Reloading explosion.vert/explosion.frag");
+                    self.explosion_gpu.reload_shader(
                         &self.gpu.device,
                         &self.bind_group_layout,
                         self.gpu.sc_desc.format,
