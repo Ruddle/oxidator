@@ -166,7 +166,7 @@ impl App {
                         },
                         wgpu::BindGroupLayoutBinding {
                             binding: 3,
-                            visibility: wgpu::ShaderStage::FRAGMENT,
+                            visibility: wgpu::ShaderStage::VERTEX | wgpu::ShaderStage::FRAGMENT,
                             ty: wgpu::BindingType::UniformBuffer { dynamic: false },
                         },
                     ],

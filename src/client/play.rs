@@ -53,11 +53,17 @@ impl App {
 
         //Upload to gpu
         let mobile_to_gpu_duration = time(|| {
+            let unit_icon_distance = self.game_state.unit_icon_distance;
             {
                 //Kbot
                 self.vertex_attr_buffer_f32.clear();
 
-                for mobile in self.game_state.kbots.values().filter(|e| e.is_in_screen) {
+                for mobile in self
+                    .game_state
+                    .kbots
+                    .values()
+                    .filter(|e| e.is_in_screen && e.distance_to_camera < unit_icon_distance)
+                {
                     let mat = mobile.trans.unwrap();
                     let is_selected = if self.game_state.selected.contains(&mobile.id.value) {
                         1.0
@@ -122,58 +128,81 @@ impl App {
                 .update_instance(&self.vertex_attr_buffer_f32[..], &self.gpu.device);
 
             //Unit life
-
             self.vertex_attr_buffer_f32.clear();
-            for (id, _) in self.game_state.in_screen.iter() {
-                if let Some(kbot) = self.game_state.kbots.get(id) {
-                    let distance =
-                        (self.game_state.position_smooth.coords - kbot.position.coords).magnitude();
+            for kbot in self
+                .game_state
+                .kbots
+                .values()
+                .filter(|e| e.is_in_screen && e.distance_to_camera < unit_icon_distance)
+            {
+                let distance =
+                    (self.game_state.position_smooth.coords - kbot.position.coords).magnitude();
 
-                    let alpha_range = 10.0;
-                    let max_dist = 100.0;
-                    let alpha = (1.0 + (max_dist - distance) / alpha_range)
-                        .min(1.0)
-                        .max(0.0)
-                        .powf(2.0);
+                let alpha_range = 10.0;
+                let max_dist = 100.0;
+                let alpha = (1.0 + (max_dist - distance) / alpha_range)
+                    .min(1.0)
+                    .max(0.0)
+                    .powf(2.0);
 
-                    let alpha_range = 50.0;
-                    let size_factor = (0.3 + (max_dist - distance) / alpha_range)
-                        .min(1.0)
-                        .max(0.3)
-                        .powf(1.0);
+                let alpha_range = 50.0;
+                let size_factor = (0.3 + (max_dist - distance) / alpha_range)
+                    .min(1.0)
+                    .max(0.3)
+                    .powf(1.0);
 
+                let life = kbot.life as f32 / kbot.max_life as f32;
+                if alpha > 0.0 && life < 1.0 {
+                    let w = self.gpu.sc_desc.width as f32;
+                    let h = self.gpu.sc_desc.height as f32;
+                    let half_size = Vector2::new(20.0 / w, 3.0 / h) * size_factor;
+
+                    // u is direction above kbot in camera space
+                    // right cross camera_to_unit = u
+                    let camera_to_unit =
+                        kbot.position.coords - self.game_state.position_smooth.coords;
+                    let right = Vector3::new(1.0, 0.0, 0.0);
+
+                    let u = right.cross(&camera_to_unit).normalize();
+
+                    let world_pos = kbot.position + u * kbot.radius * 1.5;
+                    let r = view_proj * world_pos.to_homogeneous();
+                    let r = r / r.w;
+
+                    let offset = Vector2::new(r.x, r.y);
+                    let min = offset - half_size;
+                    let max = offset + half_size;
                     let life = kbot.life as f32 / kbot.max_life as f32;
-                    if alpha > 0.0 && life < 1.0 {
-                        let w = self.gpu.sc_desc.width as f32;
-                        let h = self.gpu.sc_desc.height as f32;
-                        let half_size = Vector2::new(20.0 / w, 3.0 / h) * size_factor;
-
-                        // u is direction above kbot in camera space
-                        // right cross camera_to_unit = u
-                        let camera_to_unit =
-                            kbot.position.coords - self.game_state.position_smooth.coords;
-                        let right = Vector3::new(1.0, 0.0, 0.0);
-
-                        let u = right.cross(&camera_to_unit).normalize();
-
-                        let world_pos = kbot.position + u * kbot.radius * 1.5;
-                        let r = view_proj * world_pos.to_homogeneous();
-                        let r = r / r.w;
-
-                        let offset = Vector2::new(r.x, r.y);
-                        let min = offset - half_size;
-                        let max = offset + half_size;
-                        let life = kbot.life as f32 / kbot.max_life as f32;
-                        self.vertex_attr_buffer_f32
-                            .extend_from_slice(min.as_slice());
-                        self.vertex_attr_buffer_f32
-                            .extend_from_slice(max.as_slice());
-                        self.vertex_attr_buffer_f32.push(life);
-                        self.vertex_attr_buffer_f32.push(alpha);
-                    }
+                    self.vertex_attr_buffer_f32
+                        .extend_from_slice(min.as_slice());
+                    self.vertex_attr_buffer_f32
+                        .extend_from_slice(max.as_slice());
+                    self.vertex_attr_buffer_f32.push(life);
+                    self.vertex_attr_buffer_f32.push(alpha);
                 }
             }
             self.health_bar
+                .update_instance(&self.vertex_attr_buffer_f32[..], &self.gpu.device);
+
+            //Icon
+            self.vertex_attr_buffer_f32.clear();
+            for kbot in self
+                .game_state
+                .kbots
+                .values()
+                .filter(|e| e.is_in_screen && e.distance_to_camera >= unit_icon_distance)
+            {
+                self.vertex_attr_buffer_f32
+                    .extend_from_slice(kbot.screen_pos.as_slice());
+                //TODO f(distance) instead of 20.0
+                let size = ((1.0 / (kbot.distance_to_camera / unit_icon_distance)) * 10.0).max(4.0);
+                self.vertex_attr_buffer_f32.push(size);
+
+                let is_selected = self.game_state.selected.contains(&kbot.id.value);
+                let team = if is_selected { -1.0 } else { kbot.team as f32 };
+                self.vertex_attr_buffer_f32.push(team);
+            }
+            self.unit_icon
                 .update_instance(&self.vertex_attr_buffer_f32[..], &self.gpu.device);
         });
 

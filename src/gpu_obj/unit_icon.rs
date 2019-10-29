@@ -80,7 +80,7 @@ impl UnitIconGpu {
             depth_stencil_state: None,
             index_format: wgpu::IndexFormat::Uint32,
             vertex_buffers: &[wgpu::VertexBufferDescriptor {
-                stride: (4 * (2 + 2 + 2)) as wgpu::BufferAddress,
+                stride: (4 * (4)) as wgpu::BufferAddress,
                 step_mode: wgpu::InputStepMode::Instance,
                 attributes: &[
                     wgpu::VertexAttributeDescriptor {
@@ -89,19 +89,14 @@ impl UnitIconGpu {
                         shader_location: 0,
                     },
                     wgpu::VertexAttributeDescriptor {
-                        format: wgpu::VertexFormat::Float2,
+                        format: wgpu::VertexFormat::Float,
                         offset: 4 * 2,
                         shader_location: 1,
                     },
                     wgpu::VertexAttributeDescriptor {
                         format: wgpu::VertexFormat::Float,
-                        offset: 4 * 4,
+                        offset: 4 * 3,
                         shader_location: 2,
-                    },
-                    wgpu::VertexAttributeDescriptor {
-                        format: wgpu::VertexFormat::Float,
-                        offset: 4 * 5,
-                        shader_location: 3,
                     },
                 ],
             }],
@@ -127,7 +122,7 @@ impl UnitIconGpu {
             .fill_from_slice(instance_attr);
 
         std::mem::replace(&mut self.instance_buf, temp_buf);
-        self.instance_count = instance_attr.len() as u32 / 6;
+        self.instance_count = instance_attr.len() as u32 / 4;
     }
 }
 

@@ -1,5 +1,5 @@
 use crate::utils;
-use na::{Matrix4, Point3, Vector3};
+use na::{Matrix4, Point3, Vector2, Vector3};
 use serde::{Deserialize, Serialize};
 use typename::TypeName;
 use utils::Id;
@@ -9,6 +9,8 @@ pub struct KBot {
     pub position: Point3<f32>,
     pub trans: Option<Matrix4<f32>>,
     pub is_in_screen: bool,
+    pub distance_to_camera: f32,
+    pub screen_pos: Vector2<f32>,
     pub speed: Vector3<f32>,
     pub dir: Vector3<f32>,
     pub target: Option<Point3<f32>>,
@@ -32,6 +34,8 @@ impl KBot {
             speed: Vector3::new(0.0, 0.0, 0.0),
             trans: None,
             is_in_screen: false,
+            distance_to_camera: 0.0,
+            screen_pos: Vector2::new(0.0, 0.0),
             team: 0,
             dir: Vector3::new(1.0, 0.0, 0.0),
             target: None,

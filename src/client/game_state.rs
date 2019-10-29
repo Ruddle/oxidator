@@ -44,6 +44,9 @@ pub struct State {
     pub players: HashMap<Id<Player>, Player>,
 
     pub fps: u64,
+
+    //parameters
+    pub unit_icon_distance: f32,
 }
 
 impl State {
@@ -76,6 +79,7 @@ impl State {
             start_time: Instant::now(),
             last_frame: Instant::now(),
             fps: 144,
+            unit_icon_distance: 200.0,
         }
     }
 
@@ -105,19 +109,19 @@ impl State {
         log::trace!("server_sec {}", self.server_sec);
 
         use rayon::prelude::*;
-
-        self.in_screen.clear();
-
         fn test_screen(
             id: Id<KBot>,
             position: Point3<f32>,
             view_proj: &Matrix4<f32>,
-        ) -> Option<(Id<KBot>, Vector2<f32>)> {
+            cam_pos: Point3<f32>,
+        ) -> Option<(Id<KBot>, Vector2<f32>, f32)> {
             let p = position.to_homogeneous();
             let r = view_proj * p;
             //Keeping those of the clipped space in screen (-1 1, -1 1 , 0 1)
             if r.z > 0.0 && r.x < r.w && r.x > -r.w && r.y < r.w && r.y > -r.w {
-                Some((id, Vector2::new(r.x / r.w, r.y / r.w)))
+                // log::debug!("z {}", r.w);
+                // log::debug!("d {}", (position.coords - cam_pos.coords).norm());
+                Some((id, Vector2::new(r.x / r.w, r.y / r.w), r.w))
             } else {
                 None
             }
@@ -126,6 +130,7 @@ impl State {
         let mut kbots = self.frame_zero.kbots.clone();
 
         let mut in_screen: Vec<_> = Vec::new();
+        let cam_pos = self.position;
         threadpool.install(|| {
             in_screen = kbots
                 .par_iter_mut()
@@ -133,30 +138,26 @@ impl State {
                     if let Some(kbot_m) = self.frame_minus_one.kbots.get(&kbot_0.id) {
                         let position = kbot_0.position * i0 + (im * kbot_m.position).coords;
                         let dir = kbot_0.dir * i0 + kbot_m.dir * im;
-                        let mat = Matrix4::face_towards(
-                            &position,
-                            &(position + dir),
-                            &Vector3::new(0.0, 0.0, 1.0),
-                        );
-                        let trans = Some(mat);
                         kbot_0.position = position;
                         kbot_0.dir = dir;
-                        kbot_0.trans = trans;
-                    } else {
-                        let mat = Matrix4::face_towards(
-                            &kbot_0.position,
-                            &(kbot_0.position + kbot_0.dir),
-                            &Vector3::new(0.0, 0.0, 1.0),
-                        );
-
-                        let trans = Some(mat);
-                        kbot_0.trans = trans;
                     }
 
-                    let screen = test_screen(kbot_0.id, kbot_0.position, view_proj);
-                    if screen.is_some() {
-                        kbot_0.is_in_screen = true;
+                    let screen = test_screen(kbot_0.id, kbot_0.position, view_proj, cam_pos);
+                    match screen {
+                        Some((_, screen_pos, distance_to_camera)) => {
+                            kbot_0.is_in_screen = true;
+                            let mat = Matrix4::face_towards(
+                                &kbot_0.position,
+                                &(kbot_0.position + kbot_0.dir),
+                                &Vector3::new(0.0, 0.0, 1.0),
+                            );
+                            kbot_0.trans = Some(mat);
+                            kbot_0.distance_to_camera = distance_to_camera;
+                            kbot_0.screen_pos = screen_pos;
+                        }
+                        _ => {}
                     }
+
                     screen
                 })
                 .collect();
@@ -164,7 +165,11 @@ impl State {
 
         self.kbots = kbots;
 
-        self.in_screen = in_screen.iter().flatten().copied().collect();
+        self.in_screen = in_screen
+            .iter()
+            .flatten()
+            .map(|(a, b, c)| (a.clone(), b.clone()))
+            .collect();
 
         self.kinematic_projectiles.clear();
         for kine_0 in self.frame_zero.kinematic_projectiles.values() {
