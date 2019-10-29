@@ -19,7 +19,7 @@ trait IdBase {
     type Type;
 }
 
-pub type IdValue = u32;
+pub type IdValue = u64;
 
 #[derive(Serialize, Deserialize)]
 pub struct Id<T> {
@@ -37,32 +37,14 @@ impl<T> Id<T> {
 }
 
 impl<T: typename::TypeName> fmt::Display for Id<T> {
-    // This trait requires `fmt` with this exact signature.
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        // Write strictly the first element into the supplied output
-        // stream: `f`. Returns `fmt::Result` which indicates whether the
-        // operation succeeded or failed. Note that `write!` uses syntax which
-        // is very similar to `println!`.
-
-        let x: [u8; 4] = unsafe { std::mem::transmute(self.value.to_le()) };
-        write!(
-            f,
-            "{:?} {}",
-            T::type_name(),
-            base62::encode(&x) // format!("{:X}", self.value)
-        )
+        write!(f, "{:?}", self)
     }
 }
 
 impl<T: typename::TypeName> fmt::Debug for Id<T> {
-    // This trait requires `fmt` with this exact signature.
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        // Write strictly the first element into the supplied output
-        // stream: `f`. Returns `fmt::Result` which indicates whether the
-        // operation succeeded or failed. Note that `write!` uses syntax which
-        // is very similar to `println!`.
-
-        let x: [u8; 4] = unsafe { std::mem::transmute(self.value.to_le()) };
+        let x: [u8; 8] = unsafe { std::mem::transmute(self.value.to_le()) };
         write!(
             f,
             "{:?} {}",

@@ -31,10 +31,16 @@ impl App {
                     let max_y = (y0.max(y1) as f32 / self.gpu.sc_desc.height as f32) * 2.0 - 1.0;
                     let selected: HashSet<IdValue> = self
                         .game_state
-                        .in_screen
+                        .kbots
                         .iter()
-                        .filter(|(id, e)| me.kbots.contains(id))
-                        .filter(|(_, e)| e.x > min_x && e.x < max_x && e.y < max_y && e.y > min_y)
+                        .filter(|(id, e)| {
+                            e.is_in_screen
+                                && me.kbots.contains(id)
+                                && e.screen_pos.x > min_x
+                                && e.screen_pos.x < max_x
+                                && e.screen_pos.y < max_y
+                                && e.screen_pos.y > min_y
+                        })
                         .map(|(i, _)| i.value)
                         .collect();
 
