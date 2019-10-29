@@ -21,26 +21,6 @@ impl App {
 
         // Projecting on screen
         let projecting_screen = time(|| {
-            // let kbots = &self.game_state.kbots;
-
-            // let mut in_screen: Vec<_> = Vec::new();
-
-            // in_screen = kbots
-            //     .iter()
-            //     .flat_map(|(id, e)| {
-            //         let p = e.position.to_homogeneous();
-            //         let r = view_proj * p;
-            //         //Keeping those of the clipped space in screen (-1 1, -1 1 , 0 1)
-            //         if r.z > 0.0 && r.x < r.w && r.x > -r.w && r.y < r.w && r.y > -r.w {
-            //             Some((*id, Vector2::new(r.x / r.w, r.y / r.w)))
-            //         } else {
-            //             None
-            //         }
-            //     })
-            //     .collect();
-
-            // self.game_state.in_screen = in_screen;
-
             if let Some(me) = self.game_state.my_player() {
                 //Selection square
                 if let input_state::Drag::End { x0, y0, x1, y1 } = self.input_state.drag {
@@ -77,9 +57,7 @@ impl App {
                 //Kbot
                 self.vertex_attr_buffer_f32.clear();
 
-                for mobile in self.game_state.kbots.values()
-                // .filter(|e| screen_set.contains(&e.id))
-                {
+                for mobile in self.game_state.kbots.values().filter(|e| e.is_in_screen) {
                     let mat = mobile.trans.unwrap();
                     let is_selected = if self.game_state.selected.contains(&mobile.id.value) {
                         1.0

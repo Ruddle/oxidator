@@ -153,7 +153,9 @@ impl State {
                         kbot_0.trans = trans;
                     }
 
-                    test_screen(kbot_0.id, kbot_0.position, view_proj)
+                    let screen = test_screen(kbot_0.id, kbot_0.position, view_proj);
+                    kbot_0.is_in_screen = true;
+                    screen
                 })
                 .collect();
         });
