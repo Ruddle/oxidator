@@ -10,6 +10,7 @@ mod model;
 mod net_client;
 mod net_server;
 mod procedural_texels;
+
 mod utils;
 extern crate byteorder;
 extern crate crossbeam_channel;

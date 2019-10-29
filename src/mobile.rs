@@ -8,6 +8,7 @@ use utils::Id;
 pub struct KBot {
     pub position: Point3<f32>,
     pub trans: Option<Matrix4<f32>>,
+    pub is_in_screen: bool,
     pub speed: Vector3<f32>,
     pub dir: Vector3<f32>,
     pub target: Option<Point3<f32>>,
@@ -30,6 +31,7 @@ impl KBot {
             position,
             speed: Vector3::new(0.0, 0.0, 0.0),
             trans: None,
+            is_in_screen: false,
             team: 0,
             dir: Vector3::new(1.0, 0.0, 0.0),
             target: None,
