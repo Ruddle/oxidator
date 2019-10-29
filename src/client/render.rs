@@ -398,6 +398,11 @@ impl App {
             }
         }
 
+        let radius = if self.main_menu == MainMode::MapEditor {
+            self.game_state.heightmap_editor.pen_radius as f32
+        } else {
+            0.0
+        };
         let ub_misc = self
             .gpu
             .device
@@ -411,7 +416,7 @@ impl App {
                 1.0 / self.gpu.sc_desc.height as f32,
                 start_drag.0,
                 start_drag.1,
-                self.game_state.heightmap_editor.pen_radius as f32,
+                radius,
                 self.game_state.heightmap_editor.pen_strength as f32,
             ]);
 

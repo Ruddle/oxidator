@@ -11,34 +11,33 @@ layout(set = 0, binding = 3) uniform Locals {
     vec2 inv_resolution;
     vec2 start_drag;
     float pen_radius;
-     float pen_strength;
+    float pen_strength;
 };
 
 void main() {
 
 
     vec4 pos_attachment =  texture(sampler2D(t_pos, s_pos), v_TexCoord);
-    vec3 frag_pos = pos_attachment.xyz;
-
+    float alpha= 0;
     vec3 color = vec3(1.0);
 
-    //Cursor circle
-    vec3 mouse_pos_world = texture(sampler2D(t_pos, s_pos), mouse_pos/resolution).xyz;
-    float dist = length(frag_pos.xy - mouse_pos_world.xy);
-    float distance_to_sphere  = length(pen_radius - dist);
-    float base = clamp(1-distance_to_sphere,0.0,1.0);
-    float alpha=  pow(min(base,0.01)/0.01,2.0);
-
-    if (dist < pen_radius){
-        alpha= max(alpha, 0.5*pen_strength/10.0 );
+    if (pen_radius >0){
+        vec3 frag_pos = pos_attachment.xyz;
+        color = vec3(1.0);
+        //Cursor circle
+        vec3 mouse_pos_world = texture(sampler2D(t_pos, s_pos), mouse_pos/resolution).xyz;
+        float dist = length(frag_pos.xy - mouse_pos_world.xy);
+        float distance_to_sphere  = length(pen_radius - dist);
+        float base = clamp(1-distance_to_sphere,0.0,1.0);
+        alpha=  pow(min(base,0.01)/0.01,2.0);
+        if (dist < pen_radius){
+            alpha= max(alpha, 0.5*pen_strength/10.0 );
+        }
+        if (mouse_pos_world.x <0.0 || frag_pos.x < 0.0 || frag_pos.y <0.0){
+            alpha = 0;
+        }
     }
-
-    if (mouse_pos_world.x <0.0 || frag_pos.x < 0.0 || frag_pos.y <0.0){
-        alpha = 0;
-    }
-
-    
-
+ 
     // //Unit selection
     bool is_selected_area = pos_attachment.a >= 0.99;
 
