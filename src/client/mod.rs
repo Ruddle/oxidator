@@ -14,6 +14,7 @@ use imgui_winit_support;
 use imgui_winit_support::WinitPlatform;
 mod camera;
 mod game_state;
+mod unit_editor;
 
 mod heightmap_editor;
 mod input_state;
@@ -25,10 +26,10 @@ use crate::heightmap_phy;
 use log::info;
 use spin_sleep::LoopHelper;
 use std::collections::{HashMap, HashSet};
+use std::path::{Path, PathBuf};
 use std::time::Instant;
 use utils::time;
 use wgpu::{BufferMapAsyncResult, Extent3d, SwapChain, TextureFormat};
-
 use winit::event::WindowEvent;
 
 pub struct StartClient {
@@ -62,6 +63,7 @@ enum RenderEvent {
 pub enum MainMode {
     Home,
     Play,
+    UnitEditor,
     MapEditor,
     MultiplayerLobby,
 }
@@ -71,6 +73,12 @@ pub enum NetMode {
     Offline,
     Server,
     Client,
+}
+
+pub enum GenericGpuState {
+    ToLoad(model::TriangleList),
+    Ready(ModelGpu),
+    Error(String),
 }
 
 pub struct App {
@@ -83,7 +91,7 @@ pub struct App {
     position_att_view: wgpu::TextureView,
 
     heightmap_gpu: HeightmapGpu,
-    cube_gpu: ModelGpu,
+    generic_gpu: HashMap<PathBuf, GenericGpuState>,
     kbot_gpu: ModelGpu,
     arrow_gpu: ArrowGpu,
     kinematic_projectile_gpu: ModelGpu,
@@ -107,6 +115,8 @@ pub struct App {
 
     main_menu: MainMode,
     net_mode: NetMode,
+
+    unit_editor: unit_editor::UnitEditor,
 
     sender_to_client: crossbeam_channel::Sender<ToClient>,
     receiver_to_client: crossbeam_channel::Receiver<ToClient>,
@@ -321,14 +331,8 @@ impl App {
             heightmap_phy::HeightmapPhy::new(2048, 2048),
         );
 
-        let cube_gpu = ModelGpu::new(
-            &model::create_cube(),
-            &gpu.device,
-            format,
-            &bind_group_layout,
-        );
-
         let kbot_gpu = ModelGpu::new(
+            // &crate::model::open_obj("./src/asset/tank/tank-base.obj"), //
             &model::create_cube(),
             &gpu.device,
             format,
@@ -343,7 +347,7 @@ impl App {
         );
 
         let arrow_gpu = ArrowGpu::new(
-            &model::open_arrow(),
+            &model::open_obj("./src/asset/arrow.obj").unwrap(),
             &gpu.device,
             format,
             &bind_group_layout,
@@ -451,8 +455,8 @@ impl App {
             bind_group_layout,
             ub_camera_mat,
             ub_misc,
-            cube_gpu,
             kbot_gpu,
+            generic_gpu: HashMap::new(),
             kinematic_projectile_gpu,
             arrow_gpu,
             heightmap_gpu,
@@ -474,6 +478,7 @@ impl App {
             imgui_wrap,
             main_menu: MainMode::Home,
             net_mode: NetMode::Offline,
+            unit_editor: unit_editor::UnitEditor::new(),
 
             sender_to_client,
             receiver_to_client,
@@ -623,6 +628,13 @@ impl App {
 
                 WindowEvent::CursorMoved { position, .. } => {
                     let position = position.to_physical(self.gpu.hidpi_factor);
+
+                    let (old_x, old_y) = self.input_state.cursor_pos;
+
+                    self.input_state.cursor_offset = (
+                        position.x as i32 - old_x as i32,
+                        position.y as i32 - old_y as i32,
+                    );
                     self.input_state.cursor_pos = (position.x as u32, position.y as u32);
                     match self.input_state.drag {
                         input_state::Drag::Start { x0, y0 }
@@ -752,11 +764,6 @@ impl App {
                     })
                 }) {
                     log::info!("Reloading cube_instanced.vert/cube_instanced.frag");
-                    self.cube_gpu.reload_shader(
-                        &self.gpu.device,
-                        &self.bind_group_layout,
-                        self.gpu.sc_desc.format,
-                    );
                     self.kbot_gpu.reload_shader(
                         &self.gpu.device,
                         &self.bind_group_layout,

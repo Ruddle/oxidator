@@ -37,12 +37,12 @@ pub struct State {
     pub frame_zero: Frame,
     pub frame_zero_time_received: Instant,
 
-    //Interpolated
+    //Interpolated from curve
     pub kbots: HashMap<Id<KBot>, KBot>,
     pub kinematic_projectiles: HashMap<Id<KinematicProjectile>, KinematicProjectile>,
-
-    pub explosions: Vec<Explosion>,
     pub server_sec: f32,
+    //Extrapolated from events
+    pub explosions: Vec<Explosion>,
 
     pub selected: HashSet<IdValue>,
 

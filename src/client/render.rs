@@ -13,7 +13,7 @@ use wgpu::{BufferMapAsyncResult, Extent3d};
 impl App {
     pub fn render(&mut self) {
         let frame_time = self.game_state.last_frame.elapsed();
-        self.profiler.add("frame_time", frame_time);
+        self.profiler.mix("frame_time", frame_time, 20);
 
         log::trace!("sleep");
         self.loop_helper.loop_sleep();
@@ -22,7 +22,8 @@ impl App {
 
         let capped_frame_time = self.game_state.last_frame.elapsed();
 
-        self.profiler.add("capped_frame_time", capped_frame_time);
+        self.profiler
+            .mix("capped_frame_time", capped_frame_time, 20);
         self.game_state.last_frame = Instant::now();
 
         let sim_sec = capped_frame_time.as_secs_f32();
@@ -36,7 +37,7 @@ impl App {
                     from,
                     to: MainMode::MapEditor,
                 } => {
-                    self.clear_from_play();
+                    self.clear_gpu_instance_and_game_state();
                     self.game_state.position = Point3::new(1024.0, 400.0, 1100.0);
                     self.game_state.dir = Vector3::new(0.0, 0.3, -1.0);
                 }
@@ -45,89 +46,7 @@ impl App {
                     from,
                     to: MainMode::Play,
                 } => {
-                    match self.net_mode {
-                        NetMode::Offline | NetMode::Server => {
-                            self.clear_from_play();
-                            self.game_state.position = Point3::new(300.0, 100.0, 50.0);
-                            self.game_state.dir = Vector3::new(0.0, 0.3, -1.0);
-
-                            let mut player_me = Player::new();
-
-                            for i in (100..300).step_by(4) {
-                                for j in (100..500).step_by(4) {
-                                    let m =
-                                        mobile::KBot::new(Point3::new(i as f32, j as f32, 100.0));
-                                    player_me.kbots.insert(m.id);
-                                    self.game_state.kbots.insert(m.id, m);
-                                }
-                            }
-
-                            // {
-                            //     let m = mobile::KBot::new(Point3::new(100.0, 100.0, 100.0));
-                            //     player_me.kbots.insert(m.id);
-                            //     self.game_state.kbots.insert(m.id, m);
-                            // }
-
-                            let mut player_ennemy = Player::new();
-                            player_ennemy.team = 1;
-
-                            for i in (320..520).step_by(4) {
-                                for j in (100..500).step_by(4) {
-                                    let mut m =
-                                        mobile::KBot::new(Point3::new(i as f32, j as f32, 100.0));
-                                    m.team = 1;
-                                    player_ennemy.kbots.insert(m.id);
-                                    self.game_state.kbots.insert(m.id, m);
-                                }
-                            }
-
-                            // {
-                            //     let m = mobile::KBot::new(Point3::new(120.0, 100.0, 100.0));
-                            //     player_ennemy.kbots.insert(m.id);
-                            //     self.game_state.kbots.insert(m.id, m);
-                            // }
-
-                            log::info!("Starting a game with {} bots", self.game_state.kbots.len());
-
-                            self.game_state.my_player_id = Some(player_me.id);
-                            self.game_state.players.insert(player_me.id, player_me);
-                            self.game_state
-                                .players
-                                .insert(player_ennemy.id, player_ennemy);
-
-                            let replacer = FrameEventFromPlayer::ReplaceFrame(frame::Frame {
-                                number: 0,
-                                players: self.game_state.players.clone(),
-                                kbots: self.game_state.kbots.clone(),
-                                kbots_dead: HashSet::new(),
-                                kinematic_projectiles: self
-                                    .game_state
-                                    .kinematic_projectiles
-                                    .clone(),
-                                arrows: Vec::new(),
-                                explosions: Vec::new(),
-                                heightmap_phy: Some(self.heightmap_gpu.phy.clone()),
-                                frame_profiler: frame::ProfilerMap::new(),
-                            });
-                            let _ = self
-                                .sender_from_client_to_manager
-                                .try_send(client::FromClient::PlayerInput(replacer));
-                        }
-
-                        NetMode::Client => {
-                            self.clear_from_play();
-                            self.game_state.position = Point3::new(300.0, 100.0, 50.0);
-                            self.game_state.dir = Vector3::new(0.0, 0.3, -1.0);
-                            self.game_state.my_player_id = self
-                                .game_state
-                                .frame_zero
-                                .players
-                                .values()
-                                .filter(|p| p.team == 1)
-                                .map(|p| p.id.clone())
-                                .next();
-                        }
-                    }
+                    self.init_play();
                 }
 
                 RenderEvent::ChangeMode {
@@ -150,6 +69,12 @@ impl App {
                     from,
                     to: MainMode::MultiplayerLobby,
                 } => {}
+                RenderEvent::ChangeMode {
+                    from,
+                    to: MainMode::UnitEditor,
+                } => {
+                    self.init_unit_editor();
+                }
                 _ => {
                     log::info!("Something else");
                 }
@@ -174,109 +99,11 @@ impl App {
         let mode_with_camera = [MainMode::Play, MainMode::MapEditor];
         // Camera Movements
         if mode_with_camera.contains(&self.main_menu) {
-            use winit::event::VirtualKeyCode as Key;
-            let key_pressed = &self.input_state.key_pressed;
-            let on = |vkc| key_pressed.contains(&vkc);
+            self.rts_camera(sim_sec);
+        }
 
-            let mut offset = Vector3::new(0.0, 0.0, 0.0);
-            let mut dir_offset = self.game_state.dir.clone();
-            let mut new_dir = None;
-
-            let camera_ground_height = self.heightmap_gpu.phy.z(
-                self.game_state
-                    .position
-                    .x
-                    .max(0.0)
-                    .min(self.heightmap_gpu.phy.width as f32 - 1.0),
-                self.game_state
-                    .position
-                    .y
-                    .max(0.0)
-                    .min(self.heightmap_gpu.phy.height as f32 - 1.0),
-            );
-            let height_from_ground = self.game_state.position.z - camera_ground_height;
-            let distance_camera_middle_screen = self
-                .game_state
-                .screen_center_world_pos
-                .map(|scwp| (self.game_state.position.coords - scwp).magnitude())
-                .unwrap_or(height_from_ground);
-            let k = (if !on(Key::LShift) { 1.0 } else { 2.0 })
-                * distance_camera_middle_screen.max(10.0);
-            //Game
-            if on(Key::S) {
-                offset.y -= k;
-            }
-            if on(Key::Z) {
-                offset.y += k;
-            }
-            if on(Key::Q) {
-                offset.x -= k;
-            }
-            if on(Key::D) {
-                offset.x += k;
-            }
-
-            if on(Key::LControl) {
-                if let Some(screen_center_world_pos) = self.game_state.screen_center_world_pos {
-                    if self.input_state.last_scroll != 0.0 {
-                        let camera_to_center =
-                            screen_center_world_pos - self.game_state.position.coords;
-
-                        let distance = camera_to_center.norm();
-
-                        let mut new_camera_to_center = camera_to_center.normalize();
-
-                        if self.input_state.last_scroll > 0.0 {
-                            new_camera_to_center.y += 1.0 * 0.30;
-                        }
-                        if self.input_state.last_scroll < 0.0 {
-                            new_camera_to_center.z -= 1.0 * 0.30;
-                        }
-                        new_camera_to_center.x = 0.0;
-
-                        new_camera_to_center = new_camera_to_center.normalize();
-                        new_camera_to_center.y = new_camera_to_center.y.max(0.01);
-
-                        new_dir = Some(new_camera_to_center);
-                        let new_pos =
-                            screen_center_world_pos - new_camera_to_center.normalize() * distance;
-                        offset += (new_pos - self.game_state.position.coords) / sim_sec;
-                    }
-                } else {
-                    if self.input_state.last_scroll > 0.0 {
-                        dir_offset.y += 0.010 / sim_sec;
-                    }
-                    if self.input_state.last_scroll < 0.0 {
-                        dir_offset.z -= 0.010 / sim_sec;
-                    }
-                }
-            } else {
-                if let Some(mouse_world_pos) = self.game_state.mouse_world_pos {
-                    let u = (mouse_world_pos - self.game_state.position.coords).normalize();
-                    offset += self.input_state.last_scroll * u * k * 0.75 * 0.320 / sim_sec;
-                } else {
-                    offset.z = -self.input_state.last_scroll * k * 0.75 * 0.20 / sim_sec;
-                }
-            }
-
-            self.input_state.last_scroll = 0.0;
-
-            self.game_state.position += offset * sim_sec;
-            self.game_state.dir = (self.game_state.dir + dir_offset * 33.0 * sim_sec).normalize();
-
-            new_dir.map(|new_dir| {
-                self.game_state.dir = new_dir;
-            });
-
-            self.game_state.position.z = self.game_state.position.z.max(camera_ground_height + 3.0);
-
-            self.game_state.position_smooth += (self.game_state.position.coords
-                - self.game_state.position_smooth.coords)
-                * sim_sec.min(0.033)
-                * 15.0;
-
-            self.game_state.dir_smooth +=
-                (self.game_state.dir - self.game_state.dir_smooth) * sim_sec.min(0.033) * 15.0;
+        if self.main_menu == MainMode::UnitEditor {
+            self.orbit_camera(sim_sec);
         }
 
         let heightmap_editor_duration = time(|| {
@@ -292,7 +119,7 @@ impl App {
         });
 
         self.profiler
-            .add("heightmap_editor", heightmap_editor_duration);
+            .mix("heightmap_editor", heightmap_editor_duration, 20);
 
         //Render
         let mut encoder_render = self
@@ -300,9 +127,31 @@ impl App {
             .device
             .create_command_encoder(&wgpu::CommandEncoderDescriptor { todo: 0 });
 
-        if self.main_menu == MainMode::Play {
-            self.handle_play(sim_sec, &mut encoder_render)
+        //Load pending generic gpu
+        for (path, generic_gpu_state) in self.generic_gpu.iter_mut() {
+            if let GenericGpuState::ToLoad(tri_list) = generic_gpu_state {
+                let mut generic_gpu = ModelGpu::new(
+                    &tri_list,
+                    &self.gpu.device,
+                    self.gpu.sc_desc.format,
+                    &self.bind_group_layout,
+                );
+                log::debug!("Load pending generic gpu {:?} ", path);
+                let mut generic_gpu_state_new = GenericGpuState::Ready(generic_gpu);
+                std::mem::replace(generic_gpu_state, generic_gpu_state_new);
+            }
         }
+
+        let view_proj = camera::create_view_proj(
+            self.gpu.sc_desc.width as f32 / self.gpu.sc_desc.height as f32,
+            &self.game_state.position_smooth,
+            &self.game_state.dir_smooth,
+        );
+        if self.main_menu == MainMode::Play {
+            self.handle_play(sim_sec, &mut encoder_render, &view_proj);
+        }
+
+        self.upload_to_gpu(&view_proj, &mut encoder_render);
 
         let heightmap_gpu_step_duration = time(|| {
             self.heightmap_gpu
@@ -310,7 +159,7 @@ impl App {
         });
 
         self.profiler
-            .add("heightmap_gpu_step", heightmap_gpu_step_duration);
+            .mix("heightmap_gpu_step", heightmap_gpu_step_duration, 20);
 
         let cursor_sample_position = self
             .gpu
@@ -555,10 +404,7 @@ impl App {
                         home_window
                             // .size([w, h], imgui::Condition::Always)
                             .position(
-                                [
-                                    (self.gpu.sc_desc.width as f32 - w) / 2.0,
-                                    (self.gpu.sc_desc.height as f32 - h) / 2.0,
-                                ],
+                                [(self.gpu.sc_desc.width as f32 - w) / 2.0, 100.0],
                                 imgui::Condition::Always,
                             )
                             .title_bar(false)
@@ -573,6 +419,9 @@ impl App {
                                 }
                                 if ui.button(im_str!("Map Editor"), [200.0_f32, 100.0]) {
                                     next_mode = MainMode::MapEditor;
+                                }
+                                if ui.button(im_str!("Unit Editor"), [200.0_f32, 100.0]) {
+                                    next_mode = MainMode::UnitEditor;
                                 }
                                 if ui.button(im_str!("Multiplayer"), [200.0_f32, 100.0]) {
                                     next_mode = MainMode::MultiplayerLobby;
@@ -598,6 +447,13 @@ impl App {
                         self.game_state
                             .heightmap_editor
                             .draw_ui(&ui, &mut self.heightmap_gpu);
+                    }
+                    MainMode::UnitEditor => {
+                        Self::draw_unit_editor_ui(
+                            &ui,
+                            &mut self.unit_editor,
+                            &mut self.generic_gpu,
+                        );
                     }
                     MainMode::MultiplayerLobby => {
                         let w = 216.0;
@@ -689,7 +545,7 @@ impl App {
                 .platform
                 .prepare_render(&ui, &self.gpu.window);
         }
-        self.profiler.add("imgui_render", start.elapsed());
+        self.profiler.mix("imgui_render", start.elapsed(), 20);
 
         let frame = &self.gpu.swap_chain.get_next_texture();
         let now = Instant::now();
@@ -735,7 +591,14 @@ impl App {
             });
 
             self.heightmap_gpu.render(&mut rpass, &self.bind_group);
-            self.cube_gpu.render(&mut rpass, &self.bind_group);
+            for (path, generic_gpu_state) in self.generic_gpu.iter_mut() {
+                match generic_gpu_state {
+                    GenericGpuState::Ready(model_gpu) => {
+                        model_gpu.render(&mut rpass, &self.bind_group);
+                    }
+                    _ => {}
+                }
+            }
             self.kbot_gpu.render(&mut rpass, &self.bind_group);
             self.kinematic_projectile_gpu
                 .render(&mut rpass, &self.bind_group);
@@ -817,7 +680,7 @@ impl App {
 
         let render_pass_3d = now.elapsed();
 
-        self.profiler.add("render_pass_3d", render_pass_3d);
+        self.profiler.mix("render_pass_3d", render_pass_3d, 20);
 
         self.imgui_wrap
             .renderer
@@ -829,7 +692,8 @@ impl App {
             .device
             .get_queue()
             .submit(&[encoder_render.finish()]);
-        self.profiler.add("device queue submit", start.elapsed());
+        self.profiler
+            .mix("device queue submit", start.elapsed(), 20);
 
         if let (true, Some(id), Some(mouse_world_pos)) = (
             self.input_state

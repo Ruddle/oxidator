@@ -19,6 +19,7 @@ pub struct InputState {
     pub drag: Drag,
     pub last_scroll: f32,
     pub cursor_pos: (u32, u32),
+    pub cursor_offset: (i32, i32),
 }
 
 impl InputState {
@@ -32,6 +33,7 @@ impl InputState {
             mouse_release: HashSet::new(),
             last_scroll: 0.0,
             cursor_pos: (0, 0),
+            cursor_offset: (0, 0),
             drag: Drag::None,
         }
     }
@@ -44,5 +46,7 @@ impl InputState {
         if let Drag::End { .. } = self.drag {
             self.drag = Drag::None;
         }
+        self.last_scroll = 0.0;
+        self.cursor_offset = (0, 0);
     }
 }

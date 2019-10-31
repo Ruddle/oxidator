@@ -108,3 +108,37 @@ where
     f();
     start.elapsed()
 }
+use std::fs::{self, DirEntry};
+use std::io;
+use std::path::{Path, PathBuf};
+
+#[derive(Clone, Debug)]
+pub enum FileTree {
+    Unknown,
+    Node {
+        path: PathBuf,
+        children: Vec<FileTree>,
+    },
+    Leaf {
+        path: PathBuf,
+    },
+}
+
+impl FileTree {
+    pub fn new(path: PathBuf) -> Self {
+        if path.is_dir() {
+            let mut nodes = Vec::new();
+            for entry in fs::read_dir(path.clone()).unwrap() {
+                let entry = entry.unwrap();
+                let path = entry.path();
+                nodes.push(Self::new(path));
+            }
+            FileTree::Node {
+                path: path.to_owned(),
+                children: nodes,
+            }
+        } else {
+            FileTree::Leaf { path }
+        }
+    }
+}
