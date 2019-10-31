@@ -53,7 +53,7 @@ impl App {
                 //     self.game_state.kbots.insert(m.id, m);
                 // }
 
-                log::info!("Starting a game with {} bots", self.game_state.kbots.len());
+                log::info!("Starting a game with {} bots", kbots.len());
 
                 self.game_state.my_player_id = Some(player_me.id);
                 self.game_state.players.insert(player_me.id, player_me);

@@ -161,28 +161,30 @@ impl State {
             .collect();
 
         threadpool.install(|| {
-            kbots.par_iter_mut().for_each(|kbot_0| {
-                if let Some(kbot_m) = self.frame_minus_one.kbots.get(&kbot_0.id) {
-                    let position = kbot_0.position * i0 + (im * kbot_m.position).coords;
-                    let dir = kbot_0.dir * i0 + kbot_m.dir * im;
-                    kbot_0.position = position;
-                    kbot_0.dir = dir;
-                }
-
-                let screen = test_screen(kbot_0.id, kbot_0.position, view_proj);
-                match screen {
-                    Some((_, screen_pos, distance_to_camera)) => {
-                        kbot_0.is_in_screen = true;
-                        let mat = Matrix4::face_towards(
-                            &kbot_0.position,
-                            &(kbot_0.position + kbot_0.dir),
-                            &Vector3::new(0.0, 0.0, 1.0),
-                        );
-                        kbot_0.trans = Some(mat);
-                        kbot_0.distance_to_camera = distance_to_camera;
-                        kbot_0.screen_pos = screen_pos;
+            kbots.par_chunks_mut(1000).for_each(|chunk| {
+                for kbot_0 in chunk.iter_mut() {
+                    if let Some(kbot_m) = self.frame_minus_one.kbots.get(&kbot_0.id) {
+                        let position = kbot_0.position * i0 + (im * kbot_m.position).coords;
+                        let dir = kbot_0.dir * i0 + kbot_m.dir * im;
+                        kbot_0.position = position;
+                        kbot_0.dir = dir;
                     }
-                    _ => {}
+
+                    let screen = test_screen(kbot_0.id, kbot_0.position, view_proj);
+                    match screen {
+                        Some((_, screen_pos, distance_to_camera)) => {
+                            kbot_0.is_in_screen = true;
+                            let mat = Matrix4::face_towards(
+                                &kbot_0.position,
+                                &(kbot_0.position + kbot_0.dir),
+                                &Vector3::new(0.0, 0.0, 1.0),
+                            );
+                            kbot_0.trans = Some(mat);
+                            kbot_0.distance_to_camera = distance_to_camera;
+                            kbot_0.screen_pos = screen_pos;
+                        }
+                        _ => {}
+                    }
                 }
             });
         });
