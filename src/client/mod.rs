@@ -92,6 +92,7 @@ pub struct App {
 
     heightmap_gpu: HeightmapGpu,
     generic_gpu: HashMap<PathBuf, GenericGpuState>,
+
     kbot_gpu: ModelGpu,
     arrow_gpu: ArrowGpu,
     kinematic_projectile_gpu: ModelGpu,
@@ -457,6 +458,7 @@ impl App {
             ub_misc,
             kbot_gpu,
             generic_gpu: HashMap::new(),
+    
             kinematic_projectile_gpu,
             arrow_gpu,
             heightmap_gpu,

@@ -9,12 +9,12 @@ impl App {
         self.game_state.selected.clear();
         self.game_state.explosions.clear();
         self.game_state.kinematic_projectiles.clear();
-        self.unit_editor.parts.clear();
+        self.unit_editor.root.children.clear();
         self.kbot_gpu.update_instance_dirty(&[], &self.gpu.device);
         self.health_bar.update_instance(&[], &self.gpu.device);
         self.unit_icon.update_instance(&[], &self.gpu.device);
         self.explosion_gpu.update_instance(&[], &self.gpu.device);
-        for (path, generic_gpu_state) in self.generic_gpu.iter_mut() {
+        for (_, generic_gpu_state) in self.generic_gpu.iter_mut() {
             match generic_gpu_state {
                 GenericGpuState::Ready(model_gpu) => {
                     model_gpu.update_instance_dirty(&[], &self.gpu.device)
@@ -24,6 +24,34 @@ impl App {
         }
         self.kinematic_projectile_gpu
             .update_instance_dirty(&[], &self.gpu.device);
+    }
+
+    pub fn visit_part_tree(
+        part_tree: &mut unit_editor::PartTree,
+        view_proj: &Matrix4<f32>,
+        generic_gpu: &mut HashMap<PathBuf, GenericGpuState>,
+    ) {
+        for c in part_tree.children.iter_mut() {
+            match generic_gpu.get_mut(&c.dmodel.model_path) {
+                Some(GenericGpuState::Ready(generic_cpu)) => {
+                    let buf = &mut generic_cpu.instance_attr_cpu_buf;
+                    let display_model = &c.dmodel;
+
+                    let mat = Matrix4::face_towards(
+                        &display_model.position,
+                        &(display_model.position + display_model.dir),
+                        &Vector3::new(0.0, 0.0, 1.0),
+                    );
+
+                    buf.extend_from_slice(mat.as_slice());
+                    buf.push(0.0);
+                    buf.push(0.0);
+                }
+                _ => {}
+            }
+
+            Self::visit_part_tree(&mut c.sub_tree, view_proj, generic_gpu);
+        }
     }
 
     pub fn upload_to_gpu(&mut self, view_proj: &Matrix4<f32>, encoder: &mut wgpu::CommandEncoder) {
@@ -36,35 +64,55 @@ impl App {
                 for (path, model_gpu) in self.generic_gpu.iter_mut() {
                     match model_gpu {
                         GenericGpuState::Ready(model_gpu) => {
-                            self.vertex_attr_buffer_f32.clear();
-                            for display_model in self
-                                .unit_editor
-                                .parts
-                                .iter()
-                                .filter(|e| e.model_path == *path)
-                            {
-                                let mat = Matrix4::face_towards(
-                                    &display_model.position,
-                                    &(display_model.position + display_model.dir),
-                                    &Vector3::new(0.0, 0.0, 1.0),
-                                );
-
-                                self.vertex_attr_buffer_f32
-                                    .extend_from_slice(mat.as_slice());
-                                self.vertex_attr_buffer_f32.push(0.0);
-                                self.vertex_attr_buffer_f32.push(0.0);
-                            }
-
-                            model_gpu.update_instance_dirty(
-                                &self.vertex_attr_buffer_f32[..],
-                                &self.gpu.device,
-                            );
+                            model_gpu.instance_attr_cpu_buf.clear();
                         }
-                        _ => {
-                            // log::warn!("ModelGpu {:?} not ready", path);
-                        }
+                        _ => {}
                     }
                 }
+
+                Self::visit_part_tree(&mut self.unit_editor.root, view_proj, &mut self.generic_gpu);
+
+                for (path, model_gpu) in self.generic_gpu.iter_mut() {
+                    match model_gpu {
+                        GenericGpuState::Ready(model_gpu) => {
+                            model_gpu.update_instance_dirty_own_buffer(&self.gpu.device);
+                        }
+                        _ => {}
+                    }
+                }
+
+                // for (path, model_gpu) in self.generic_gpu.iter_mut() {
+                //     match model_gpu {
+                //         GenericGpuState::Ready(model_gpu) => {
+                //             self.vertex_attr_buffer_f32.clear();
+                //             for display_model in self
+                //                 .unit_editor
+                //                 .parts
+                //                 .iter()
+                //                 .filter(|e| e.model_path == *path)
+                //             {
+                //                 let mat = Matrix4::face_towards(
+                //                     &display_model.position,
+                //                     &(display_model.position + display_model.dir),
+                //                     &Vector3::new(0.0, 0.0, 1.0),
+                //                 );
+
+                //                 self.vertex_attr_buffer_f32
+                //                     .extend_from_slice(mat.as_slice());
+                //                 self.vertex_attr_buffer_f32.push(0.0);
+                //                 self.vertex_attr_buffer_f32.push(0.0);
+                //             }
+
+                //             model_gpu.update_instance_dirty(
+                //                 &self.vertex_attr_buffer_f32[..],
+                //                 &self.gpu.device,
+                //             );
+                //         }
+                //         _ => {
+                //             // log::warn!("ModelGpu {:?} not ready", path);
+                //         }
+                //     }
+                // }
             }
 
             //Kbot

@@ -16,16 +16,55 @@ pub struct DisplayModel {
 
 pub struct UnitEditor {
     pub orbit: Point3<f32>,
-    pub parts: Vec<DisplayModel>,
+    pub root: PartTree,
     pub asset_dir_cached: FileTree,
+    pub selected_id: utils::Id<PartTree>,
+}
+#[derive(Debug, Clone)]
+pub enum Joint {
+    Fix,
+    Spherical,
+}
+
+#[derive(Debug, Clone)]
+pub struct JointedPartTree {
+    pub dmodel: DisplayModel,
+    pub joint: Joint,
+    pub sub_tree: PartTree,
+}
+#[derive(Debug, Clone, typename::TypeName)]
+pub struct PartTree {
+    pub id: utils::Id<PartTree>,
+    pub children: Vec<JointedPartTree>,
+}
+
+impl PartTree {
+    pub fn find_node(&mut self, id: utils::Id<PartTree>) -> Option<&mut PartTree> {
+        if self.id == id {
+            Some(self)
+        } else {
+            for c in self.children.iter_mut() {
+                match c.sub_tree.find_node(id) {
+                    Some(node) => return Some(node),
+                    None => {}
+                }
+            }
+            None
+        }
+    }
 }
 
 impl UnitEditor {
     pub fn new() -> Self {
+        let root = PartTree {
+            id: utils::rand_id(),
+            children: Vec::new(),
+        };
         UnitEditor {
             orbit: Point3::new(300.0, 100.0, 0.5),
-            parts: Vec::new(),
             asset_dir_cached: FileTree::Unknown,
+            selected_id: root.id,
+            root,
         }
     }
 
@@ -37,7 +76,6 @@ impl UnitEditor {
         log::debug!("open_obj {:?}", path);
         match crate::model::open_obj(path.to_str().unwrap()) {
             Ok(triangle_list) => {
-                log::debug!("triangle_list");
                 generic_gpu.insert(
                     path.to_owned(),
                     GenericGpuState::ToLoad(triangle_list.clone()),
@@ -53,11 +91,23 @@ impl UnitEditor {
     }
 
     fn add_to_parts(&mut self, path: PathBuf) {
-        self.parts.push(DisplayModel {
-            position: self.orbit,
-            dir: Vector3::new(1.0, 0.0, 0.0),
-            model_path: path,
-        })
+        log::debug!("adding {:?} to {}", path, self.selected_id);
+
+        match self.root.find_node(self.selected_id) {
+            Some(node) => node.children.push(JointedPartTree {
+                dmodel: DisplayModel {
+                    position: self.orbit.clone(),
+                    dir: Vector3::new(1.0, 0.0, 0.0),
+                    model_path: path,
+                },
+                joint: Joint::Fix,
+                sub_tree: PartTree {
+                    id: utils::rand_id(),
+                    children: Vec::new(),
+                },
+            }),
+            None => {}
+        }
     }
 }
 
@@ -98,16 +148,30 @@ impl App {
 
                 ui.separator();
 
-                ui.tree_node(im_str!("Parts")).default_open(true).build(|| {
-                    let parts: Vec<_> = unit_editor.parts.iter().map(|e| e.clone()).collect();
-                    for (index, display_model) in parts.iter().enumerate() {
-                        ui.text(im_str!("{}: {:?}", index, display_model.model_path));
-                        ui.same_line(0.0);
-                        if ui.small_button(im_str!("delete##{:?}{:?}", index, path).as_ref()) {
-                            unit_editor.parts.remove(index);
-                        };
+                Self::ui_part_tree(ui, &mut unit_editor.root.clone(), unit_editor);
+            });
+    }
+
+    fn ui_part_tree(ui: &Ui, part_tree: &PartTree, unit_editor: &mut UnitEditor) {
+        ui.tree_node(im_str!("parts {}", part_tree.id).as_ref())
+            .default_open(true)
+            .build(|| {
+                if unit_editor.selected_id == part_tree.id {
+                    ui.text(im_str!("Selected"));
+                } else {
+                    if ui.small_button(im_str!("select##{:?}", part_tree.id).as_ref()) {
+                        unit_editor.selected_id = part_tree.id;
                     }
-                });
+                }
+                for c in part_tree.children.iter() {
+                    ui.tree_node(im_str!("{}", c.sub_tree.id).as_ref())
+                        .default_open(true)
+                        .build(|| {
+                            ui.text(im_str!("model {:?}", c.dmodel.model_path));
+                            ui.text(im_str!("joint {:?}", c.joint));
+                            Self::ui_part_tree(ui, &c.sub_tree, unit_editor);
+                        });
+                }
             });
     }
 

@@ -4,6 +4,7 @@ use wgpu::Device;
 use wgpu::{BindGroup, BindGroupLayout, RenderPass, TextureFormat};
 
 pub struct ModelGpu {
+    pub instance_attr_cpu_buf: Vec<f32>,
     vertex_buf: wgpu::Buffer,
     index_buf: wgpu::Buffer,
     index_count: usize,
@@ -45,6 +46,7 @@ impl ModelGpu {
         let pipeline = Self::create_pipeline(device, main_bind_group_layout, format).unwrap();;
 
         ModelGpu {
+            instance_attr_cpu_buf: Vec::new(),
             vertex_buf,
             index_buf,
             index_count: index_data.len(),
@@ -189,6 +191,16 @@ impl ModelGpu {
 
         std::mem::replace(&mut self.instance_buf, temp_buf);
         self.instance_count = instance_attr.len() as u32 / 18;
+    }
+
+    pub fn update_instance_dirty_own_buffer(&mut self, device: &wgpu::Device) {
+        log::trace!("ModelGpu update_instance");
+        let temp_buf = device
+            .create_buffer_mapped(self.instance_attr_cpu_buf.len(), wgpu::BufferUsage::VERTEX)
+            .fill_from_slice(&self.instance_attr_cpu_buf);
+
+        std::mem::replace(&mut self.instance_buf, temp_buf);
+        self.instance_count = self.instance_attr_cpu_buf.len() as u32 / 18;
     }
 
     pub fn update_instance(
