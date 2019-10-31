@@ -19,11 +19,13 @@ impl App {
 
                 let mut player_me = Player::new();
 
+                let mut kbots = HashMap::new();
+
                 for i in (100..300).step_by(4) {
                     for j in (100..500).step_by(4) {
                         let m = mobile::KBot::new(Point3::new(i as f32, j as f32, 100.0));
                         player_me.kbots.insert(m.id);
-                        self.game_state.kbots.insert(m.id, m);
+                        kbots.insert(m.id, m);
                     }
                 }
 
@@ -41,7 +43,7 @@ impl App {
                         let mut m = mobile::KBot::new(Point3::new(i as f32, j as f32, 100.0));
                         m.team = 1;
                         player_ennemy.kbots.insert(m.id);
-                        self.game_state.kbots.insert(m.id, m);
+                        kbots.insert(m.id, m);
                     }
                 }
 
@@ -62,7 +64,7 @@ impl App {
                 let replacer = FrameEventFromPlayer::ReplaceFrame(frame::Frame {
                     number: 0,
                     players: self.game_state.players.clone(),
-                    kbots: self.game_state.kbots.clone(),
+                    kbots,
                     kbots_dead: HashSet::new(),
                     kinematic_projectiles: self.game_state.kinematic_projectiles.clone(),
                     arrows: Vec::new(),
@@ -116,15 +118,15 @@ impl App {
                         .game_state
                         .kbots
                         .iter()
-                        .filter(|(id, e)| {
+                        .filter(|e| {
                             e.is_in_screen
-                                && me.kbots.contains(id)
+                                && me.kbots.contains(&e.id)
                                 && e.screen_pos.x > min_x
                                 && e.screen_pos.x < max_x
                                 && e.screen_pos.y < max_y
                                 && e.screen_pos.y > min_y
                         })
-                        .map(|(i, _)| i.value)
+                        .map(|e| e.id.value)
                         .collect();
 
                     log::trace!("Selection took {}us", start_sel.elapsed().as_micros());
@@ -143,6 +145,4 @@ impl App {
         self.profiler.mix("interp", interp_duration, 20);
         self.profiler.mix("selection_screen", selection_screen, 20);
     }
-
-
 }

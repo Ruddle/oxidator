@@ -38,7 +38,7 @@ pub struct State {
     pub frame_zero_time_received: Instant,
 
     //Interpolated from curve
-    pub kbots: HashMap<Id<KBot>, KBot>,
+    pub kbots: Vec<KBot>,
     pub kinematic_projectiles: HashMap<Id<KinematicProjectile>, KinematicProjectile>,
     pub server_sec: f32,
     //Extrapolated from events
@@ -76,7 +76,7 @@ impl State {
             frame_zero: Frame::new(),
             frame_zero_time_received: Instant::now(),
 
-            kbots: HashMap::new(),
+            kbots: Vec::new(),
             kinematic_projectiles: HashMap::new(),
 
             explosions: Vec::new(),
@@ -151,7 +151,7 @@ impl State {
             }
         }
 
-        let mut kbots = self.frame_zero.kbots.clone();
+        let mut kbots: Vec<_> = self.frame_zero.kbots.values().cloned().collect();
 
         self.explosions = self
             .explosions
@@ -161,7 +161,7 @@ impl State {
             .collect();
 
         threadpool.install(|| {
-            kbots.par_iter_mut().for_each(|(_, kbot_0)| {
+            kbots.par_iter_mut().for_each(|kbot_0| {
                 if let Some(kbot_m) = self.frame_minus_one.kbots.get(&kbot_0.id) {
                     let position = kbot_0.position * i0 + (im * kbot_m.position).coords;
                     let dir = kbot_0.dir * i0 + kbot_m.dir * im;

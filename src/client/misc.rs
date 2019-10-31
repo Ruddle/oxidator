@@ -74,7 +74,7 @@ impl App {
                 for mobile in self
                     .game_state
                     .kbots
-                    .values()
+                    .iter()
                     .filter(|e| e.is_in_screen && e.distance_to_camera < unit_icon_distance)
                 {
                     let mat = mobile.trans.unwrap();
@@ -145,7 +145,7 @@ impl App {
             for kbot in self
                 .game_state
                 .kbots
-                .values()
+                .iter()
                 .filter(|e| e.is_in_screen && e.distance_to_camera < unit_icon_distance)
             {
                 let distance =
@@ -202,7 +202,7 @@ impl App {
             for kbot in self
                 .game_state
                 .kbots
-                .values()
+                .iter()
                 .filter(|e| e.is_in_screen && e.distance_to_camera >= unit_icon_distance)
             {
                 self.vertex_attr_buffer_f32
