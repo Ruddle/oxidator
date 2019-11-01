@@ -45,10 +45,15 @@ impl<T: typename::TypeName> fmt::Display for Id<T> {
 impl<T: typename::TypeName> fmt::Debug for Id<T> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let x: [u8; 8] = unsafe { std::mem::transmute(self.value.to_le()) };
+
+        let name = format!("{:?}", T::type_name());
+
+        let simple_name = name.split("::").last().unwrap();
+        let simple_name = &simple_name[..simple_name.len() - 1];
         write!(
             f,
-            "{:?} {}",
-            T::type_name(),
+            "{}#{}",
+            simple_name,
             base62::encode(&x) // format!("{:X}", self.value)
         )
     }

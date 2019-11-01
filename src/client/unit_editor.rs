@@ -26,16 +26,26 @@ pub enum Joint {
     Spherical,
 }
 
-#[derive(Debug, Clone)]
-pub struct JointedPartTree {
-    pub dmodel: DisplayModel,
-    pub joint: Joint,
-    pub sub_tree: PartTree,
+impl Joint {
+    pub fn next(&self) -> Self {
+        match self {
+            Joint::Fix => Joint::Spherical,
+            Joint::Spherical => Joint::Fix,
+        }
+    }
+
+    pub fn replace_with_next(&mut self) {
+        let next = self.next();
+        std::mem::replace(self, next);
+    }
 }
+
 #[derive(Debug, Clone, typename::TypeName)]
 pub struct PartTree {
     pub id: utils::Id<PartTree>,
-    pub children: Vec<JointedPartTree>,
+    pub dmodel: Option<DisplayModel>,
+    pub joint: Joint,
+    pub children: Vec<PartTree>,
 }
 
 impl PartTree {
@@ -44,12 +54,29 @@ impl PartTree {
             Some(self)
         } else {
             for c in self.children.iter_mut() {
-                match c.sub_tree.find_node(id) {
+                match c.find_node(id) {
                     Some(node) => return Some(node),
                     None => {}
                 }
             }
             None
+        }
+    }
+
+    pub fn remove_node(&mut self, id: utils::Id<PartTree>) -> Option<utils::Id<PartTree>> {
+        let pos = self.children.iter().position(|e| e.id == id);
+        match pos {
+            Some(index) => {
+                self.children.remove(index);
+                Some(self.id)
+            }
+            None => {
+                let mut res = None;
+                for c in self.children.iter_mut() {
+                    res = res.or(c.remove_node(id));
+                }
+                res
+            }
         }
     }
 }
@@ -59,6 +86,8 @@ impl UnitEditor {
         let root = PartTree {
             id: utils::rand_id(),
             children: Vec::new(),
+            dmodel: None,
+            joint: Joint::Fix,
         };
         UnitEditor {
             orbit: Point3::new(300.0, 100.0, 0.5),
@@ -94,17 +123,15 @@ impl UnitEditor {
         log::debug!("adding {:?} to {}", path, self.selected_id);
 
         match self.root.find_node(self.selected_id) {
-            Some(node) => node.children.push(JointedPartTree {
-                dmodel: DisplayModel {
+            Some(node) => node.children.push(PartTree {
+                dmodel: Some(DisplayModel {
                     position: self.orbit.clone(),
                     dir: Vector3::new(1.0, 0.0, 0.0),
                     model_path: path,
-                },
+                }),
                 joint: Joint::Fix,
-                sub_tree: PartTree {
-                    id: utils::rand_id(),
-                    children: Vec::new(),
-                },
+                id: utils::rand_id(),
+                children: Vec::new(),
             }),
             None => {}
         }
@@ -134,9 +161,8 @@ impl App {
 
         let window = imgui::Window::new(im_str!("Unit Editor"));
         window
-            .size([400.0, 300.0], imgui::Condition::FirstUseEver)
-            .position([3.0, 415.0], imgui::Condition::FirstUseEver)
-            .movable(false)
+            .size([400.0, 600.0], imgui::Condition::FirstUseEver)
+            .position([3.0, 115.0], imgui::Condition::FirstUseEver)
             .collapsed(false, imgui::Condition::FirstUseEver)
             .build(&ui, || {
                 Self::visit_dirs(
@@ -148,28 +174,56 @@ impl App {
 
                 ui.separator();
 
-                Self::ui_part_tree(ui, &mut unit_editor.root.clone(), unit_editor);
+                Self::ui_part_tree(ui, &mut unit_editor.root.clone(), unit_editor, true);
             });
     }
 
-    fn ui_part_tree(ui: &Ui, part_tree: &PartTree, unit_editor: &mut UnitEditor) {
-        ui.tree_node(im_str!("parts {}", part_tree.id).as_ref())
-            .default_open(true)
-            .build(|| {
-                if unit_editor.selected_id == part_tree.id {
-                    ui.text(im_str!("Selected"));
-                } else {
-                    if ui.small_button(im_str!("select##{:?}", part_tree.id).as_ref()) {
-                        unit_editor.selected_id = part_tree.id;
+    fn ui_part_tree(ui: &Ui, part_tree: &PartTree, unit_editor: &mut UnitEditor, is_root: bool) {
+        if unit_editor.selected_id == part_tree.id {
+            ui.text(im_str!("Selected"));
+        } else {
+            if ui.small_button(im_str!("select##{:?}", part_tree.id).as_ref()) {
+                unit_editor.selected_id = part_tree.id;
+            }
+        }
+        if !is_root {
+            ui.same_line(0.0);
+            if ui.small_button(im_str!("remove##{:?}", part_tree.id).as_ref()) {
+                let deleter = unit_editor.root.remove_node(part_tree.id);
+                if part_tree.id == unit_editor.selected_id {
+                    for d in deleter.iter() {
+                        unit_editor.selected_id = *d;
                     }
                 }
+            }
+        }
+        ui.tree_node(im_str!("children").as_ref())
+            .default_open(true)
+            .build(|| {
                 for c in part_tree.children.iter() {
-                    ui.tree_node(im_str!("{}", c.sub_tree.id).as_ref())
-                        .default_open(true)
-                        .build(|| {
-                            ui.text(im_str!("model {:?}", c.dmodel.model_path));
-                            ui.text(im_str!("joint {:?}", c.joint));
-                            Self::ui_part_tree(ui, &c.sub_tree, unit_editor);
+                    let name = im_str!("child");
+                    ChildWindow::new(name)
+                        .border(true)
+                        .always_auto_resize(true)
+                        .build(ui, || {
+                            ui.tree_node(im_str!("child").as_ref())
+                                .default_open(true)
+                                .build(|| {
+                                    if let Some(model) = &c.dmodel {
+                                        ui.text(im_str!("model {:?}", model.model_path));
+                                    }
+                                    ui.text(im_str!("joint {:?}", c.joint));
+                                    ui.same_line(0.0);
+                                    if ui.small_button(im_str!("swap##{:?}", c.id).as_ref()) {
+                                        unit_editor
+                                            .root
+                                            .find_node(c.id)
+                                            .unwrap()
+                                            .joint
+                                            .replace_with_next();
+                                    }
+                                    Self::ui_part_tree(ui, &c, unit_editor, false);
+                                });
                         });
                 }
             });

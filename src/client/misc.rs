@@ -27,30 +27,32 @@ impl App {
     }
 
     pub fn visit_part_tree(
-        part_tree: &mut unit_editor::PartTree,
+        part_tree: &unit_editor::PartTree,
         view_proj: &Matrix4<f32>,
         generic_gpu: &mut HashMap<PathBuf, GenericGpuState>,
     ) {
-        for c in part_tree.children.iter_mut() {
-            match generic_gpu.get_mut(&c.dmodel.model_path) {
-                Some(GenericGpuState::Ready(generic_cpu)) => {
-                    let buf = &mut generic_cpu.instance_attr_cpu_buf;
-                    let display_model = &c.dmodel;
+        for c in part_tree.children.iter() {
+            if let Some(dmodel) = &c.dmodel {
+                match generic_gpu.get_mut(&dmodel.model_path) {
+                    Some(GenericGpuState::Ready(generic_cpu)) => {
+                        let buf = &mut generic_cpu.instance_attr_cpu_buf;
+                        let display_model = &dmodel;
 
-                    let mat = Matrix4::face_towards(
-                        &display_model.position,
-                        &(display_model.position + display_model.dir),
-                        &Vector3::new(0.0, 0.0, 1.0),
-                    );
+                        let mat = Matrix4::face_towards(
+                            &display_model.position,
+                            &(display_model.position + display_model.dir),
+                            &Vector3::new(0.0, 0.0, 1.0),
+                        );
 
-                    buf.extend_from_slice(mat.as_slice());
-                    buf.push(0.0);
-                    buf.push(0.0);
+                        buf.extend_from_slice(mat.as_slice());
+                        buf.push(0.0);
+                        buf.push(0.0);
+                    }
+                    _ => {}
                 }
-                _ => {}
             }
 
-            Self::visit_part_tree(&mut c.sub_tree, view_proj, generic_gpu);
+            Self::visit_part_tree(c, view_proj, generic_gpu);
         }
     }
 
