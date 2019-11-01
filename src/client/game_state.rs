@@ -39,10 +39,11 @@ pub struct State {
 
     //Interpolated from curve
     pub kbots: Vec<KBot>,
-    pub kinematic_projectiles: HashMap<Id<KinematicProjectile>, KinematicProjectile>,
     pub server_sec: f32,
     //Extrapolated from events
     pub explosions: Vec<Explosion>,
+    pub kinematic_projectiles_cache: HashMap<Id<KinematicProjectile>, KinematicProjectile>,
+    pub kinematic_projectiles: Vec<Point3<f32>>,
 
     pub selected: HashSet<IdValue>,
 
@@ -77,7 +78,8 @@ impl State {
             frame_zero_time_received: Instant::now(),
 
             kbots: Vec::new(),
-            kinematic_projectiles: HashMap::new(),
+            kinematic_projectiles_cache: HashMap::new(),
+            kinematic_projectiles: Vec::new(),
 
             explosions: Vec::new(),
             server_sec: 0.0,
@@ -112,6 +114,15 @@ impl State {
                 size: explosion.size,
                 seed,
             });
+        }
+
+        for proj_b in self.frame_zero.kinematic_projectiles_birth.iter() {
+            self.kinematic_projectiles_cache
+                .insert(proj_b.id, proj_b.clone());
+        }
+
+        for dead in self.frame_zero.kinematic_projectiles_dead.iter() {
+            self.kinematic_projectiles_cache.remove(dead);
         }
 
         self.selected = self
@@ -189,33 +200,16 @@ impl State {
             });
         });
 
-        self.kbots = kbots;
-
         self.kinematic_projectiles.clear();
-        for kine_0 in self.frame_zero.kinematic_projectiles.values() {
-            let to_insert = {
-                if let Some(kine_m) = self.frame_minus_one.kinematic_projectiles.get(&kine_0.id) {
-                    let position = kine_0.position() * i0 + (im * kine_m.position()).coords;
 
-                    let mut positions = vec![position];
-                    positions.extend(&kine_0.positions.clone());
-                    let kine = KinematicProjectile {
-                        positions,
-                        ..*kine_0
-                    };
+        for kproj in self.kinematic_projectiles_cache.values_mut() {
+            let pos = kproj.position_at(self.frame_minus_one.number + 1) * im
+                + kproj.position_at(self.frame_zero.number + 1).coords * i0;
 
-                    kine
-                } else {
-                    //No interpolation possible, taking last data point
-                    kine_0.clone()
-                }
-            };
-
-            self.kinematic_projectiles.insert(to_insert.id, to_insert);
+            self.kinematic_projectiles.push(pos);
         }
 
-        // self.kbots = self.frame_zero.kbots.clone();
-        // self.kinematic_projectiles = self.frame_zero.kinematic_projectiles.clone();
+        self.kbots = kbots;
         self.players = self.frame_zero.players.clone();
     }
 

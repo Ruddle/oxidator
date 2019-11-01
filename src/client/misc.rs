@@ -8,7 +8,7 @@ impl App {
         self.game_state.kbots.clear();
         self.game_state.selected.clear();
         self.game_state.explosions.clear();
-        self.game_state.kinematic_projectiles.clear();
+        self.game_state.kinematic_projectiles_cache.clear();
         self.unit_editor.root.children.clear();
         self.kbot_gpu.update_instance_dirty(&[], &self.gpu.device);
         self.health_bar.update_instance(&[], &self.gpu.device);
@@ -146,18 +146,14 @@ impl App {
             }
             //Kinematic Projectile
             self.vertex_attr_buffer_f32.clear();
-            for mobile in self.game_state.kinematic_projectiles.values() {
+            for mobile in self.game_state.kinematic_projectiles.iter() {
                 let mat = Matrix4::face_towards(
-                    &mobile.positions.iter().next().unwrap(),
-                    &(mobile.positions.iter().next().unwrap() + Vector3::new(1.0, 0.0, 0.0)),
+                    &mobile,
+                    &(mobile + Vector3::new(1.0, 0.0, 0.0)),
                     &Vector3::new(0.0, 0.0, 1.0),
                 );
 
-                let is_selected = if self.game_state.selected.contains(&mobile.id.value) {
-                    1.0
-                } else {
-                    0.0
-                };
+                let is_selected = 0.0;
 
                 let team = -1.0;
 

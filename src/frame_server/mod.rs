@@ -27,40 +27,32 @@ impl FrameServerCache {
         r_to_frame_server: Receiver<ToFrameServer>,
         s_from_frame_server: Sender<FromFrameServer>,
     ) -> () {
-        std::thread::spawn(move || {
-            let mut fsc = FrameServerCache::new();
-            for msg in r_to_frame_server.iter() {
-                match msg {
-                    ToFrameServer::DataToComputeNextFrame(DataToComputeNextFrame {
-                        old_frame,
-                        events,
-                    }) => {
-                        let next_frame = fsc.next_frame(old_frame, events);
-                        // let vec = bincode::serialize(&next_frame).unwrap();
-                        // log::info!("Frame is {} bytes", vec.len());
-                        // let mut vec = Vec::new();
-                        // for k in next_frame.kbots.values() {
-                        //     vec.push(k.clone());
-                        // }
-                        // let fu = frame::FrameUpdate { kbots: vec };
-                        // let vec = bincode::serialize(&fu).unwrap();
-                        // log::info!("FrameUpdate is {} bytes", vec.len());
-                        // let dur = utils::time(|| {
-                        //     use flate2::write::ZlibEncoder;
-                        //     use flate2::Compression;
-                        //     use std::io::prelude::*;
-                        //     let mut e = ZlibEncoder::new(Vec::new(), Compression::new(1));
-                        //     e.write_all(&vec);
-                        //     let compressed_bytes = e.finish().unwrap();
-                        //     log::info!("Compressed is {} bytes", compressed_bytes.len());
-                        // });
-                        // log::info!("compression took {:?}", dur);
-
-                        let _ = s_from_frame_server.send(FromFrameServer::NewFrame(next_frame));
+        let _ = std::thread::Builder::new()
+            .name("frame_server".to_string())
+            .spawn(move || {
+                let mut fsc = FrameServerCache::new();
+                for msg in r_to_frame_server.iter() {
+                    match msg {
+                        ToFrameServer::DataToComputeNextFrame(DataToComputeNextFrame {
+                            old_frame,
+                            events,
+                        }) => {
+                            let next_frame = fsc.next_frame(old_frame, events);
+                            // let dur = utils::time(|| {
+                            //     use flate2::write::ZlibEncoder;
+                            //     use flate2::Compression;
+                            //     use std::io::prelude::*;
+                            //     let mut e = ZlibEncoder::new(Vec::new(), Compression::new(1));
+                            //     e.write_all(&vec);
+                            //     let compressed_bytes = e.finish().unwrap();
+                            //     log::info!("Compressed is {} bytes", compressed_bytes.len());
+                            // });
+                            // log::info!("compression took {:?}", dur);
+                            let _ = s_from_frame_server.send(FromFrameServer::NewFrame(next_frame));
+                        }
                     }
                 }
-            }
-        });
+            });
     }
 
     pub fn new() -> Self {
@@ -95,6 +87,8 @@ impl FrameServerCache {
         frame.kbots_dead.clear();
         frame.heightmap_phy = None;
         frame.explosions.clear();
+        frame.kinematic_projectiles_birth.clear();
+        frame.kinematic_projectiles_dead.clear();
 
         for event in events {
             match event {
@@ -120,6 +114,8 @@ impl FrameServerCache {
                 &mut frame_profiler,
                 &mut frame.kbots,
                 &mut frame.kbots_dead,
+                &mut frame.kinematic_projectiles_dead,
+                &mut frame.kinematic_projectiles_birth,
                 &mut frame.kinematic_projectiles,
                 heightmap,
                 &mut arrows,
@@ -217,6 +213,8 @@ pub fn update_units(
     frame_profiler: &mut ProfilerMap,
     kbots: &mut HashMap<Id<KBot>, KBot>,
     kbots_dead: &mut HashSet<Id<KBot>>,
+    kinematic_projectiles_dead: &mut Vec<Id<KinematicProjectile>>,
+    kinematic_projectiles_birth: &mut Vec<KinematicProjectile>,
     kinematic_projectiles: &mut HashMap<Id<KinematicProjectile>, KinematicProjectile>,
     heightmap_phy: &heightmap_phy::HeightmapPhy,
     arrows: &mut Vec<Arrow>,
@@ -470,12 +468,11 @@ pub fn update_units(
         let start = std::time::Instant::now();
         //Projectile move compute
         {
-            let mut proj_to_remove = HashSet::new();
             for proj in kinematic_projectiles.values_mut() {
-                let current_pos = proj.positions.iter().next().unwrap();
-                let next_pos = proj.positions.iter().skip(1).next();
+                let current_pos = proj.position_at(frame_count - 1);
+                let next_pos = proj.position_at(frame_count);
 
-                if let Some(next_pos) = next_pos {
+                {
                     //Slowly interpolate to not miss collisions
                     let step_size = proj.radius * 1.0;
                     let ul = next_pos.coords - current_pos.coords;
@@ -514,7 +511,7 @@ pub fn update_units(
                             if distance_to_target < (kbot.radius + proj.radius) {
                                 //Colission between Kbot and projectile
                                 kbot.life = (kbot.life - 10).max(0);
-                                proj.positions = Vec::new();
+                                proj.death_frame = frame_count;
                                 explosions.push(ExplosionEvent {
                                     position: Point3::from(current_interp),
                                     size: 0.5,
@@ -526,13 +523,12 @@ pub fn update_units(
                     }
                 }
 
-                proj.positions = proj.positions.clone().into_iter().skip(1).collect();
-                if proj.positions.len() == 0 {
-                    proj_to_remove.insert(proj.id);
+                if proj.death_frame == frame_count {
+                    kinematic_projectiles_dead.push(proj.id);
                 }
             }
 
-            for r in proj_to_remove {
+            for r in kinematic_projectiles_dead.iter() {
                 kinematic_projectiles.remove(&r);
             }
         }
@@ -600,20 +596,20 @@ pub fn update_units(
 
         for shot in shots.iter() {
             let kbot = kbots.get_mut(&shot.bot).unwrap();
-
             let dir = (shot.target - kbot.position.coords).normalize();
-            let mut positions = Vec::new();
-            positions.push(kbot.position + dir * kbot.radius * 1.1);
-
-            let mut speed = dir * 2.0 + Vector3::new(0.0, 0.0, 0.2);
-            for i in 0..5 {
-                speed -= Vector3::new(0.0, 0.0, 0.08);
-                positions.push(positions.last().unwrap() + speed);
-            }
-
             kbot.frame_last_shot = frame_count;
-
-            let proj = KinematicProjectile::new(positions);
+            let proj = KinematicProjectile {
+                id: rand_id(),
+                birth_frame: frame_count,
+                death_frame: frame_count + 5,
+                position_at_birth: kbot.position + dir * kbot.radius * 1.0,
+                speed_per_frame_at_birth: dir * 2.0 + Vector3::new(0.0, 0.0, 0.2),
+                accel_per_frame: Vector3::new(0.0, 0.0, -0.08),
+                radius: 0.25,
+                position_cache: Vec::new(),
+                speed_cache: Vec::new(),
+            };
+            kinematic_projectiles_birth.push(proj.clone());
             kinematic_projectiles.insert(proj.id, proj);
         }
         frame_profiler.add("07  kbot_fire", start.elapsed());

@@ -90,12 +90,15 @@ pub struct Frame {
     pub number: i32,
     pub players: HashMap<Id<Player>, Player>,
     pub kbots: HashMap<Id<KBot>, KBot>,
-    pub kbots_dead: HashSet<Id<KBot>>,
     pub kinematic_projectiles: HashMap<Id<KinematicProjectile>, KinematicProjectile>,
     pub arrows: Vec<Arrow>,
-    pub explosions: Vec<ExplosionEvent>,
     pub heightmap_phy: Option<heightmap_phy::HeightmapPhy>,
     pub frame_profiler: ProfilerMap,
+    // relevant to send to client
+    pub explosions: Vec<ExplosionEvent>,
+    pub kbots_dead: HashSet<Id<KBot>>,
+    pub kinematic_projectiles_dead: Vec<Id<KinematicProjectile>>,
+    pub kinematic_projectiles_birth: Vec<KinematicProjectile>,
 }
 
 impl Frame {
@@ -104,12 +107,14 @@ impl Frame {
             number: 0,
             players: HashMap::new(),
             kbots: HashMap::new(),
-            kbots_dead: HashSet::new(),
             kinematic_projectiles: HashMap::new(),
             arrows: Vec::new(),
             explosions: Vec::new(),
             heightmap_phy: None,
             frame_profiler: ProfilerMap::new(),
+            kbots_dead: HashSet::new(),
+            kinematic_projectiles_dead: Vec::new(),
+            kinematic_projectiles_birth: Vec::new(),
         }
     }
 }

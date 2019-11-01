@@ -60,21 +60,49 @@ impl KBot {
 #[derive(Clone, TypeName, Debug, Serialize, Deserialize, PartialEq)]
 pub struct KinematicProjectile {
     pub id: Id<KinematicProjectile>,
-    pub positions: Vec<Point3<f32>>,
+    pub birth_frame: i32,
+    pub death_frame: i32,
+    pub position_at_birth: Point3<f32>,
+    pub speed_per_frame_at_birth: Vector3<f32>,
+    pub accel_per_frame: Vector3<f32>,
     pub radius: f32,
+
+    pub position_cache: Vec<Point3<f32>>,
+    pub speed_cache: Vec<Vector3<f32>>,
 }
 
 impl KinematicProjectile {
-    pub fn new(positions: Vec<Point3<f32>>) -> Self {
-        KinematicProjectile {
-            id: utils::rand_id(),
-            positions,
-            radius: 0.25,
+    pub fn speed_at(&mut self, frame_number: i32) -> Vector3<f32> {
+        //End recursion
+        if frame_number == self.birth_frame {
+            self.speed_per_frame_at_birth
+        }
+        //Check cache
+        else if self.speed_cache.len() as i32 > frame_number - self.birth_frame {
+            self.speed_cache[(frame_number - self.birth_frame) as usize]
+        }
+        //Compute
+        else {
+            let new_speed = self.speed_at(frame_number - 1) + self.accel_per_frame;
+            self.speed_cache.push(new_speed);
+            *self.speed_cache.last().unwrap()
         }
     }
-
-    pub fn position(&self) -> Point3<f32> {
-        self.positions.first().unwrap().clone()
+    pub fn position_at(&mut self, frame_number: i32) -> Point3<f32> {
+        //End recursion
+        if frame_number == self.birth_frame {
+            self.position_at_birth
+        }
+        //Check cache
+        else if self.position_cache.len() as i32 > frame_number - self.birth_frame {
+            self.position_cache[(frame_number - self.birth_frame) as usize]
+        }
+        //Compute
+        else {
+            let new_pos = self.position_at(frame_number - 1) + self.speed_at(frame_number);
+            self.position_cache.push(new_pos);
+            *self.position_cache.last().unwrap()
+        }
     }
 }
 
