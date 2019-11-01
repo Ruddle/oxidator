@@ -6,6 +6,7 @@ pub mod health_bar;
 pub mod heightmap_gpu;
 mod heightmap_helper;
 pub mod imgui_wgpu;
+pub mod line;
 pub mod model_gpu;
 pub mod post_fx;
 pub mod post_fxaa;

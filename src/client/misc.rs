@@ -71,9 +71,7 @@ impl App {
                         _ => {}
                     }
                 }
-
                 Self::visit_part_tree(&mut self.unit_editor.root, view_proj, &mut self.generic_gpu);
-
                 for (path, model_gpu) in self.generic_gpu.iter_mut() {
                     match model_gpu {
                         GenericGpuState::Ready(model_gpu) => {
@@ -82,39 +80,6 @@ impl App {
                         _ => {}
                     }
                 }
-
-                // for (path, model_gpu) in self.generic_gpu.iter_mut() {
-                //     match model_gpu {
-                //         GenericGpuState::Ready(model_gpu) => {
-                //             self.vertex_attr_buffer_f32.clear();
-                //             for display_model in self
-                //                 .unit_editor
-                //                 .parts
-                //                 .iter()
-                //                 .filter(|e| e.model_path == *path)
-                //             {
-                //                 let mat = Matrix4::face_towards(
-                //                     &display_model.position,
-                //                     &(display_model.position + display_model.dir),
-                //                     &Vector3::new(0.0, 0.0, 1.0),
-                //                 );
-
-                //                 self.vertex_attr_buffer_f32
-                //                     .extend_from_slice(mat.as_slice());
-                //                 self.vertex_attr_buffer_f32.push(0.0);
-                //                 self.vertex_attr_buffer_f32.push(0.0);
-                //             }
-
-                //             model_gpu.update_instance_dirty(
-                //                 &self.vertex_attr_buffer_f32[..],
-                //                 &self.gpu.device,
-                //             );
-                //         }
-                //         _ => {
-                //             // log::warn!("ModelGpu {:?} not ready", path);
-                //         }
-                //     }
-                // }
             }
 
             //Kbot
@@ -262,6 +227,34 @@ impl App {
                 self.vertex_attr_buffer_f32.push(team);
             }
             self.unit_icon
+                .update_instance(&self.vertex_attr_buffer_f32[..], &self.gpu.device);
+
+            //Line
+            self.vertex_attr_buffer_f32.clear();
+            {
+                if self
+                    .input_state
+                    .key_pressed
+                    .contains(&winit::event::VirtualKeyCode::LShift)
+                {
+                    for mobile in self.game_state.kbots.iter() {
+                        if let Some(target) = mobile.target {
+                            let min = view_proj * mobile.position.to_homogeneous();
+                            let max = view_proj * target.to_homogeneous();
+
+                            if min.z > 0.0 && max.z > 0.0 {
+                                self.vertex_attr_buffer_f32.push(min.x / min.w);
+                                self.vertex_attr_buffer_f32.push(min.y / min.w);
+                                self.vertex_attr_buffer_f32.push(max.x / max.w);
+                                self.vertex_attr_buffer_f32.push(max.y / max.w);
+                                self.vertex_attr_buffer_f32.push(0.0);
+                                self.vertex_attr_buffer_f32.push(0.0);
+                            }
+                        }
+                    }
+                }
+            }
+            self.line_gpu
                 .update_instance(&self.vertex_attr_buffer_f32[..], &self.gpu.device);
 
             //Explosions

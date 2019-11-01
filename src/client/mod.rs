@@ -107,6 +107,7 @@ pub struct App {
     postfx: gpu_obj::post_fx::PostFx,
     postfxaa: gpu_obj::post_fxaa::PostFxaa,
     health_bar: gpu_obj::health_bar::HealthBarGpu,
+    line_gpu: gpu_obj::line::LineGpu,
     unit_icon: gpu_obj::unit_icon::UnitIconGpu,
     explosion_gpu: gpu_obj::explosion::ExplosionGpu,
 
@@ -357,6 +358,8 @@ impl App {
         let health_bar =
             gpu_obj::health_bar::HealthBarGpu::new(&gpu.device, format, &bind_group_layout);
 
+        let line_gpu = gpu_obj::line::LineGpu::new(&gpu.device, format, &bind_group_layout);
+
         let unit_icon =
             gpu_obj::unit_icon::UnitIconGpu::new(&gpu.device, format, &bind_group_layout);
 
@@ -458,7 +461,6 @@ impl App {
             ub_misc,
             kbot_gpu,
             generic_gpu: HashMap::new(),
-    
             kinematic_projectile_gpu,
             arrow_gpu,
             heightmap_gpu,
@@ -472,6 +474,7 @@ impl App {
             postfx,
             postfxaa,
             health_bar,
+            line_gpu,
             unit_icon,
             explosion_gpu,
 
@@ -822,6 +825,19 @@ impl App {
                 }) {
                     log::info!("Reloading explosion.vert/explosion.frag");
                     self.explosion_gpu.reload_shader(
+                        &self.gpu.device,
+                        &self.bind_group_layout,
+                        self.gpu.sc_desc.format,
+                    );
+                }
+
+                if event.paths.iter().any(|p| {
+                    p.file_name().iter().any(|name| {
+                        name.to_os_string() == "line.frag" || name.to_os_string() == "line.vert"
+                    })
+                }) {
+                    log::info!("Reloading line.vert/line.frag");
+                    self.line_gpu.reload_shader(
                         &self.gpu.device,
                         &self.bind_group_layout,
                         self.gpu.sc_desc.format,
