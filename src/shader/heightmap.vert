@@ -27,10 +27,14 @@ layout(set = 1, binding = 4) uniform sampler height_sampler;
 layout(set = 1, binding = 5) uniform texture2D height_lod_tex;
 layout(set = 1, binding = 6) uniform sampler height_lod_sampler;
 
+float floor_res(int res, float val ){
+    return floor(int(val)/res)*res;
+}
 
 void main() {
 
-    vec2 cam_pos  =   vec2(cam_x, cam_y); //vec2(0); //
+    int res = int(round(pow(2.0,mip)));
+    vec2 cam_pos  =   vec2(floor_res(res,cam_x), floor_res(res,cam_y)); //vec2(0); //
     vec2 dim = vec2(width,height);
 
     vec2 pos_xy = clamp(

@@ -612,8 +612,8 @@ impl HeightmapGpu {
             self.phy.width as u32 as f32,
             self.phy.height as u32 as f32,
             self.ring_size as f32,
-            (camera_x.max(0.0).min(self.phy.width as u32 as f32) / 1.0).floor() * 1.0,
-            (camera_y.max(0.0).min(self.phy.height as u32 as f32) / 1.0).floor() * 1.0,
+            (camera_x.max(0.0).min(self.phy.width as u32 as f32) / 1.0),
+            (camera_y.max(0.0).min(self.phy.height as u32 as f32) / 1.0),
         ];
 
         let uniform_buf = device
