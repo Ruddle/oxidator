@@ -3,8 +3,8 @@ use super::client::*;
 use na::{Matrix4, Point3, Vector3};
 
 const FOVY: f32 = 3.14 / 4.0;
-const NEAR: f32 = 0.10;
-const FAR: f32 = 10.0;
+const NEAR: f32 = 1.0;
+const FAR: f32 = 8000.0;
 const A: f32 = NEAR + FAR;
 const B: f32 = NEAR - FAR;
 const C: f32 = 2.0 * NEAR * FAR;
@@ -21,7 +21,7 @@ pub fn create_view_proj(aspect_ratio: f32, pos: &Point3<f32>, dir: &Vector3<f32>
     let mx_view = Matrix4::look_at_rh(pos, &(pos + dir), &Vector3::new(0.0, 0.0, 1.0));
 
     let mx_correction: Matrix4<f32> = Matrix4::new(
-        1.0, 0.0, 0.0, 0.0, 0.0, -1.0, 0.0, 0.0, 0.0, 0.0, 0.5, 0.0, 0.0, 0.0, 0.5, 1.0,
+        1.0, 0.0, 0.0, 0.0, 0.0, -1.0, 0.0, 0.0, 0.0, 0.0, 0.5, 0.5, 0.0, 0.0, 0.0, 1.0,
     );
     mx_correction * mx_projection * mx_view
 }
