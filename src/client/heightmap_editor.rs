@@ -88,7 +88,7 @@ impl State {
 
                 if ui.small_button(im_str!("Clear")) {
                     for i in 0..heightmap_gpu.phy.width * heightmap_gpu.phy.height {
-                        heightmap_gpu.phy.texels[i as usize] = 0.0;
+                        heightmap_gpu.phy.texels[i as usize] = 50.0;
                     }
                     heightmap_gpu.update_rect(
                         0 as u32,

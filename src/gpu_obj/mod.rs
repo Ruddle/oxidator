@@ -12,3 +12,4 @@ pub mod post_fx;
 pub mod post_fxaa;
 pub mod trait_gpu;
 pub mod unit_icon;
+pub mod water;

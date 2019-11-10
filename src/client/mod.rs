@@ -9,6 +9,7 @@ use gpu_obj::gpu;
 use gpu_obj::heightmap_gpu::HeightmapGpu;
 use gpu_obj::model_gpu::ModelGpu;
 use gpu_obj::trait_gpu::TraitGpu;
+use gpu_obj::water::WaterGpu;
 use imgui::*;
 use imgui_winit_support;
 use imgui_winit_support::WinitPlatform;
@@ -87,11 +88,13 @@ pub struct App {
     gpu: gpu::WgpuState,
 
     first_color_att_view: wgpu::TextureView,
+    secon_color_att_view: wgpu::TextureView,
     forward_depth: wgpu::TextureView,
     position_att: wgpu::Texture,
     position_att_view: wgpu::TextureView,
 
     heightmap_gpu: HeightmapGpu,
+    water_gpu: WaterGpu,
     generic_gpu: HashMap<PathBuf, GenericGpuState>,
 
     kbot_gpu: ModelGpu,
@@ -340,6 +343,8 @@ impl App {
             heightmap_phy::HeightmapPhy::new(2048, 2048),
         );
 
+        let water_gpu = WaterGpu::new(&gpu.device, format, &bind_group_layout);
+
         let kbot_gpu = ModelGpu::new(
             // &crate::model::open_obj("./src/asset/tank/tank-base.obj"), //
             &model::open_obj("./src/asset/cube.obj").unwrap(),
@@ -367,6 +372,11 @@ impl App {
         generic_gpu.insert(
             Path::new("./src/asset/cube.obj").to_owned(),
             GenericGpuState::ToLoad(model::open_obj("./src/asset/cube.obj").unwrap()),
+        );
+
+        generic_gpu.insert(
+            Path::new("./src/asset/small_sphere.obj").to_owned(),
+            GenericGpuState::ToLoad(model::open_obj("./src/asset/small_sphere.obj").unwrap()),
         );
 
         let health_bar =
@@ -455,6 +465,22 @@ impl App {
 
         let first_color_att_view = first_color_att.create_default_view();
 
+        let secon_color_att = gpu.device.create_texture(&wgpu::TextureDescriptor {
+            size: wgpu::Extent3d {
+                width: gpu.sc_desc.width,
+                height: gpu.sc_desc.height,
+                depth: 1,
+            },
+            array_layer_count: 1,
+            mip_level_count: 1,
+            sample_count: 1,
+            dimension: wgpu::TextureDimension::D2,
+            format: wgpu::TextureFormat::Bgra8UnormSrgb,
+            usage: wgpu::TextureUsage::OUTPUT_ATTACHMENT | wgpu::TextureUsage::SAMPLED,
+        });
+
+        let secon_color_att_view = secon_color_att.create_default_view();
+
         let postfx = gpu_obj::post_fx::PostFx::new(
             &gpu.device,
             &bind_group_layout,
@@ -481,9 +507,11 @@ impl App {
             kinematic_projectile_gpu,
             arrow_gpu,
             heightmap_gpu,
+            water_gpu,
             vertex_attr_buffer_f32: Vec::new(),
 
             first_color_att_view,
+            secon_color_att_view,
             forward_depth: depth_texture.create_default_view(),
             position_att_view,
             position_att,
@@ -541,6 +569,22 @@ impl App {
         });
 
         self.first_color_att_view = first_color_att.create_default_view();
+
+        let secon_color_att = self.gpu.device.create_texture(&wgpu::TextureDescriptor {
+            size: wgpu::Extent3d {
+                width: self.gpu.sc_desc.width,
+                height: self.gpu.sc_desc.height,
+                depth: 1,
+            },
+            array_layer_count: 1,
+            mip_level_count: 1,
+            sample_count: 1,
+            dimension: wgpu::TextureDimension::D2,
+            format: wgpu::TextureFormat::Bgra8UnormSrgb,
+            usage: wgpu::TextureUsage::OUTPUT_ATTACHMENT | wgpu::TextureUsage::SAMPLED,
+        });
+
+        self.secon_color_att_view = secon_color_att.create_default_view();
 
         self.postfxaa
             .update_last_pass_view(&self.gpu.device, &self.first_color_att_view);
@@ -857,6 +901,19 @@ impl App {
                 }) {
                     log::info!("Reloading line.vert/line.frag");
                     self.line_gpu.reload_shader(
+                        &self.gpu.device,
+                        &self.bind_group_layout,
+                        self.gpu.sc_desc.format,
+                    );
+                }
+
+                if event.paths.iter().any(|p| {
+                    p.file_name().iter().any(|name| {
+                        name.to_os_string() == "water.frag" || name.to_os_string() == "water.vert"
+                    })
+                }) {
+                    log::info!("Reloading water.vert/water.frag");
+                    self.water_gpu.reload_shader(
                         &self.gpu.device,
                         &self.bind_group_layout,
                         self.gpu.sc_desc.format,

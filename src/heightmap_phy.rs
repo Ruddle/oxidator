@@ -21,7 +21,7 @@ impl HeightmapPhy {
         let mut texels = Vec::with_capacity((width * height) as usize);
         for j in 0..height {
             for i in 0..width {
-                texels.push(0.0);
+                texels.push(50.0);
             }
         }
         HeightmapPhy {

@@ -610,6 +610,36 @@ impl App {
             self.arrow_gpu.render(&mut rpass, &self.bind_group);
         }
 
+        //Transparent pass
+        {
+            log::trace!("begin_render_pass transparent");
+            let mut rpass = encoder_render.begin_render_pass(&wgpu::RenderPassDescriptor {
+                color_attachments: &[wgpu::RenderPassColorAttachmentDescriptor {
+                    attachment: &self.first_color_att_view,
+                    resolve_target: None,
+                    load_op: wgpu::LoadOp::Load,
+                    store_op: wgpu::StoreOp::Store,
+                    clear_color: wgpu::Color {
+                        r: 0.1,
+                        g: 0.2,
+                        b: 0.3,
+                        a: 1.0,
+                    },
+                }],
+                depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachmentDescriptor {
+                    attachment: &self.forward_depth,
+                    depth_load_op: wgpu::LoadOp::Load,
+                    depth_store_op: wgpu::StoreOp::Store,
+                    stencil_load_op: wgpu::LoadOp::Clear,
+                    stencil_store_op: wgpu::StoreOp::Store,
+                    clear_depth: 1.0,
+                    clear_stencil: 0,
+                }),
+            });
+
+            self.water_gpu.render(&mut rpass, &self.bind_group);
+        }
+
         // Post pass
         {
             log::trace!("begin_post_render_pass");

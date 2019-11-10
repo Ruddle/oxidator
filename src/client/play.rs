@@ -14,7 +14,8 @@ impl App {
         match self.net_mode {
             NetMode::Offline | NetMode::Server => {
                 self.clear_gpu_instance_and_game_state();
-                self.game_state.position = Point3::new(300.0, 100.0, 50.0);
+                self.game_state.position =
+                    Point3::new(300.0, 100.0, self.heightmap_gpu.phy.z(300.0, 100.0) + 50.0);
                 self.game_state.dir = Vector3::new(0.0, 0.3, -1.0);
 
                 let mut player_me = Player::new();
@@ -69,7 +70,8 @@ impl App {
 
             NetMode::Client => {
                 self.clear_gpu_instance_and_game_state();
-                self.game_state.position = Point3::new(300.0, 100.0, 50.0);
+                self.game_state.position =
+                    Point3::new(300.0, 100.0, self.heightmap_gpu.phy.z(300.0, 100.0) + 50.0);
                 self.game_state.dir = Vector3::new(0.0, 0.3, -1.0);
                 self.game_state.my_player_id = self
                     .game_state
