@@ -27,32 +27,36 @@ impl App {
     }
 
     pub fn visit_part_tree(
-        part_tree: &unit_editor::PartTree,
-        view_proj: &Matrix4<f32>,
+        part_tree: &unit::PartTree,
+        root_trans: &Matrix4<f32>,
         generic_gpu: &mut HashMap<PathBuf, GenericGpuState>,
+        selected: f32,
+        team: f32,
     ) {
         for c in part_tree.children.iter() {
             if let Some(dmodel) = &c.dmodel {
+                let display_model = &dmodel;
+
+                let mat = Matrix4::face_towards(
+                    &display_model.position,
+                    &(display_model.position + display_model.dir),
+                    &Vector3::new(0.0, 0.0, 1.0),
+                );
+
+                let combined = root_trans * mat;
                 match generic_gpu.get_mut(&dmodel.model_path) {
                     Some(GenericGpuState::Ready(generic_cpu)) => {
                         let buf = &mut generic_cpu.instance_attr_cpu_buf;
-                        let display_model = &dmodel;
-
-                        let mat = Matrix4::face_towards(
-                            &display_model.position,
-                            &(display_model.position + display_model.dir),
-                            &Vector3::new(0.0, 0.0, 1.0),
-                        );
-
-                        buf.extend_from_slice(mat.as_slice());
-                        buf.push(0.0);
-                        buf.push(0.0);
+                        buf.extend_from_slice(combined.as_slice());
+                        buf.push(selected);
+                        buf.push(team);
                     }
                     _ => {}
                 }
+                Self::visit_part_tree(c, &combined, generic_gpu, selected, team);
+            } else {
+                Self::visit_part_tree(c, root_trans, generic_gpu, selected, team);
             }
-
-            Self::visit_part_tree(c, view_proj, generic_gpu);
         }
     }
 
@@ -71,7 +75,42 @@ impl App {
                         _ => {}
                     }
                 }
-                Self::visit_part_tree(&mut self.unit_editor.root, view_proj, &mut self.generic_gpu);
+
+                let identity = Matrix4::identity();
+
+                Self::visit_part_tree(
+                    &mut self.unit_editor.root,
+                    &identity,
+                    &mut self.generic_gpu,
+                    0.0,
+                    0.0,
+                );
+
+                //Kbot
+                {
+                    for mobile in self
+                        .game_state
+                        .kbots
+                        .iter_mut()
+                        .filter(|e| e.is_in_screen && e.distance_to_camera < unit_icon_distance)
+                    {
+                        let mat = mobile.trans.unwrap();
+                        let is_selected = if self.game_state.selected.contains(&mobile.id.value) {
+                            1.0
+                        } else {
+                            0.0
+                        };
+                        let team = mobile.team;
+                        Self::visit_part_tree(
+                            &mut mobile.part_tree,
+                            &mat,
+                            &mut self.generic_gpu,
+                            is_selected,
+                            team as f32,
+                        );
+                    }
+                }
+
                 for (path, model_gpu) in self.generic_gpu.iter_mut() {
                     match model_gpu {
                         GenericGpuState::Ready(model_gpu) => {
@@ -82,33 +121,33 @@ impl App {
                 }
             }
 
-            //Kbot
-            {
-                self.vertex_attr_buffer_f32.clear();
+            // //Kbot
+            // {
+            //     self.vertex_attr_buffer_f32.clear();
 
-                for mobile in self
-                    .game_state
-                    .kbots
-                    .iter()
-                    .filter(|e| e.is_in_screen && e.distance_to_camera < unit_icon_distance)
-                {
-                    let mat = mobile.trans.unwrap();
-                    let is_selected = if self.game_state.selected.contains(&mobile.id.value) {
-                        1.0
-                    } else {
-                        0.0
-                    };
-                    let team = mobile.team;
+            //     for mobile in self
+            //         .game_state
+            //         .kbots
+            //         .iter()
+            //         .filter(|e| e.is_in_screen && e.distance_to_camera < unit_icon_distance)
+            //     {
+            //         let mat = mobile.trans.unwrap();
+            //         let is_selected = if self.game_state.selected.contains(&mobile.id.value) {
+            //             1.0
+            //         } else {
+            //             0.0
+            //         };
+            //         let team = mobile.team;
 
-                    self.vertex_attr_buffer_f32
-                        .extend_from_slice(mat.as_slice());
-                    self.vertex_attr_buffer_f32.push(is_selected);
-                    self.vertex_attr_buffer_f32.push(team as f32)
-                }
+            //         self.vertex_attr_buffer_f32
+            //             .extend_from_slice(mat.as_slice());
+            //         self.vertex_attr_buffer_f32.push(is_selected);
+            //         self.vertex_attr_buffer_f32.push(team as f32)
+            //     }
 
-                self.kbot_gpu
-                    .update_instance_dirty(&self.vertex_attr_buffer_f32[..], &self.gpu.device);
-            }
+            //     self.kbot_gpu
+            //         .update_instance_dirty(&self.vertex_attr_buffer_f32[..], &self.gpu.device);
+            // }
             //Kinematic Projectile
             self.vertex_attr_buffer_f32.clear();
             for mobile in self.game_state.kinematic_projectiles.iter() {

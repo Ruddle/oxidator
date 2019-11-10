@@ -5,28 +5,21 @@ authors = ["Thomas SIMON <thomas.simon.work@gmail.com>"]
 edition = "2018"
 default-run = "oxidator"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [features]
-metal = ["wgpu/metal"]
-dx11 = ["wgpu/dx11"]
-dx12 = ["wgpu/dx12"]
-vulkan = ["wgpu/vulkan"]
-#Choose one method of loading spirv out of the three. use_spirv use the precompiled shaders, but do not support hotreloading.
+#Choose one method of loading spirv out of the three. use_spirv use the precompiled shaders, but does not support hotreloading.
 use_shaderc =["shaderc"]
 use_glsl_to_spirv =["glsl-to-spirv"]
 use_spirv =[]
-
-default = ["wgpu/vulkan","use_spirv"]
+default = ["use_shaderc"]
 
 [dependencies]
-wgpu = { version = "0.3.0" }
+wgpu = { version = "0.4.0" }
 env_logger = "0.7.1"
 glsl-to-spirv = {version= "0.1", optional= true}
 log = "0.4"
 png = "0.15"
-winit = "0.20.0-alpha3"
-raw-window-handle = "0.1"
+winit = "0.20.0-alpha4"
+raw-window-handle = "0.3.1"
 imgui = "0.2.1"
 shaderc = {version = "0.6", optional = true} 
 noise = "0.6.0"
@@ -39,11 +32,9 @@ typename = "0.1.1"
 base-62 = "0.1.1"
 obj-rs = "0.5"
 spin_sleep = "0.3.7"
-
 serde = { version = "1.0", features = ["derive"] }
 bincode = "1.2.0"
 flate2 = "1.0"
-
 rayon = "1.2"
 
 [dependencies.imgui-winit-support]

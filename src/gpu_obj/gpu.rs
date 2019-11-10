@@ -7,13 +7,12 @@ pub struct WgpuState {
     pub hidpi_factor: f64,
     pub swap_chain: SwapChain,
     pub surface: wgpu::Surface,
+    pub queue: wgpu::Queue,
 }
 
 impl WgpuState {
     pub fn new(window: winit::window::Window) -> Self {
-        let (instance, hidpi_factor, size, surface) = {
-            let instance = wgpu::Instance::new();
-
+        let (hidpi_factor, size, surface) = {
             window.set_inner_size(winit::dpi::LogicalSize {
                 width: 1280.0,
                 height: 720.0,
@@ -21,18 +20,17 @@ impl WgpuState {
             window.set_title("Oxidator");
             let hidpi_factor = window.hidpi_factor();
             let size = window.inner_size().to_physical(hidpi_factor);
-
-            use raw_window_handle::HasRawWindowHandle as _;
-            let surface = instance.create_surface(window.raw_window_handle());
-
-            (instance, hidpi_factor, size, surface)
+            let surface = wgpu::Surface::create(&window);
+            (hidpi_factor, size, surface)
         };
 
-        let adapter = instance.request_adapter(&wgpu::RequestAdapterOptions {
+        let adapter = wgpu::Adapter::request(&wgpu::RequestAdapterOptions {
             power_preference: wgpu::PowerPreference::HighPerformance,
-        });
+            backends: wgpu::BackendBit::PRIMARY,
+        })
+        .unwrap();
 
-        let device: wgpu::Device = adapter.request_device(&wgpu::DeviceDescriptor {
+        let (device, queue) = adapter.request_device(&wgpu::DeviceDescriptor {
             extensions: wgpu::Extensions {
                 anisotropic_filtering: false,
             },
@@ -55,6 +53,7 @@ impl WgpuState {
             hidpi_factor,
             swap_chain,
             surface,
+            queue,
         }
     }
 }

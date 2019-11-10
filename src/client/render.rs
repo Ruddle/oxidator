@@ -256,7 +256,12 @@ impl App {
         let ub_misc = self
             .gpu
             .device
-            .create_buffer_mapped(10, wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::COPY_DST)
+            .create_buffer_mapped(
+                10,
+                wgpu::BufferUsage::UNIFORM
+                    | wgpu::BufferUsage::COPY_DST
+                    | wgpu::BufferUsage::COPY_SRC,
+            )
             .fill_from_slice(&[
                 self.input_state.cursor_pos.0 as f32,
                 self.input_state.cursor_pos.1 as f32,
@@ -689,10 +694,7 @@ impl App {
             .expect("Rendering failed");
 
         let start = Instant::now();
-        self.gpu
-            .device
-            .get_queue()
-            .submit(&[encoder_render.finish()]);
+        self.gpu.queue.submit(&[encoder_render.finish()]);
         self.profiler
             .mix("device queue submit", start.elapsed(), 20);
 

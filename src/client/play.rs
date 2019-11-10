@@ -29,12 +29,6 @@ impl App {
                     }
                 }
 
-                // {
-                //     let m = mobile::KBot::new(Point3::new(100.0, 100.0, 100.0));
-                //     player_me.kbots.insert(m.id);
-                //     self.game_state.kbots.insert(m.id, m);
-                // }
-
                 let mut player_ennemy = Player::new();
                 player_ennemy.team = 1;
 
@@ -46,12 +40,6 @@ impl App {
                         kbots.insert(m.id, m);
                     }
                 }
-
-                // {
-                //     let m = mobile::KBot::new(Point3::new(120.0, 100.0, 100.0));
-                //     player_ennemy.kbots.insert(m.id);
-                //     self.game_state.kbots.insert(m.id, m);
-                // }
 
                 log::info!("Starting a game with {} bots", kbots.len());
 

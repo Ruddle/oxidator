@@ -1,6 +1,8 @@
+use crate::unit;
 use crate::utils;
 use na::{Matrix4, Point3, Vector2, Vector3};
 use serde::{Deserialize, Serialize};
+use std::path::{Path, PathBuf};
 use typename::TypeName;
 use utils::Id;
 
@@ -32,6 +34,7 @@ pub struct KBot {
 
     pub frame_last_shot: i32,
     pub reload_frame_count: i32,
+    pub part_tree: unit::PartTree,
 }
 
 impl KBot {
@@ -53,6 +56,22 @@ impl KBot {
             life: 100,
             max_life: 100,
             grounded: false,
+            part_tree: unit::PartTree {
+                id: utils::rand_id(),
+                dmodel: None,
+                joint: unit::Joint::Fix,
+                children: vec![unit::PartTree {
+                    id: utils::rand_id(),
+                    dmodel: Some(unit::DisplayModel {
+                        //Z is Y ?
+                        position: Point3::new(0.0, 0.0, 0.0),
+                        dir: Vector3::new(1.0, 0.0, 0.0),
+                        model_path: Path::new("./src/asset/cube.obj").to_owned(),
+                    }),
+                    joint: unit::Joint::Fix,
+                    children: Vec::new(),
+                }],
+            },
         }
     }
 }

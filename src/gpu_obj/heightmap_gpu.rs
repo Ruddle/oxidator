@@ -617,7 +617,12 @@ impl HeightmapGpu {
         ];
 
         let uniform_buf = device
-            .create_buffer_mapped(5, wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::COPY_DST)
+            .create_buffer_mapped(
+                5,
+                wgpu::BufferUsage::UNIFORM
+                    | wgpu::BufferUsage::COPY_DST
+                    | wgpu::BufferUsage::COPY_SRC,
+            )
             .fill_from_slice(&map_size_cam_pos);
 
         encoder.copy_buffer_to_buffer(&uniform_buf, 0, &self.uniform_buf, 0, 64);

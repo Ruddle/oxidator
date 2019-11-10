@@ -14,6 +14,7 @@ use imgui_winit_support;
 use imgui_winit_support::WinitPlatform;
 mod camera;
 mod game_state;
+
 mod unit_editor;
 
 mod heightmap_editor;
@@ -314,7 +315,13 @@ impl App {
             }]);
 
             // imgui <-> wgpu
-            let renderer = Renderer::new(&mut imgui, &mut gpu.device, gpu.sc_desc.format, None);
+            let renderer = Renderer::new(
+                &mut imgui,
+                &mut gpu.device,
+                &mut gpu.queue,
+                gpu.sc_desc.format,
+                None,
+            );
 
             ImguiWrap {
                 imgui,
@@ -335,14 +342,14 @@ impl App {
 
         let kbot_gpu = ModelGpu::new(
             // &crate::model::open_obj("./src/asset/tank/tank-base.obj"), //
-            &model::create_cube(),
+            &model::open_obj("./src/asset/cube.obj").unwrap(),
             &gpu.device,
             format,
             &bind_group_layout,
         );
 
         let kinematic_projectile_gpu = ModelGpu::new(
-            &model::create_small_cube(),
+            &model::open_obj("./src/asset/small_sphere.obj").unwrap(),
             &gpu.device,
             format,
             &bind_group_layout,
@@ -353,6 +360,13 @@ impl App {
             &gpu.device,
             format,
             &bind_group_layout,
+        );
+
+        let mut generic_gpu = HashMap::new();
+
+        generic_gpu.insert(
+            Path::new("./src/asset/cube.obj").to_owned(),
+            GenericGpuState::ToLoad(model::open_obj("./src/asset/cube.obj").unwrap()),
         );
 
         let health_bar =
@@ -395,12 +409,14 @@ impl App {
             sample_count: 1,
             dimension: wgpu::TextureDimension::D2,
             format: wgpu::TextureFormat::Rgba32Float,
-            usage: wgpu::TextureUsage::OUTPUT_ATTACHMENT | wgpu::TextureUsage::SAMPLED,
+            usage: wgpu::TextureUsage::OUTPUT_ATTACHMENT
+                | wgpu::TextureUsage::SAMPLED
+                | wgpu::TextureUsage::COPY_SRC,
         });
 
         let position_att_view = position_att.create_default_view();
 
-        gpu.device.get_queue().submit(&[init_encoder.finish()]);
+        gpu.queue.submit(&[init_encoder.finish()]);
 
         let game_state = game_state::State::new();
 
@@ -451,6 +467,7 @@ impl App {
             format,
             &first_color_att_view,
         );
+
         // Done
         let this = App {
             gpu,
@@ -460,7 +477,7 @@ impl App {
             ub_camera_mat,
             ub_misc,
             kbot_gpu,
-            generic_gpu: HashMap::new(),
+            generic_gpu,
             kinematic_projectile_gpu,
             arrow_gpu,
             heightmap_gpu,
@@ -554,7 +571,9 @@ impl App {
             sample_count: 1,
             dimension: wgpu::TextureDimension::D2,
             format: wgpu::TextureFormat::Rgba32Float,
-            usage: wgpu::TextureUsage::OUTPUT_ATTACHMENT | wgpu::TextureUsage::SAMPLED,
+            usage: wgpu::TextureUsage::OUTPUT_ATTACHMENT
+                | wgpu::TextureUsage::SAMPLED
+                | wgpu::TextureUsage::COPY_SRC,
         });
 
         self.position_att_view = position_att.create_default_view();
@@ -592,7 +611,7 @@ impl App {
                     .create_swap_chain(&self.gpu.surface, &self.gpu.sc_desc);
                 let command_buf = self.resize();
                 if let Some(command_buf) = command_buf {
-                    self.gpu.device.get_queue().submit(&[command_buf]);
+                    self.gpu.queue.submit(&[command_buf]);
                 }
             }
             event::Event::WindowEvent { event, .. } => match event {
