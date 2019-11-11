@@ -254,45 +254,48 @@ impl App {
         } else {
             0.0
         };
-        let ub_misc = self
+
+        let mut filler = camera::create_camera_uniform_vec(
+            (self.gpu.sc_desc.width, self.gpu.sc_desc.height),
+            self.game_state.near(),
+            &self.game_state.position_smooth,
+            &self.game_state.dir_smooth,
+        );
+
+        filler.extend_from_slice(&[
+            self.input_state.cursor_pos.0 as f32,
+            self.input_state.cursor_pos.1 as f32,
+            self.gpu.sc_desc.width as f32,
+            self.gpu.sc_desc.height as f32,
+            1.0 / self.gpu.sc_desc.width as f32,
+            1.0 / self.gpu.sc_desc.height as f32,
+            start_drag.0,
+            start_drag.1,
+            radius,
+            self.game_state.heightmap_editor.pen_strength as f32,
+            self.heightmap_gpu.phy.width as f32,
+            self.heightmap_gpu.phy.height as f32,
+        ]);
+
+        let ub_camera_temp = self
             .gpu
             .device
-            .create_buffer_mapped(
-                10,
-                wgpu::BufferUsage::UNIFORM
-                    | wgpu::BufferUsage::COPY_DST
-                    | wgpu::BufferUsage::COPY_SRC,
-            )
-            .fill_from_slice(&[
-                self.input_state.cursor_pos.0 as f32,
-                self.input_state.cursor_pos.1 as f32,
-                self.gpu.sc_desc.width as f32,
-                self.gpu.sc_desc.height as f32,
-                1.0 / self.gpu.sc_desc.width as f32,
-                1.0 / self.gpu.sc_desc.height as f32,
-                start_drag.0,
-                start_drag.1,
-                radius,
-                self.game_state.heightmap_editor.pen_strength as f32,
-            ]);
+            .create_buffer_mapped(4 * 16 + 12, wgpu::BufferUsage::COPY_SRC)
+            .fill_from_slice(&filler[..]);
 
-        encoder_render.copy_buffer_to_buffer(&ub_misc, 0, &self.ub_misc, 0, 10 * 4);
+        encoder_render.copy_buffer_to_buffer(
+            &ub_camera_temp,
+            0,
+            &self.ub_camera_mat,
+            0,
+            (4 * 16 + 12) * 4,
+        );
 
         self.heightmap_gpu.update_uniform(
             &self.gpu.device,
             &mut encoder_render,
             self.game_state.position_smooth.x,
             self.game_state.position_smooth.y,
-        );
-
-        camera::update_camera_uniform(
-            (self.gpu.sc_desc.width, self.gpu.sc_desc.height),
-            self.game_state.near(),
-            &self.game_state.position_smooth,
-            &self.game_state.dir_smooth,
-            &self.ub_camera_mat,
-            &self.gpu.device,
-            &mut encoder_render,
         );
 
         //Imgui

@@ -12,11 +12,18 @@ layout(location = 4) in float v_seed;
 
 layout(location = 0) out vec4 o_Target;
 
-layout(set = 0, binding = 3) uniform Locals {
+layout(set = 0, binding = 0) uniform Locals {
+    mat4 cor_proj_view;
+    mat4 u_View;
+    mat4 u_proj;
+    mat4 u_Normal;
     vec2 mouse_pos;
     vec2 resolution;
     vec2 inv_resolution;
     vec2 start_drag;
+    float pen_radius;
+    float pen_strength;
+    vec2 hmap_size;
 };
 layout(set = 1, binding = 0) uniform texture2D t_noise;
 layout(set = 1, binding = 1) uniform sampler s_noise;

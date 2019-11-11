@@ -10,7 +10,17 @@ layout(location = 2) out float min_lod;
 layout(location = 3) out float max_mip;
 
 layout(set = 0, binding = 0) uniform Locals {
-    mat4 u_Transform;
+    mat4 cor_proj_view;
+    mat4 u_View;
+    mat4 u_proj;
+    mat4 u_Normal;
+    vec2 mouse_pos;
+    vec2 resolution;
+    vec2 inv_resolution;
+    vec2 start_drag;
+    float pen_radius;
+    float pen_strength;
+    vec2 hmap_size;
 };
 
 layout(set = 1, binding = 0) uniform MapCfg {
@@ -36,7 +46,7 @@ void main() {
 
     int res = int(round(pow(2.0,mip)));
     vec2 cam_pos  =   vec2(floor_res(res,cam_x), floor_res(res,cam_y)); //vec2(0); //
-    vec2 dim = vec2(width,height);
+    vec2 dim = hmap_size ;//vec2(width,height);
 
     // vec2 pos_xy = clamp(
     // a_Pos.xy+cam_pos + vec2(0.5)
@@ -82,5 +92,5 @@ void main() {
 
     color = vec3(min_lod/4.0,min_lod/4.0,min_lod/4.0);
 
-    gl_Position = u_Transform * ( vec4(pos,1.0) );
+    gl_Position = cor_proj_view * ( vec4(pos,1.0) );
 }

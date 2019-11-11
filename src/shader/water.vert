@@ -4,7 +4,17 @@ layout(location = 0) out vec2 v_TexCoord;
 
 
 layout(set = 0, binding = 0) uniform Locals {
-    mat4 u_Transform;
+    mat4 cor_proj_view;
+    mat4 u_View;
+    mat4 u_proj;
+    mat4 u_Normal;
+    vec2 mouse_pos;
+    vec2 resolution;
+    vec2 inv_resolution;
+    vec2 start_drag;
+    float pen_radius;
+    float pen_strength;
+    vec2 hmap_size;
 };
 
 void main() {
@@ -18,6 +28,6 @@ void main() {
         case 3: tc = vec2(min, max); break;
     }
     v_TexCoord = tc;
-    vec2 pos =tc*2048.0;
-    gl_Position = u_Transform *vec4(pos,40.0,1.0);
+    vec2 pos =tc*hmap_size;
+    gl_Position = cor_proj_view *vec4(pos,40.0,1.0);
 }

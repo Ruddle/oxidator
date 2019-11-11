@@ -106,7 +106,6 @@ pub struct App {
     bind_group_layout: wgpu::BindGroupLayout,
 
     ub_camera_mat: wgpu::Buffer,
-    ub_misc: wgpu::Buffer,
 
     postfx: gpu_obj::post_fx::PostFx,
     postfxaa: gpu_obj::post_fxaa::PostFxaa,
@@ -181,11 +180,6 @@ impl App {
                             binding: 2,
                             visibility: wgpu::ShaderStage::FRAGMENT,
                             ty: wgpu::BindingType::Sampler,
-                        },
-                        wgpu::BindGroupLayoutBinding {
-                            binding: 3,
-                            visibility: wgpu::ShaderStage::VERTEX | wgpu::ShaderStage::FRAGMENT,
-                            ty: wgpu::BindingType::UniformBuffer { dynamic: false },
                         },
                     ],
                 });
@@ -268,20 +262,28 @@ impl App {
         //TODO reuse camera.rs code
         filler.extend_from_slice(mx_ref);
         filler.extend_from_slice(mx_normal_ref);
+        filler.extend_from_slice(&[
+            0.0_f32, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+        ]);
+        // mat4 cor_proj_view;
+        // mat4 u_View;
+        // mat4 u_proj;
+        // mat4 u_Normal;
+        // vec2 mouse_pos;
+        // vec2 resolution;
+        // vec2 inv_resolution;
+        // vec2 start_drag;
+        // float radius
+        // float pen_strength
+        // vec2 mapSize;
+
         let ub_camera_mat = gpu
             .device
             .create_buffer_mapped(
-                16 * 4,
+                16 * 4 + 12,
                 wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::COPY_DST,
             )
             .fill_from_slice(&filler[..]);
-
-        //2 Mouse pos
-        //2 resolution
-        let ub_misc = gpu
-            .device
-            .create_buffer_mapped(10, wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::COPY_DST)
-            .fill_from_slice(&[0.0_f32, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]);
 
         // Create bind group
         let bind_group = gpu.device.create_bind_group(&wgpu::BindGroupDescriptor {
@@ -291,7 +293,7 @@ impl App {
                     binding: 0,
                     resource: wgpu::BindingResource::Buffer {
                         buffer: &ub_camera_mat,
-                        range: 0..64,
+                        range: 0..(4 * 16 + 12) * 4,
                     },
                 },
                 wgpu::Binding {
@@ -301,13 +303,6 @@ impl App {
                 wgpu::Binding {
                     binding: 2,
                     resource: wgpu::BindingResource::Sampler(&sampler),
-                },
-                wgpu::Binding {
-                    binding: 3,
-                    resource: wgpu::BindingResource::Buffer {
-                        buffer: &ub_misc,
-                        range: 0..(10 * 4),
-                    },
                 },
             ],
         });
@@ -535,7 +530,6 @@ impl App {
             bind_group,
             bind_group_layout,
             ub_camera_mat,
-            ub_misc,
             kbot_gpu,
             generic_gpu,
             kinematic_projectile_gpu,

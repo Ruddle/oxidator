@@ -25,57 +25,42 @@ pub fn create_proj(aspect_ratio: f32, near: f32) -> Matrix4<f32> {
     mx_correction * mx_projection
 }
 
-pub fn create_view_proj(aspect_ratio: f32, near: f32, pos: &Point3<f32>, dir: &Vector3<f32>) -> Matrix4<f32> {
+pub fn create_view_proj(
+    aspect_ratio: f32,
+    near: f32,
+    pos: &Point3<f32>,
+    dir: &Vector3<f32>,
+) -> Matrix4<f32> {
     let mx_view = create_view(pos, dir);
     let mx_proj = create_proj(aspect_ratio, near);
     mx_proj * mx_view
 }
 
-pub fn update_camera_uniform(
+pub fn create_camera_uniform_vec(
     screen_res: (u32, u32),
-     near: f32,
+    near: f32,
     pos: &Point3<f32>,
     dir: &Vector3<f32>,
-    uniform_buf: &wgpu::Buffer,
-    device: &wgpu::Device,
-    encoder: &mut wgpu::CommandEncoder,
-) {
+) -> Vec<f32> {
+    let mut res = Vec::new();
     //ViewProj
     let mx_total = create_view_proj(screen_res.0 as f32 / screen_res.1 as f32, near, pos, dir);
     let mx_ref: &[f32] = mx_total.as_slice();
-
-    let temp_buf = device
-        .create_buffer_mapped(16, wgpu::BufferUsage::COPY_SRC)
-        .fill_from_slice(mx_ref);
-
-    encoder.copy_buffer_to_buffer(&temp_buf, 0, uniform_buf, 0, 64);
+    res.extend_from_slice(mx_ref);
     //View
     let mx_total = create_view(pos, dir);
     let mx_ref: &[f32] = mx_total.as_slice();
-
-    let temp_buf = device
-        .create_buffer_mapped(16, wgpu::BufferUsage::COPY_SRC)
-        .fill_from_slice(mx_ref);
-
-    encoder.copy_buffer_to_buffer(&temp_buf, 0, uniform_buf, 64, 64);
+    res.extend_from_slice(mx_ref);
     //Proj
     let mx_total = create_proj(screen_res.0 as f32 / screen_res.1 as f32, near);
     let mx_ref: &[f32] = mx_total.as_slice();
-
-    let temp_buf = device
-        .create_buffer_mapped(16, wgpu::BufferUsage::COPY_SRC)
-        .fill_from_slice(mx_ref);
-
-    encoder.copy_buffer_to_buffer(&temp_buf, 0, uniform_buf, 64 * 2, 64);
+    res.extend_from_slice(mx_ref);
     //Normal
     let mx_total = create_normal(pos, dir);
     let mx_ref: &[f32] = mx_total.as_slice();
-
-    let temp_buf = device
-        .create_buffer_mapped(16, wgpu::BufferUsage::COPY_SRC)
-        .fill_from_slice(mx_ref);
-
-    encoder.copy_buffer_to_buffer(&temp_buf, 0, uniform_buf, 64 * 3, 64);
+    res.extend_from_slice(mx_ref);
+    
+    res
 }
 
 impl App {

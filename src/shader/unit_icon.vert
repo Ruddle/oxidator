@@ -10,11 +10,18 @@ layout(location = 0) in vec2 center;
 layout(location = 1) in float size;
 layout(location = 2) in float team;
 
-layout(set = 0, binding = 3) uniform Locals {
+layout(set = 0, binding = 0) uniform Locals {
+    mat4 cor_proj_view;
+    mat4 u_View;
+    mat4 u_proj;
+    mat4 u_Normal;
     vec2 mouse_pos;
     vec2 resolution;
     vec2 inv_resolution;
     vec2 start_drag;
+    float pen_radius;
+    float pen_strength;
+    vec2 hmap_size;
 };
 
 void main() {

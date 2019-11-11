@@ -13,11 +13,17 @@ layout(set = 1, binding = 2) uniform texture2D t_pos;
 layout(set = 1, binding = 3) uniform sampler s_pos;
 
 layout(set = 0, binding = 0) uniform Locals {
-    mat4 u_Transform;
+    mat4 cor_proj_view;
     mat4 u_View;
     mat4 u_proj;
     mat4 u_Normal;
-    
+    vec2 mouse_pos;
+    vec2 resolution;
+    vec2 inv_resolution;
+    vec2 start_drag;
+    float pen_radius;
+    float pen_strength;
+    vec2 hmap_size;
 };
 
 int max_step = 40;
@@ -29,7 +35,7 @@ void main() {
 
 
     vec3 aze = texture(sampler2D(t_pos, s_pos), v_TexCoord).rgb;
-    vec3 world_pos = vec3(v_TexCoord*2048.0,40);
+    vec3 world_pos = vec3(v_TexCoord*hmap_size,40);
 
     vec4 view_pos4 = u_View* vec4(world_pos,1.0);
     vec3 view_pos  = view_pos4.xyz/ view_pos4.w;
