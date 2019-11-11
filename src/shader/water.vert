@@ -8,14 +8,16 @@ layout(set = 0, binding = 0) uniform Locals {
 };
 
 void main() {
+    float min = 0.0002;
+    float max = 1.0-min;
     vec2 tc = vec2(0.0);
     switch(gl_VertexIndex) {
-        case 0: tc = vec2(1.0, 0.0); break;
-        case 1: tc = vec2(1.0, 1.0); break;
-        case 2: tc = vec2(0.0, 0.0); break;
-        case 3: tc = vec2(0.0, 1.0); break;
+        case 0: tc = vec2(max, min); break;
+        case 1: tc = vec2(max, max); break;
+        case 2: tc = vec2(min, min); break;
+        case 3: tc = vec2(min, max); break;
     }
     v_TexCoord = tc;
-    vec2 pos = tc*2048;
+    vec2 pos =tc*2048.0;
     gl_Position = u_Transform *vec4(pos,40.0,1.0);
 }

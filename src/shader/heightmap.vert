@@ -7,6 +7,7 @@ layout(location = 1) in float mip;
 layout(location = 0) out vec2 v_TexCoord;
 layout(location = 1) out vec3 color;
 layout(location = 2) out float min_lod;
+layout(location = 3) out float max_mip;
 
 layout(set = 0, binding = 0) uniform Locals {
     mat4 u_Transform;
@@ -37,19 +38,47 @@ void main() {
     vec2 cam_pos  =   vec2(floor_res(res,cam_x), floor_res(res,cam_y)); //vec2(0); //
     vec2 dim = vec2(width,height);
 
-    vec2 pos_xy = clamp(
-    a_Pos.xy+cam_pos + vec2(0.5)
-    , vec2(0.0), dim);
+    // vec2 pos_xy = clamp(
+    // a_Pos.xy+cam_pos + vec2(0.5)
+    // , vec2(0.0), dim);
 
-    vec2 heightCoord = pos_xy/vec2(width,height);
-    v_TexCoord =heightCoord;// a_Pos.xy / dim;
+     vec2 pos_xy =  a_Pos.xy+cam_pos + vec2(0.5);
+
+ 
+
+    v_TexCoord =pos_xy/dim;
 
     min_lod =  texture(sampler2D(height_lod_tex, height_lod_sampler),v_TexCoord).r;
-
-    float max_mip  = max(mip, min_lod);
+    max_mip  = max(mip, min_lod);
 
     float z =  textureLod(sampler2D(height_tex, height_sampler),v_TexCoord, max_mip).r;
     vec3 pos = vec3(pos_xy,z);
+
+    float rock_bottom = -40.0;
+    if(pos_xy.y<-0.0){
+        pos.y= 0;
+        pos.z = rock_bottom;    
+    }
+
+    if(pos_xy.x<-0.0){
+        pos.x= 0;
+        pos.z = rock_bottom;    
+    }
+
+
+    if(pos_xy.x>width - pow(2,max_mip) ){
+        pos.x= width;
+    }
+
+    if(pos_xy.x>width  ){
+        pos.x= width;
+        pos.z = rock_bottom;    
+    }
+
+    if(pos_xy.y>height){
+        pos.y= height;
+        pos.z = rock_bottom;    
+    }
 
     color = vec3(min_lod/4.0,min_lod/4.0,min_lod/4.0);
 

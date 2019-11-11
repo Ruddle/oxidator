@@ -3,6 +3,7 @@
 layout(location = 0) in vec2 v_TexCoord;
 layout(location = 1) in vec3 color;
 layout(location = 2) in float min_lod;
+layout(location = 3) in float max_mip;
 layout(location = 0) out vec4 o_Target;
 layout(location = 1) out vec4 position_att;
 layout(set = 0, binding = 1) uniform texture2D t_Color;
@@ -96,6 +97,10 @@ void main() {
     vec3 phong = vec3(ambientColor +
     lambertian* diffuse +
     specular*specColor);
+
+    if(pos.y<=0.5 || pos.x <=0.5 || pos.x >= width-1.0* (pow(2,max_mip))  ){
+        phong= vec3(0.1);
+    }
 
     position_att = vec4(pos, 0.0);
     o_Target =   vec4(phong,1.0);
