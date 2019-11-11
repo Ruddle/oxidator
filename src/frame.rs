@@ -8,10 +8,10 @@ use na::{Point3, Vector3};
 use std::collections::{HashMap, HashSet};
 use std::time::Duration;
 
-use utils::*;
-
+use crate::unit;
 use mobile::*;
 use serde::{Deserialize, Serialize};
+use utils::*;
 
 #[derive(Clone, TypeName, Debug, Serialize, Deserialize, PartialEq)]
 pub struct Player {
@@ -99,6 +99,7 @@ pub struct Frame {
     pub kbots_dead: HashSet<Id<KBot>>,
     pub kinematic_projectiles_dead: Vec<Id<KinematicProjectile>>,
     pub kinematic_projectiles_birth: Vec<KinematicProjectile>,
+    pub part_trees: HashMap<Id<unit::PartTree>, unit::PartTree>,
 }
 
 impl Frame {
@@ -115,6 +116,7 @@ impl Frame {
             kbots_dead: HashSet::new(),
             kinematic_projectiles_dead: Vec::new(),
             kinematic_projectiles_birth: Vec::new(),
+            part_trees: HashMap::new(),
         }
     }
 }

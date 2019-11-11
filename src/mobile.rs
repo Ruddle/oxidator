@@ -34,11 +34,11 @@ pub struct KBot {
 
     pub frame_last_shot: i32,
     pub reload_frame_count: i32,
-    pub part_tree: unit::PartTree,
+    pub part_tree_id: Id<unit::PartTree>,
 }
 
 impl KBot {
-    pub fn new(position: Point3<f32>) -> Self {
+    pub fn new(position: Point3<f32>, part_tree_id: Id<unit::PartTree>) -> Self {
         KBot {
             position,
             speed: Vector3::new(0.0, 0.0, 0.0),
@@ -56,37 +56,10 @@ impl KBot {
             life: 100,
             max_life: 100,
             grounded: false,
-            part_tree: unit::PartTree {
-                id: utils::rand_id(),
-                dmodel: None,
-                joint: unit::Joint::Fix,
-                children: vec![unit::PartTree {
-                    id: utils::rand_id(),
-                    dmodel: Some(unit::DisplayModel {
-                        //Z is Y ?
-                        position: Point3::new(0.0, 0.0, 0.0),
-                        dir: Vector3::new(1.0, 0.0, 0.0),
-                        model_path: Path::new("./src/asset/cube.obj").to_owned(),
-                    }),
-                    joint: unit::Joint::Fix,
-                    children: vec![],
-                }],
-            },
+            part_tree_id,
         }
     }
 }
-
-// unit::PartTree {
-//     id: utils::rand_id(),
-//     dmodel: Some(unit::DisplayModel {
-//         //Z is Y ?
-//         position: Point3::new(0.5, 0.0, 0.0),
-//         dir: Vector3::new(1.0, 0.0, 0.0),
-//         model_path: Path::new("./src/asset/small_sphere.obj").to_owned(),
-//     }),
-//     joint: unit::Joint::Fix,
-//     children: Vec::new(),
-// }
 
 #[derive(Clone, TypeName, Debug, Serialize, Deserialize, PartialEq)]
 pub struct KinematicProjectile {

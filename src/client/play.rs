@@ -22,9 +22,29 @@ impl App {
 
                 let mut kbots = HashMap::new();
 
+                let tank_example = unit::PartTree {
+                    id: utils::rand_id(),
+                    dmodel: None,
+                    joint: unit::Joint::Fix,
+                    children: vec![unit::PartTree {
+                        id: utils::rand_id(),
+                        dmodel: Some(unit::DisplayModel {
+                            //Z is Y ?
+                            position: Point3::new(0.0, 0.0, 0.0),
+                            dir: Vector3::new(1.0, 0.0, 0.0),
+                            model_path: Path::new("./src/asset/cube.obj").to_owned(),
+                        }),
+                        joint: unit::Joint::Fix,
+                        children: vec![],
+                    }],
+                };
+
                 for i in (100..300).step_by(4) {
                     for j in (100..500).step_by(4) {
-                        let m = mobile::KBot::new(Point3::new(i as f32, j as f32, 100.0));
+                        let m = mobile::KBot::new(
+                            Point3::new(i as f32, j as f32, 100.0),
+                            tank_example.id,
+                        );
                         player_me.kbots.insert(m.id);
                         kbots.insert(m.id, m);
                     }
@@ -35,7 +55,10 @@ impl App {
 
                 for i in (320..520).step_by(4) {
                     for j in (100..500).step_by(4) {
-                        let mut m = mobile::KBot::new(Point3::new(i as f32, j as f32, 100.0));
+                        let mut m = mobile::KBot::new(
+                            Point3::new(i as f32, j as f32, 100.0),
+                            tank_example.id,
+                        );
                         m.team = 1;
                         player_ennemy.kbots.insert(m.id);
                         kbots.insert(m.id, m);
@@ -50,6 +73,9 @@ impl App {
                     .players
                     .insert(player_ennemy.id, player_ennemy);
 
+                let mut part_trees = HashMap::new();
+                part_trees.insert(tank_example.id, tank_example);
+
                 let replacer = FrameEventFromPlayer::ReplaceFrame(frame::Frame {
                     number: 0,
                     players: self.game_state.players.clone(),
@@ -62,6 +88,7 @@ impl App {
                     explosions: Vec::new(),
                     heightmap_phy: Some(self.heightmap_gpu.phy.clone()),
                     frame_profiler: frame::ProfilerMap::new(),
+                    part_trees,
                 });
                 let _ = self
                     .sender_from_client_to_manager

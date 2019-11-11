@@ -53,6 +53,7 @@ impl App {
                     from,
                     to: MainMode::Home,
                 } => {
+                    self.clear_gpu_instance_and_game_state();
                     self.game_state.position = Point3::new(200.0, 100.0, 50.0);
                     self.game_state.dir = Vector3::new(0.0, 0.3, -1.0);
                     match self.net_mode {

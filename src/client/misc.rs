@@ -79,7 +79,7 @@ impl App {
                 let identity = Matrix4::identity();
 
                 Self::visit_part_tree(
-                    &mut self.unit_editor.root,
+                    &self.unit_editor.root,
                     &identity,
                     &mut self.generic_gpu,
                     0.0,
@@ -101,13 +101,21 @@ impl App {
                             0.0
                         };
                         let team = mobile.team;
-                        Self::visit_part_tree(
-                            &mut mobile.part_tree,
-                            &mat,
-                            &mut self.generic_gpu,
-                            is_selected,
-                            team as f32,
-                        );
+
+                        if let Some(part_tree) = self
+                            .game_state
+                            .frame_zero
+                            .part_trees
+                            .get(&mobile.part_tree_id)
+                        {
+                            Self::visit_part_tree(
+                                &part_tree,
+                                &mat,
+                                &mut self.generic_gpu,
+                                is_selected,
+                                team as f32,
+                            );
+                        }
                     }
                 }
 
