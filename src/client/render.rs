@@ -144,6 +144,7 @@ impl App {
 
         let view_proj = camera::create_view_proj(
             self.gpu.sc_desc.width as f32 / self.gpu.sc_desc.height as f32,
+            self.game_state.near(),
             &self.game_state.position_smooth,
             &self.game_state.dir_smooth,
         );
@@ -286,6 +287,7 @@ impl App {
 
         camera::update_camera_uniform(
             (self.gpu.sc_desc.width, self.gpu.sc_desc.height),
+            self.game_state.near(),
             &self.game_state.position_smooth,
             &self.game_state.dir_smooth,
             &self.ub_camera_mat,
@@ -320,8 +322,7 @@ impl App {
                     .resizable(true)
                     .movable(false)
                     .build(&ui, || {
-                        imgui::Slider::new(im_str!("fps"), 1..=480).build(&ui, mut_fps);
-
+                        imgui::Slider::new(im_str!("fps cap"), 1..=480).build(&ui, mut_fps);
                         ui.text(im_str!(
                             "render: {:?}",
                             profiler_render.get("frame_time").unwrap()

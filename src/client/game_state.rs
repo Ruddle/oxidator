@@ -218,4 +218,12 @@ impl State {
             .map(|id| self.players.get(&id))
             .unwrap_or(None)
     }
+
+    pub fn near(&self) -> f32 {
+        if self.position_smooth.z > 515.0 {
+            10.0
+        } else {
+            0.3
+        }
+    }
 }

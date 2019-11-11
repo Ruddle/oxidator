@@ -248,6 +248,7 @@ impl App {
 
         let mx_total = camera::create_view_proj(
             gpu.sc_desc.width as f32 / gpu.sc_desc.height as f32,
+            1.0,
             &Point3::new(0.0, 0.0, 0.0),
             &Vector3::new(0.0, 0.0, 0.0),
         );
