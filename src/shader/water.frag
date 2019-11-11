@@ -1,6 +1,7 @@
 #version 450
 
 layout(location = 0) in vec2 v_TexCoord;
+layout(location = 1) flat in int v_floor_lwall_fwall_rwall;
 
 
 layout(location = 0) out vec4 o_Target;
@@ -28,28 +29,21 @@ layout(set = 0, binding = 0) uniform Locals {
 
 int max_step = 40;
 
-
-
 void main() {
-    // vec3 aze = texture(sampler2D(t_color, s_color), v_TexCoord).rgb;
-
-
-    vec3 aze = texture(sampler2D(t_pos, s_pos), v_TexCoord).rgb;
-    vec3 world_pos = vec3(v_TexCoord*hmap_size,40);
-
+    float water_level = 40;
+    vec3 world_pos = vec3(v_TexCoord*hmap_size,water_level);
     vec4 view_pos4 = u_View* vec4(world_pos,1.0);
     vec3 view_pos  = view_pos4.xyz/ view_pos4.w;
-    
     vec3 normal = vec3(0,0,1);
     vec3 view_normal = mat3(u_Normal)*normal;
-
-     vec3 reflected = normalize(reflect(normalize(view_pos), normalize(view_normal)));
-
+    vec3 reflected = normalize(reflect(normalize(view_pos), normalize(view_normal)));
     vec3 current =  view_pos;
     vec3 current_dir = reflected*15;
     bool found = false;
 
+
     int j = 0;
+    if(v_floor_lwall_fwall_rwall==0)
     for(int i =0; i<max_step;i++){
         j=i;
         current += current_dir;
@@ -108,6 +102,10 @@ void main() {
             texture(sampler2D(t_color, s_color), projected.xy).xyz,
             ref_color, alpha);
     }
+    //if wall
+     if(v_floor_lwall_fwall_rwall!=0){
+         ref_color*=ref_color;
+     }
 
     o_Target = vec4(ref_color,1.0);
     o_Target = vec4(vec3(float(j)/float(max_step)),1.0);

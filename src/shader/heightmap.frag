@@ -98,7 +98,13 @@ void main() {
     lambertian* diffuse +
     specular*specColor);
 
-    if(pos.y<=0.5 || pos.x <=0.5 || pos.x >= width-1.0* (pow(2,max_mip))  ){
+
+    // phong =mix(color, phong,0.1);
+    if(
+        pos.y <=0.5 || 
+        pos.x <=0.5 || 
+        pos.x >= width  
+    ){
         phong= vec3(0.1);
     }
 

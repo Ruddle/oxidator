@@ -1,7 +1,7 @@
 #version 450
 
 layout(location = 0) out vec2 v_TexCoord;
-
+layout(location = 1) flat out int v_floor_lwall_fwall_rwall;
 
 layout(set = 0, binding = 0) uniform Locals {
     mat4 cor_proj_view;
@@ -18,7 +18,7 @@ layout(set = 0, binding = 0) uniform Locals {
 };
 
 void main() {
-    float min = 0.0002;
+    float min = 0.0003;
     float max = 1.0-min;
     vec2 tc = vec2(0.0);
     switch(gl_VertexIndex) {
@@ -28,6 +28,31 @@ void main() {
         case 3: tc = vec2(min, max); break;
     }
     v_TexCoord = tc;
-    vec2 pos =tc*hmap_size;
-    gl_Position = cor_proj_view *vec4(pos,40.0,1.0);
+
+    v_floor_lwall_fwall_rwall = gl_InstanceIndex;
+    float water_level = 40; 
+    vec3 pos = vec3(0); 
+ 
+    switch(v_floor_lwall_fwall_rwall){
+        case 0: 
+            pos = vec3(tc*hmap_size,water_level);
+            break;
+        case 1: 
+            if(tc== vec2(max,max)){
+                tc= vec2(min,min);
+            }else if(tc== vec2(min,min)){
+                tc= vec2(max,max);
+            }
+            pos = vec3(min*hmap_size.x, tc* vec2( hmap_size.x ,water_level*1.001));
+            break;
+        case 2: 
+            pos = vec3(tc.x* hmap_size.x,min*hmap_size.y, tc.y* water_level*1.001);
+            break;
+        case 3: 
+            pos = vec3(max*hmap_size.x, tc* vec2( hmap_size.x ,water_level*1.001));
+            break;
+    }
+
+    
+    gl_Position = cor_proj_view *vec4(pos,1.0);
 }

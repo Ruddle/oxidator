@@ -201,7 +201,7 @@ impl WaterGpu {
         rpass.set_pipeline(&self.pipeline);
         rpass.set_bind_group(0, &main_bind_group, &[]);
         rpass.set_bind_group(1, &self.bind_group, &[]);
-        rpass.draw(0..4, 0..1);
+        rpass.draw(0..4, 0..4) ; //floor lwall fwall rwall
     }
 }
 
