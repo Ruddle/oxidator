@@ -110,6 +110,7 @@ pub struct App {
 
     postfx: gpu_obj::post_fx::PostFx,
     postfxaa: gpu_obj::post_fxaa::PostFxaa,
+    post_bicopy: gpu_obj::texture_view_bicopy::TextureViewBiCopy,
     health_bar: gpu_obj::health_bar::HealthBarGpu,
     line_gpu: gpu_obj::line::LineGpu,
     unit_icon: gpu_obj::unit_icon::UnitIconGpu,
@@ -165,7 +166,7 @@ impl App {
                     bindings: &[
                         wgpu::BindGroupLayoutBinding {
                             binding: 0,
-                            visibility: wgpu::ShaderStage::VERTEX,
+                            visibility: wgpu::ShaderStage::VERTEX | wgpu::ShaderStage::FRAGMENT,
                             ty: wgpu::BindingType::UniformBuffer { dynamic: false },
                         },
                         wgpu::BindGroupLayoutBinding {
@@ -244,16 +245,35 @@ impl App {
             lod_max_clamp: 100.0,
             compare_function: wgpu::CompareFunction::Always,
         });
+
         let mx_total = camera::create_view_proj(
             gpu.sc_desc.width as f32 / gpu.sc_desc.height as f32,
             &Point3::new(0.0, 0.0, 0.0),
             &Vector3::new(0.0, 0.0, 0.0),
         );
         let mx_ref: &[f32] = mx_total.as_slice();
+
+        let mx_view =
+            camera::create_view(&Point3::new(0.0, 0.0, 0.0), &Vector3::new(0.0, 0.0, 0.0));
+        let mx_view_ref: &[f32] = mx_view.as_slice();
+
+        let mx_normal =
+            camera::create_normal(&Point3::new(0.0, 0.0, 0.0), &Vector3::new(0.0, 0.0, 0.0));
+        let mx_normal_ref: &[f32] = mx_normal.as_slice();
+
+        let mut filler = Vec::new();
+        filler.extend_from_slice(mx_ref);
+        filler.extend_from_slice(mx_view_ref);
+        //TODO reuse camera.rs code
+        filler.extend_from_slice(mx_ref);
+        filler.extend_from_slice(mx_normal_ref);
         let ub_camera_mat = gpu
             .device
-            .create_buffer_mapped(16, wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::COPY_DST)
-            .fill_from_slice(mx_ref);
+            .create_buffer_mapped(
+                16 * 4,
+                wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::COPY_DST,
+            )
+            .fill_from_slice(&filler[..]);
 
         //2 Mouse pos
         //2 resolution
@@ -342,8 +362,6 @@ impl App {
             &bind_group_layout,
             heightmap_phy::HeightmapPhy::new(2048, 2048),
         );
-
-        let water_gpu = WaterGpu::new(&gpu.device, format, &bind_group_layout);
 
         let kbot_gpu = ModelGpu::new(
             // &crate::model::open_obj("./src/asset/tank/tank-base.obj"), //
@@ -481,6 +499,14 @@ impl App {
 
         let secon_color_att_view = secon_color_att.create_default_view();
 
+        let water_gpu = WaterGpu::new(
+            &gpu.device,
+            format,
+            &bind_group_layout,
+            &secon_color_att_view,
+            &position_att_view,
+        );
+
         let postfx = gpu_obj::post_fx::PostFx::new(
             &gpu.device,
             &bind_group_layout,
@@ -492,6 +518,13 @@ impl App {
             &bind_group_layout,
             format,
             &first_color_att_view,
+        );
+
+        let post_bicopy = gpu_obj::texture_view_bicopy::TextureViewBiCopy::new(
+            &gpu.device,
+            &bind_group_layout,
+            format,
+            &secon_color_att_view,
         );
 
         // Done
@@ -518,6 +551,7 @@ impl App {
 
             postfx,
             postfxaa,
+            post_bicopy,
             health_bar,
             line_gpu,
             unit_icon,
@@ -589,6 +623,9 @@ impl App {
         self.postfxaa
             .update_last_pass_view(&self.gpu.device, &self.first_color_att_view);
 
+        self.post_bicopy
+            .update_last_pass_view(&self.gpu.device, &self.secon_color_att_view);
+
         let depth_texture = self.gpu.device.create_texture(&wgpu::TextureDescriptor {
             size: wgpu::Extent3d {
                 width: self.gpu.sc_desc.width,
@@ -621,6 +658,12 @@ impl App {
         });
 
         self.position_att_view = position_att.create_default_view();
+
+        self.water_gpu.update_bind_group(
+            &self.gpu.device,
+            &self.secon_color_att_view,
+            &self.position_att_view,
+        );
 
         self.postfx
             .update_pos_att_view(&self.gpu.device, &self.position_att_view);

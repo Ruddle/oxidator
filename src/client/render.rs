@@ -669,7 +669,7 @@ impl App {
             log::trace!("begin_post_render_pass");
             let mut rpass = encoder_render.begin_render_pass(&wgpu::RenderPassDescriptor {
                 color_attachments: &[wgpu::RenderPassColorAttachmentDescriptor {
-                    attachment: &frame.view,
+                    attachment: &self.secon_color_att_view,
                     resolve_target: None,
                     load_op: wgpu::LoadOp::Clear,
                     store_op: wgpu::StoreOp::Store,
@@ -693,7 +693,7 @@ impl App {
             log::trace!("begin_post_render_pass");
             let mut rpass = encoder_render.begin_render_pass(&wgpu::RenderPassDescriptor {
                 color_attachments: &[wgpu::RenderPassColorAttachmentDescriptor {
-                    attachment: &frame.view,
+                    attachment: &self.secon_color_att_view,
                     resolve_target: None,
                     load_op: wgpu::LoadOp::Load,
                     store_op: wgpu::StoreOp::Store,
@@ -712,6 +712,29 @@ impl App {
             self.unit_icon.render(&mut rpass, &self.bind_group);
             self.explosion_gpu.render(&mut rpass, &self.bind_group);
             self.line_gpu.render(&mut rpass, &self.bind_group);
+        }
+
+        //Copy on frame view
+        {
+            let mut rpass = encoder_render.begin_render_pass(&wgpu::RenderPassDescriptor {
+                color_attachments: &[wgpu::RenderPassColorAttachmentDescriptor {
+                    attachment: &frame.view,
+                    resolve_target: None,
+                    load_op: wgpu::LoadOp::Load,
+                    store_op: wgpu::StoreOp::Store,
+                    clear_color: wgpu::Color {
+                        r: 1.0,
+                        g: 0.2,
+                        b: 0.3,
+                        a: 1.0,
+                    },
+                }],
+
+                depth_stencil_attachment: None,
+            });
+
+            self.post_bicopy
+                .render(&mut rpass, &self.gpu.device, &self.bind_group);
         }
 
         let render_pass_3d = now.elapsed();

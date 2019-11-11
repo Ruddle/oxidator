@@ -69,12 +69,24 @@ impl KBot {
                         model_path: Path::new("./src/asset/cube.obj").to_owned(),
                     }),
                     joint: unit::Joint::Fix,
-                    children: Vec::new(),
+                    children: vec![],
                 }],
             },
         }
     }
 }
+
+// unit::PartTree {
+//     id: utils::rand_id(),
+//     dmodel: Some(unit::DisplayModel {
+//         //Z is Y ?
+//         position: Point3::new(0.5, 0.0, 0.0),
+//         dir: Vector3::new(1.0, 0.0, 0.0),
+//         model_path: Path::new("./src/asset/small_sphere.obj").to_owned(),
+//     }),
+//     joint: unit::Joint::Fix,
+//     children: Vec::new(),
+// }
 
 #[derive(Clone, TypeName, Debug, Serialize, Deserialize, PartialEq)]
 pub struct KinematicProjectile {

@@ -6,7 +6,6 @@ pub struct PostFxaa {
     pipeline: wgpu::RenderPipeline,
     bind_group_layout: BindGroupLayout,
     bind_group: BindGroup,
-    sampler: wgpu::Sampler,
 }
 
 impl PostFxaa {
@@ -67,12 +66,23 @@ impl PostFxaa {
         PostFxaa {
             pipeline,
             bind_group_layout,
-            sampler,
             bind_group,
         }
     }
 
     pub fn update_last_pass_view(&mut self, device: &Device, last_pass_view: &TextureView) {
+        let sampler = device.create_sampler(&wgpu::SamplerDescriptor {
+            address_mode_u: wgpu::AddressMode::ClampToEdge,
+            address_mode_v: wgpu::AddressMode::ClampToEdge,
+            address_mode_w: wgpu::AddressMode::ClampToEdge,
+            mag_filter: wgpu::FilterMode::Linear,
+            min_filter: wgpu::FilterMode::Linear,
+            mipmap_filter: wgpu::FilterMode::Linear,
+            lod_min_clamp: -100.0,
+            lod_max_clamp: 100.0,
+            compare_function: wgpu::CompareFunction::Always,
+        });
+
         self.bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
             layout: &self.bind_group_layout,
             bindings: &[
@@ -82,7 +92,7 @@ impl PostFxaa {
                 },
                 wgpu::Binding {
                     binding: 1,
-                    resource: wgpu::BindingResource::Sampler(&self.sampler),
+                    resource: wgpu::BindingResource::Sampler(&sampler),
                 },
             ],
         });
@@ -138,12 +148,7 @@ impl PostFxaa {
         Ok(pipeline)
     }
 
-    pub fn render(
-        &self,
-        rpass: &mut RenderPass,
-        device: &Device,
-        main_bind_group: &BindGroup,
-    ) {
+    pub fn render(&self, rpass: &mut RenderPass, device: &Device, main_bind_group: &BindGroup) {
         log::trace!("PostFxaa render");
         rpass.set_pipeline(&self.pipeline);
         rpass.set_bind_group(0, &main_bind_group, &[]);

@@ -10,6 +10,7 @@ pub mod line;
 pub mod model_gpu;
 pub mod post_fx;
 pub mod post_fxaa;
+pub mod texture_view_bicopy;
 pub mod trait_gpu;
 pub mod unit_icon;
 pub mod water;

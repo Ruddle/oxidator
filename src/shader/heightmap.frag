@@ -61,7 +61,11 @@ void main() {
 
     float ground_end= 1/90.0;
     float grass_start= 2/90.0;
+
     vec3 grass_color = vec3(0.45,0.7,0.2);
+    vec3 sand_color = vec3(1.0,0.8,0.7);
+
+    grass_color = mix(grass_color,sand_color, min(1,max(46.0- pos.z,0)*2 )); 
     
     if  (slope > ground_end){
         diffuse = mix(diffuse,grass_color, linlerp(slope,ground_end,grass_start) );

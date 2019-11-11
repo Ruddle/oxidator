@@ -15,15 +15,29 @@ pub fn camera_dist_from_clip(clip_pos_z: f32) -> f32 {
     zeye
 }
 
-pub fn create_view_proj(aspect_ratio: f32, pos: &Point3<f32>, dir: &Vector3<f32>) -> Matrix4<f32> {
+pub fn create_view(pos: &Point3<f32>, dir: &Vector3<f32>) -> Matrix4<f32> {
+    Matrix4::look_at_rh(pos, &(pos + dir), &Vector3::new(0.0, 0.0, 1.0))
+}
+
+pub fn create_normal(pos: &Point3<f32>, dir: &Vector3<f32>) -> Matrix4<f32> {
+    Matrix4::look_at_rh(pos, &(pos + dir), &Vector3::new(0.0, 0.0, 1.0))
+        .try_inverse()
+        .unwrap()
+        .transpose()
+}
+
+pub fn create_proj(aspect_ratio: f32) -> Matrix4<f32> {
     let mx_projection = Matrix4::new_perspective(aspect_ratio, FOVY, NEAR, FAR);
-
-    let mx_view = Matrix4::look_at_rh(pos, &(pos + dir), &Vector3::new(0.0, 0.0, 1.0));
-
     let mx_correction: Matrix4<f32> = Matrix4::new(
         1.0, 0.0, 0.0, 0.0, 0.0, -1.0, 0.0, 0.0, 0.0, 0.0, 0.5, 0.5, 0.0, 0.0, 0.0, 1.0,
     );
-    mx_correction * mx_projection * mx_view
+    mx_correction * mx_projection
+}
+
+pub fn create_view_proj(aspect_ratio: f32, pos: &Point3<f32>, dir: &Vector3<f32>) -> Matrix4<f32> {
+    let mx_view = create_view(pos, dir);
+    let mx_proj = create_proj(aspect_ratio);
+    mx_proj * mx_view
 }
 
 pub fn update_camera_uniform(
@@ -34,6 +48,7 @@ pub fn update_camera_uniform(
     device: &wgpu::Device,
     encoder: &mut wgpu::CommandEncoder,
 ) {
+    //ViewProj
     let mx_total = create_view_proj(screen_res.0 as f32 / screen_res.1 as f32, pos, dir);
     let mx_ref: &[f32] = mx_total.as_slice();
 
@@ -42,6 +57,33 @@ pub fn update_camera_uniform(
         .fill_from_slice(mx_ref);
 
     encoder.copy_buffer_to_buffer(&temp_buf, 0, uniform_buf, 0, 64);
+    //View
+    let mx_total = create_view(pos, dir);
+    let mx_ref: &[f32] = mx_total.as_slice();
+
+    let temp_buf = device
+        .create_buffer_mapped(16, wgpu::BufferUsage::COPY_SRC)
+        .fill_from_slice(mx_ref);
+
+    encoder.copy_buffer_to_buffer(&temp_buf, 0, uniform_buf, 64, 64);
+    //Proj
+    let mx_total = create_proj(screen_res.0 as f32 / screen_res.1 as f32);
+    let mx_ref: &[f32] = mx_total.as_slice();
+
+    let temp_buf = device
+        .create_buffer_mapped(16, wgpu::BufferUsage::COPY_SRC)
+        .fill_from_slice(mx_ref);
+
+    encoder.copy_buffer_to_buffer(&temp_buf, 0, uniform_buf, 64 * 2, 64);
+    //Normal
+    let mx_total = create_normal(pos, dir);
+    let mx_ref: &[f32] = mx_total.as_slice();
+
+    let temp_buf = device
+        .create_buffer_mapped(16, wgpu::BufferUsage::COPY_SRC)
+        .fill_from_slice(mx_ref);
+
+    encoder.copy_buffer_to_buffer(&temp_buf, 0, uniform_buf, 64 * 3, 64);
 }
 
 impl App {
