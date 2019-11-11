@@ -10,7 +10,7 @@ default-run = "oxidator"
 use_shaderc =["shaderc"]
 use_glsl_to_spirv =["glsl-to-spirv"]
 use_spirv =[]
-default = ["use_shaderc"]
+default = ["use_spirv"]
 
 [dependencies]
 wgpu = { version = "0.4.0" }
