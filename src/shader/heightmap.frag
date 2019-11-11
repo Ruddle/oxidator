@@ -103,7 +103,8 @@ void main() {
     if(
         pos.y <=0.5 || 
         pos.x <=0.5 || 
-        pos.x >= width  
+        pos.x >= width  ||
+        pos.y >= height  
     ){
         phong= vec3(0.1);
     }

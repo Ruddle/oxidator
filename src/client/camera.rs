@@ -59,7 +59,6 @@ pub fn create_camera_uniform_vec(
     let mx_total = create_normal(pos, dir);
     let mx_ref: &[f32] = mx_total.as_slice();
     res.extend_from_slice(mx_ref);
-    
     res
 }
 
@@ -85,10 +84,16 @@ impl App {
                 .max(0.0)
                 .min(self.heightmap_gpu.phy.height as f32 - 1.0),
         );
+
+        let screen_center_world_pos_fallback = self.game_state.position_smooth
+            + self.game_state.dir_smooth * (40.0 - self.game_state.position_smooth.z)
+                / self.game_state.dir_smooth.z;
+
         let height_from_ground = self.game_state.position.z - camera_ground_height;
         let distance_camera_middle_screen = self
             .game_state
             .screen_center_world_pos
+            .or(Some(screen_center_world_pos_fallback.coords))
             .map(|scwp| (self.game_state.position.coords - scwp).magnitude())
             .unwrap_or(height_from_ground);
         let k =
@@ -108,7 +113,11 @@ impl App {
         }
 
         if on(Key::LControl) {
-            if let Some(screen_center_world_pos) = self.game_state.screen_center_world_pos {
+            if let Some(screen_center_world_pos) = self
+                .game_state
+                .screen_center_world_pos
+                .or(Some(screen_center_world_pos_fallback.coords))
+            {
                 if self.input_state.last_scroll != 0.0 {
                     let camera_to_center =
                         screen_center_world_pos - self.game_state.position.coords;
@@ -142,7 +151,11 @@ impl App {
                 }
             }
         } else {
-            if let Some(mouse_world_pos) = self.game_state.mouse_world_pos {
+            if let Some(mouse_world_pos) = self
+                .game_state
+                .mouse_world_pos
+                .or(Some(screen_center_world_pos_fallback.coords))
+            {
                 let u = (mouse_world_pos - self.game_state.position.coords).normalize();
                 offset += self.input_state.last_scroll * u * k * 0.75 * 0.320 / sim_sec;
             } else {
@@ -158,6 +171,11 @@ impl App {
         });
 
         self.game_state.position.z = self.game_state.position.z.max(camera_ground_height + 3.0);
+
+        if self.game_state.position.coords.magnitude() > 7000.0 {
+            self.game_state.position =
+                Point3::from(7000.0 * self.game_state.position.coords.normalize());
+        }
 
         self.game_state.position_smooth += (self.game_state.position.coords
             - self.game_state.position_smooth.coords)
