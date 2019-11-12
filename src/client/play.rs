@@ -1,4 +1,5 @@
 use super::client::*;
+use crate::botdef;
 use crate::frame::FrameEventFromPlayer;
 use crate::frame::Player;
 use crate::*;
@@ -22,21 +23,41 @@ impl App {
 
                 let mut kbots = HashMap::new();
 
-                let tank_example = unit::PartTree {
+                let tank_example_part_tree = unit::PartTree {
                     id: utils::rand_id(),
-                    dmodel: None,
+                    placed_mesh: None,
+                    placed_collider: None,
                     joint: unit::Joint::Fix,
                     children: vec![unit::PartTree {
                         id: utils::rand_id(),
-                        dmodel: Some(unit::DisplayModel {
-                            //Z is Y ?
+                        placed_mesh: Some(unit::PlacedMesh {
                             position: Point3::new(0.0, 0.0, 0.0),
                             dir: Vector3::new(1.0, 0.0, 0.0),
-                            model_path: Path::new("./src/asset/cube.obj").to_owned(),
+                            mesh_path: Path::new("./src/asset/cube.obj").to_owned(),
                         }),
+                        placed_collider: None,
                         joint: unit::Joint::Fix,
-                        children: vec![],
+                        children: vec![
+                            //
+                            // unit::PartTree {
+                            //     id: utils::rand_id(),
+                            //     placed_mesh: Some(unit::PlacedMesh {
+                            //         position: Point3::new(0.0, 0.0, 0.0),
+                            //         dir: Vector3::new(1.0, 0.0, 0.0).normalize(),
+                            //         mesh_path: Path::new("./src/asset/tank/canon.obj").to_owned(),
+                            //     }),
+                            //     joint: unit::Joint::Fix,
+                            //     children: vec![],
+                            // }, //
+                        ],
                     }],
+                };
+
+                let tank_example = botdef::BotDef {
+                    id: utils::rand_id(),
+                    radius: 0.5,
+                    max_life: 100,
+                    part_tree: tank_example_part_tree,
                 };
 
                 for i in (100..300).step_by(4) {
@@ -73,8 +94,8 @@ impl App {
                     .players
                     .insert(player_ennemy.id, player_ennemy);
 
-                let mut part_trees = HashMap::new();
-                part_trees.insert(tank_example.id, tank_example);
+                let mut bot_defs = HashMap::new();
+                bot_defs.insert(tank_example.id, tank_example);
 
                 let replacer = FrameEventFromPlayer::ReplaceFrame(frame::Frame {
                     number: 0,
@@ -88,7 +109,7 @@ impl App {
                     explosions: Vec::new(),
                     heightmap_phy: Some(self.heightmap_gpu.phy.clone()),
                     frame_profiler: frame::ProfilerMap::new(),
-                    part_trees,
+                    bot_defs,
                 });
                 let _ = self
                     .sender_from_client_to_manager
@@ -138,14 +159,14 @@ impl App {
                         .kbots
                         .iter()
                         .filter(|e| {
-                            e.is_in_screen
-                                && me.kbots.contains(&e.id)
-                                && e.screen_pos.x > min_x
-                                && e.screen_pos.x < max_x
-                                && e.screen_pos.y < max_y
-                                && e.screen_pos.y > min_y
+                            e.1.is_in_screen
+                                && me.kbots.contains(&e.0.id)
+                                && e.1.screen_pos.x > min_x
+                                && e.1.screen_pos.x < max_x
+                                && e.1.screen_pos.y < max_y
+                                && e.1.screen_pos.y > min_y
                         })
-                        .map(|e| e.id.value)
+                        .map(|e| e.0.id.value)
                         .collect();
 
                     log::trace!("Selection took {}us", start_sel.elapsed().as_micros());

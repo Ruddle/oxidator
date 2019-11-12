@@ -1,3 +1,4 @@
+mod botdef;
 mod client;
 mod frame;
 mod frame_server;

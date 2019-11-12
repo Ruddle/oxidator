@@ -1,3 +1,4 @@
+use crate::botdef;
 use crate::unit;
 use crate::utils;
 use na::{Matrix4, Point3, Vector2, Vector3};
@@ -15,48 +16,60 @@ pub struct ExplosionEvent {
 
 #[derive(Clone, TypeName, Debug, Serialize, Deserialize, PartialEq)]
 pub struct KBot {
+    pub id: Id<KBot>,
     pub position: Point3<f32>,
+    pub speed: Vector3<f32>,
+    pub dir: Vector3<f32>,
+    pub up: Vector3<f32>,
+    pub target: Option<Point3<f32>>,
+    pub life: i32,
+    pub team: i32,
+    pub grounded: bool,
+    pub frame_last_shot: i32,
+    pub reload_frame_count: i32,
+    pub botdef_id: Id<botdef::BotDef>,
+}
+
+pub struct ClientKbot {
+    pub position: Point3<f32>,
+    pub dir: Vector3<f32>,
+    pub up: Vector3<f32>,
+
     pub trans: Option<Matrix4<f32>>,
     pub is_in_screen: bool,
     pub distance_to_camera: f32,
     pub screen_pos: Vector2<f32>,
-    pub speed: Vector3<f32>,
-    pub dir: Vector3<f32>,
-    pub target: Option<Point3<f32>>,
-    pub id: Id<KBot>,
-
-    pub radius: f32,
-    pub life: i32,
-    pub max_life: i32,
-    pub team: i32,
-
-    pub grounded: bool,
-
-    pub frame_last_shot: i32,
-    pub reload_frame_count: i32,
-    pub part_tree_id: Id<unit::PartTree>,
 }
 
-impl KBot {
-    pub fn new(position: Point3<f32>, part_tree_id: Id<unit::PartTree>) -> Self {
-        KBot {
+impl ClientKbot {
+    pub fn new(position: Point3<f32>) -> Self {
+        ClientKbot {
             position,
-            speed: Vector3::new(0.0, 0.0, 0.0),
+            dir: Vector3::new(0.0, 0.0, 0.0),
+            up: Vector3::new(0.0, 0.0, 0.0),
             trans: None,
             is_in_screen: false,
             distance_to_camera: 0.0,
             screen_pos: Vector2::new(0.0, 0.0),
+        }
+    }
+}
+
+impl KBot {
+    pub fn new(position: Point3<f32>, botdef_id: Id<botdef::BotDef>) -> Self {
+        KBot {
+            position,
+            speed: Vector3::new(0.0, 0.0, 0.0),
             team: 0,
             dir: Vector3::new(1.0, 0.0, 0.0),
+            up: Vector3::new(0.0, 0.0, 1.0),
             target: None,
             id: utils::rand_id(),
-            radius: 0.5,
             frame_last_shot: 0,
             reload_frame_count: 3,
             life: 100,
-            max_life: 100,
             grounded: false,
-            part_tree_id,
+            botdef_id,
         }
     }
 }

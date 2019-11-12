@@ -389,6 +389,11 @@ impl App {
         );
 
         generic_gpu.insert(
+            Path::new("./src/asset/axis_debug.obj").to_owned(),
+            GenericGpuState::ToLoad(model::open_obj("./src/asset/axis_debug.obj").unwrap()),
+        );
+
+        generic_gpu.insert(
             Path::new("./src/asset/small_sphere.obj").to_owned(),
             GenericGpuState::ToLoad(model::open_obj("./src/asset/small_sphere.obj").unwrap()),
         );

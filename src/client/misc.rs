@@ -34,17 +34,25 @@ impl App {
         team: f32,
     ) {
         for c in part_tree.children.iter() {
-            if let Some(dmodel) = &c.dmodel {
-                let display_model = &dmodel;
+            if let Some(placed_mesh) = &c.placed_mesh {
+                let display_model = &placed_mesh;
 
-                let mat = Matrix4::face_towards(
-                    &display_model.position,
-                    &(display_model.position + display_model.dir),
+                let mat = utils::face_towards_dir(
+                    &display_model.position.coords,
+                    &(display_model.dir),
                     &Vector3::new(0.0, 0.0, 1.0),
                 );
 
                 let combined = root_trans * mat;
-                match generic_gpu.get_mut(&dmodel.model_path) {
+
+                // log::warn!(
+                //     "root {:?}\nlocal {:?}\ncombined {:?}\n",
+                //     root_trans,
+                //     mat,
+                //     combined
+                // );
+
+                match generic_gpu.get_mut(&placed_mesh.mesh_path) {
                     Some(GenericGpuState::Ready(generic_cpu)) => {
                         let buf = &mut generic_cpu.instance_attr_cpu_buf;
                         buf.extend_from_slice(combined.as_slice());
@@ -76,7 +84,11 @@ impl App {
                     }
                 }
 
-                let identity = Matrix4::identity();
+                let identity = utils::face_towards_dir(
+                    &Vector3::new(0.0_f32, 0.0, 0.0),
+                    &Vector3::new(1.0, 0.0, 0.0),
+                    &Vector3::new(0.0, 0.0, 1.0),
+                ); //Matrix4::identity();
 
                 Self::visit_part_tree(
                     &self.unit_editor.root,
@@ -88,13 +100,12 @@ impl App {
 
                 //Kbot
                 {
-                    for mobile in self
-                        .game_state
-                        .kbots
-                        .iter_mut()
-                        .filter(|e| e.is_in_screen && e.distance_to_camera < unit_icon_distance)
+                    for (mobile, client_kbot) in
+                        self.game_state.kbots.iter_mut().filter(|e| {
+                            e.1.is_in_screen && e.1.distance_to_camera < unit_icon_distance
+                        })
                     {
-                        let mat = mobile.trans.unwrap();
+                        let mat = client_kbot.trans.unwrap();
                         let is_selected = if self.game_state.selected.contains(&mobile.id.value) {
                             1.0
                         } else {
@@ -102,14 +113,11 @@ impl App {
                         };
                         let team = mobile.team;
 
-                        if let Some(part_tree) = self
-                            .game_state
-                            .frame_zero
-                            .part_trees
-                            .get(&mobile.part_tree_id)
+                        if let Some(botdef) =
+                            self.game_state.frame_zero.bot_defs.get(&mobile.botdef_id)
                         {
                             Self::visit_part_tree(
-                                &part_tree,
+                                &botdef.part_tree,
                                 &mat,
                                 &mut self.generic_gpu,
                                 is_selected,
@@ -159,9 +167,9 @@ impl App {
             //Kinematic Projectile
             self.vertex_attr_buffer_f32.clear();
             for mobile in self.game_state.kinematic_projectiles.iter() {
-                let mat = Matrix4::face_towards(
-                    &mobile,
-                    &(mobile + Vector3::new(1.0, 0.0, 0.0)),
+                let mat = utils::face_towards_dir(
+                    &mobile.coords,
+                    &(Vector3::new(1.0, 0.0, 0.0)),
                     &Vector3::new(0.0, 0.0, 1.0),
                 );
 
@@ -200,11 +208,11 @@ impl App {
 
             //Unit life
             self.vertex_attr_buffer_f32.clear();
-            for kbot in self
+            for (kbot, client_kbot) in self
                 .game_state
                 .kbots
                 .iter()
-                .filter(|e| e.is_in_screen && e.distance_to_camera < unit_icon_distance)
+                .filter(|e| e.1.is_in_screen && e.1.distance_to_camera < unit_icon_distance)
             {
                 let distance =
                     (self.game_state.position_smooth.coords - kbot.position.coords).magnitude();
@@ -222,7 +230,13 @@ impl App {
                     .max(0.3)
                     .powf(1.0);
 
-                let life = kbot.life as f32 / kbot.max_life as f32;
+                let botdef = self
+                    .game_state
+                    .frame_zero
+                    .bot_defs
+                    .get(&kbot.botdef_id)
+                    .unwrap();
+                let life = kbot.life as f32 / botdef.max_life as f32;
                 if alpha > 0.0 && life < 1.0 {
                     let w = self.gpu.sc_desc.width as f32;
                     let h = self.gpu.sc_desc.height as f32;
@@ -236,14 +250,14 @@ impl App {
 
                     let u = right.cross(&camera_to_unit).normalize();
 
-                    let world_pos = kbot.position + u * kbot.radius * 1.5;
+                    let world_pos = kbot.position + u * botdef.radius * 1.5;
                     let r = view_proj * world_pos.to_homogeneous();
                     let r = r / r.w;
 
                     let offset = Vector2::new(r.x, r.y);
                     let min = offset - half_size;
                     let max = offset + half_size;
-                    let life = kbot.life as f32 / kbot.max_life as f32;
+                    let life = kbot.life as f32 / botdef.max_life as f32;
                     self.vertex_attr_buffer_f32
                         .extend_from_slice(min.as_slice());
                     self.vertex_attr_buffer_f32
@@ -257,16 +271,17 @@ impl App {
 
             //Icon
             self.vertex_attr_buffer_f32.clear();
-            for kbot in self
+            for (kbot, client_kbot) in self
                 .game_state
                 .kbots
                 .iter()
-                .filter(|e| e.is_in_screen && e.distance_to_camera >= unit_icon_distance)
+                .filter(|e| e.1.is_in_screen && e.1.distance_to_camera >= unit_icon_distance)
             {
                 self.vertex_attr_buffer_f32
-                    .extend_from_slice(kbot.screen_pos.as_slice());
+                    .extend_from_slice(client_kbot.screen_pos.as_slice());
                 //TODO f(distance) instead of 20.0
-                let size = ((1.0 / (kbot.distance_to_camera / unit_icon_distance)) * 15.0).max(4.0);
+                let size =
+                    ((1.0 / (client_kbot.distance_to_camera / unit_icon_distance)) * 15.0).max(4.0);
                 self.vertex_attr_buffer_f32.push(size);
 
                 let is_selected = self.game_state.selected.contains(&kbot.id.value);
@@ -284,7 +299,7 @@ impl App {
                     .key_pressed
                     .contains(&winit::event::VirtualKeyCode::LShift)
                 {
-                    for mobile in self.game_state.kbots.iter() {
+                    for (mobile, _) in self.game_state.kbots.iter() {
                         if let Some(target) = mobile.target {
                             let min = view_proj * mobile.position.to_homogeneous();
                             let max = view_proj * target.to_homogeneous();

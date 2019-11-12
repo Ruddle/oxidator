@@ -1,3 +1,4 @@
+use na::Vector3;
 use serde::{Deserialize, Serialize};
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct HeightmapPhy {
@@ -55,5 +56,13 @@ impl HeightmapPhy {
             + d * (1.0 - x.fract()) * (y.fract());
 
         z
+    }
+
+    pub fn normal(&self, x: f32, y: f32) -> Vector3<f32> {
+        let r = self.z_linear(x + 1.0, y);
+        let l = self.z_linear(x - 1.0, y);
+        let u = self.z_linear(x, y - 1.0);
+        let d = self.z_linear(x, y + 1.0);
+        Vector3::new(-(r - l), (d - u), 2.0).normalize()
     }
 }

@@ -38,7 +38,7 @@ pub struct State {
     pub frame_zero_time_received: Instant,
 
     //Interpolated from curve
-    pub kbots: Vec<KBot>,
+    pub kbots: Vec<(KBot, ClientKbot)>,
     pub server_sec: f32,
     //Extrapolated from events
     pub explosions: Vec<Explosion>,
@@ -130,6 +130,13 @@ impl State {
             .difference(&self.frame_zero.kbots_dead.iter().map(|e| e.value).collect())
             .copied()
             .collect();
+
+        self.kbots = self
+            .frame_zero
+            .kbots
+            .values()
+            .map(|kbot| (kbot.clone(), ClientKbot::new(kbot.position)))
+            .collect();
     }
 
     pub fn interpolate(&mut self, threadpool: &rayon::ThreadPool, view_proj: &Matrix4<f32>) {
@@ -162,8 +169,6 @@ impl State {
             }
         }
 
-        let mut kbots: Vec<_> = self.frame_zero.kbots.values().cloned().collect();
-
         self.explosions = self
             .explosions
             .iter()
@@ -171,28 +176,33 @@ impl State {
             .filter(|e| e.death_sec > self.server_sec)
             .collect();
 
+        let mut kbots = std::mem::replace(&mut self.kbots, Vec::new());
+
         threadpool.install(|| {
             kbots.par_chunks_mut(1000).for_each(|chunk| {
-                for kbot_0 in chunk.iter_mut() {
-                    if let Some(kbot_m) = self.frame_minus_one.kbots.get(&kbot_0.id) {
-                        let position = kbot_0.position * i0 + (im * kbot_m.position).coords;
-                        let dir = kbot_0.dir * i0 + kbot_m.dir * im;
-                        kbot_0.position = position;
-                        kbot_0.dir = dir;
+                for (kbot_0, client_kbot0) in chunk.iter_mut() {
+                    let kbot_m_opt = self.frame_minus_one.kbots.get(&kbot_0.id);
+                    if let Some(kbot_m) = kbot_m_opt {
+                        client_kbot0.position =
+                            kbot_0.position * i0 + (im * kbot_m.position).coords;
                     }
 
-                    let screen = test_screen(kbot_0.id, kbot_0.position, view_proj);
+                    let screen = test_screen(kbot_0.id, client_kbot0.position, view_proj);
                     match screen {
                         Some((_, screen_pos, distance_to_camera)) => {
-                            kbot_0.is_in_screen = true;
-                            let mat = Matrix4::face_towards(
-                                &kbot_0.position,
-                                &(kbot_0.position + kbot_0.dir),
-                                &Vector3::new(0.0, 0.0, 1.0),
+                            if let Some(kbot_m) = kbot_m_opt {
+                                client_kbot0.dir = kbot_0.dir * i0 + kbot_m.dir * im;
+                                client_kbot0.up = kbot_0.up * i0 + kbot_m.up * im;
+                            }
+                            client_kbot0.is_in_screen = true;
+                            let mat = utils::face_towards_dir(
+                                &client_kbot0.position.coords,
+                                &(client_kbot0.dir.normalize()),
+                                &client_kbot0.up,
                             );
-                            kbot_0.trans = Some(mat);
-                            kbot_0.distance_to_camera = distance_to_camera;
-                            kbot_0.screen_pos = screen_pos;
+                            client_kbot0.trans = Some(mat);
+                            client_kbot0.distance_to_camera = distance_to_camera;
+                            client_kbot0.screen_pos = screen_pos;
                         }
                         _ => {}
                     }
@@ -200,6 +210,7 @@ impl State {
             });
         });
 
+        self.kbots = kbots;
         self.kinematic_projectiles.clear();
 
         for kproj in self.kinematic_projectiles_cache.values_mut() {
@@ -209,7 +220,6 @@ impl State {
             self.kinematic_projectiles.push(pos);
         }
 
-        self.kbots = kbots;
         self.players = self.frame_zero.players.clone();
     }
 

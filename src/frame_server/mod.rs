@@ -1,5 +1,6 @@
 use crate::frame::*;
 
+use crate::botdef;
 use crate::heightmap_phy;
 use crate::mobile::*;
 use crate::utils::*;
@@ -124,6 +125,7 @@ impl FrameServerCache {
                 &mut self.grid,
                 &mut self.small_grid,
                 &mut frame.explosions,
+                &frame.bot_defs,
             );
         }
         frame_profiler.add("0 update_units", start_update_units.elapsed());
@@ -223,6 +225,7 @@ pub fn update_units(
     grid: &mut Vec<Vec<Id<KBot>>>,
     small_grid: &mut Vec<Vec<Id<KBot>>>,
     explosions: &mut Vec<ExplosionEvent>,
+    bot_defs: &HashMap<Id<botdef::BotDef>, botdef::BotDef>,
 ) {
     let start = std::time::Instant::now();
     let cell_size = 4;
@@ -412,6 +415,7 @@ pub fn update_units(
                 .min(heightmap_phy.height as f32 - 1.0);
             mobile.position.z = heightmap_phy.z_linear(mobile.position.x, mobile.position.y) + 0.5;
             mobile.grounded = true;
+            mobile.up = heightmap_phy.normal(mobile.position.x, mobile.position.y);
         }
     }
     frame_profiler.add("02  movement", start.elapsed());
@@ -458,7 +462,8 @@ pub fn update_units(
         }
 
         for (id, kbot) in kbots.iter() {
-            for index in index_aabb(kbot.position.coords, kbot.radius, cell_size, grid_w).iter() {
+            let radius = bot_defs.get(&kbot.botdef_id).unwrap().radius;
+            for index in index_aabb(kbot.position.coords, radius, cell_size, grid_w).iter() {
                 small_grid[*index].push(*id);
             }
         }
@@ -488,11 +493,6 @@ pub fn update_units(
                         }
 
                         //Checking collision with current_interp
-                        let (x, y) = (current_interp.x + 0.0, current_interp.y + 0.0);
-                        // println!("x y {} {}", x, y);
-                        // let index = (x as usize / cell_size as usize) as usize
-                        //     + (y as usize / cell_size as usize) as usize * grid_w;
-
                         let indices = index_aabb(current_interp, proj.radius, cell_size, grid_w);
 
                         let kbots_in_proximity: HashSet<_> = indices
@@ -508,7 +508,8 @@ pub fn update_units(
                                 (kbot.position.coords - current_interp).magnitude();
 
                             // println!("Distance {}", distance_to_target);
-                            if distance_to_target < (kbot.radius + proj.radius) {
+                            let kbot_radius = bot_defs.get(&kbot.botdef_id).unwrap().radius;
+                            if distance_to_target < (kbot_radius + proj.radius) {
                                 //Colission between Kbot and projectile
                                 kbot.life = (kbot.life - 10).max(0);
                                 proj.death_frame = frame_count;
@@ -598,11 +599,12 @@ pub fn update_units(
             let kbot = kbots.get_mut(&shot.bot).unwrap();
             let dir = (shot.target - kbot.position.coords).normalize();
             kbot.frame_last_shot = frame_count;
+            let kbot_radius = bot_defs.get(&kbot.botdef_id).unwrap().radius;
             let proj = KinematicProjectile {
                 id: rand_id(),
                 birth_frame: frame_count,
-                death_frame: frame_count + 5,
-                position_at_birth: kbot.position + dir * kbot.radius * 1.0,
+                death_frame: frame_count + 6,
+                position_at_birth: kbot.position + dir * kbot_radius * 1.0,
                 speed_per_frame_at_birth: dir * 2.0 + Vector3::new(0.0, 0.0, 0.2),
                 accel_per_frame: Vector3::new(0.0, 0.0, -0.08),
                 radius: 0.25,

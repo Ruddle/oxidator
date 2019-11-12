@@ -2,6 +2,7 @@ extern crate nalgebra as na;
 
 use crate::heightmap_phy;
 
+use crate::botdef;
 use crate::mobile;
 use crate::utils;
 use na::{Point3, Vector3};
@@ -87,19 +88,21 @@ pub struct FrameUpdate {
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct Frame {
-    pub number: i32,
-    pub players: HashMap<Id<Player>, Player>,
-    pub kbots: HashMap<Id<KBot>, KBot>,
+    // relevant to send to client on change
     pub kinematic_projectiles: HashMap<Id<KinematicProjectile>, KinematicProjectile>,
     pub arrows: Vec<Arrow>,
     pub heightmap_phy: Option<heightmap_phy::HeightmapPhy>,
-    pub frame_profiler: ProfilerMap,
-    // relevant to send to client
+    pub players: HashMap<Id<Player>, Player>,
+    pub kbots: HashMap<Id<KBot>, KBot>,
+    // relevant to send to client once
+    pub bot_defs: HashMap<Id<botdef::BotDef>, botdef::BotDef>,
+    // relevant to send to client always
+    pub number: i32,
     pub explosions: Vec<ExplosionEvent>,
     pub kbots_dead: HashSet<Id<KBot>>,
     pub kinematic_projectiles_dead: Vec<Id<KinematicProjectile>>,
     pub kinematic_projectiles_birth: Vec<KinematicProjectile>,
-    pub part_trees: HashMap<Id<unit::PartTree>, unit::PartTree>,
+    pub frame_profiler: ProfilerMap,
 }
 
 impl Frame {
@@ -116,7 +119,7 @@ impl Frame {
             kbots_dead: HashSet::new(),
             kinematic_projectiles_dead: Vec::new(),
             kinematic_projectiles_birth: Vec::new(),
-            part_trees: HashMap::new(),
+            bot_defs: HashMap::new(),
         }
     }
 }

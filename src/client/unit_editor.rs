@@ -19,7 +19,8 @@ impl UnitEditor {
         let root = PartTree {
             id: utils::rand_id(),
             children: Vec::new(),
-            dmodel: None,
+            placed_mesh: None,
+            placed_collider: None,
             joint: Joint::Fix,
         };
         UnitEditor {
@@ -57,11 +58,12 @@ impl UnitEditor {
 
         match self.root.find_node(self.selected_id) {
             Some(node) => node.children.push(PartTree {
-                dmodel: Some(DisplayModel {
+                placed_mesh: Some(PlacedMesh {
                     position: self.orbit.clone(),
                     dir: Vector3::new(1.0, 0.0, 0.0),
-                    model_path: path,
+                    mesh_path: path,
                 }),
+                placed_collider: None,
                 joint: Joint::Fix,
                 id: utils::rand_id(),
                 children: Vec::new(),
@@ -88,7 +90,7 @@ impl App {
         let path = std::path::Path::new("./src/asset/");
 
         if let FileTree::Unknown = unit_editor.asset_dir_cached {
-            log::debug!("Reading all assets to build file cache");
+            log::debug!("Reading all assets to build file directory cache");
             unit_editor.asset_dir_cached = FileTree::new(path.to_owned());
         }
 
@@ -142,8 +144,8 @@ impl App {
                             ui.tree_node(im_str!("child").as_ref())
                                 .default_open(true)
                                 .build(|| {
-                                    if let Some(model) = &c.dmodel {
-                                        ui.text(im_str!("model {:?}", model.model_path));
+                                    if let Some(model) = &c.placed_mesh {
+                                        ui.text(im_str!("model {:?}", model.mesh_path));
                                     }
                                     ui.text(im_str!("joint {:?}", c.joint));
                                     ui.same_line(0.0);

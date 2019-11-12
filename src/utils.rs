@@ -1,4 +1,5 @@
 use base_62::base62;
+use na::{IsometryMatrix3, Matrix4, Point3, Vector2, Vector3, Vector4};
 use rand::seq::SliceRandom;
 use rand::thread_rng;
 use serde::{Deserialize, Serialize};
@@ -6,6 +7,23 @@ use std::collections::{HashMap, HashSet};
 use std::fmt;
 use std::hash::Hash;
 use std::hash::Hasher;
+
+pub fn face_towards_dir(
+    pos: &Vector3<f32>,
+    normalized_dir: &Vector3<f32>,
+    normalized_up: &Vector3<f32>,
+) -> Matrix4<f32> {
+    let x_axis = normalized_dir;
+    let y_axis = normalized_up.cross(&x_axis);
+    let z_axis = x_axis.cross(&y_axis);
+
+    Matrix4::new(
+        x_axis.x, y_axis.x, z_axis.x, pos.x, //
+        x_axis.y, y_axis.y, z_axis.y, pos.y, //
+        x_axis.z, y_axis.z, z_axis.z, pos.z, //
+        0.0, 0.0, 0.0, 1.0,
+    )
+}
 
 const ID_CHARS: [char; 62] = [
     'A', 'Z', 'E', 'R', 'T', 'Y', 'U', 'I', 'O', 'P', 'Q', 'S', 'D', 'F', 'G', 'H', 'J', 'K', 'L',

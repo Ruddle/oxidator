@@ -9,10 +9,15 @@ use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct DisplayModel {
+pub struct PlacedMesh {
     pub position: Point3<f32>,
     pub dir: Vector3<f32>,
-    pub model_path: PathBuf,
+    pub mesh_path: PathBuf,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub enum PlacedCollider {
+    Sphere { position: Point3<f32>, radius: f32 },
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -38,7 +43,8 @@ impl Joint {
 #[derive(Debug, Clone, typename::TypeName, PartialEq, Serialize, Deserialize)]
 pub struct PartTree {
     pub id: utils::Id<PartTree>,
-    pub dmodel: Option<DisplayModel>,
+    pub placed_mesh: Option<PlacedMesh>,
+    pub placed_collider: Option<PlacedCollider>,
     pub joint: Joint,
     pub children: Vec<PartTree>,
 }
