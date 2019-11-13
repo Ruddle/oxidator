@@ -37,14 +37,8 @@ impl App {
             if let Some(placed_mesh) = &c.placed_mesh {
                 let display_model = &placed_mesh;
 
-                let mat = utils::face_towards_dir(
-                    &display_model.position.coords,
-                    &(display_model.dir),
-                    &Vector3::new(0.0, 0.0, 1.0),
-                );
-
-                let combined = root_trans * mat;
-
+                let combined = root_trans * c.parent_to_self;
+                let for_display = combined * display_model.trans;
                 // log::warn!(
                 //     "root {:?}\nlocal {:?}\ncombined {:?}\n",
                 //     root_trans,
@@ -57,13 +51,13 @@ impl App {
                         let buf = &mut generic_cpu.instance_attr_cpu_buf;
 
                         let isometry: Isometry3<f32> = unsafe {
-                            na::convert_unchecked::<Matrix4<f32>, Isometry3<f32>>(combined)
+                            na::convert_unchecked::<Matrix4<f32>, Isometry3<f32>>(for_display)
                         };
                         let euler = isometry.rotation.euler_angles();
 
-                        buf.push(combined[12]);
-                        buf.push(combined[13]);
-                        buf.push(combined[14]);
+                        buf.push(for_display[12]);
+                        buf.push(for_display[13]);
+                        buf.push(for_display[14]);
                         buf.push(euler.0);
                         buf.push(euler.1);
                         buf.push(euler.2);

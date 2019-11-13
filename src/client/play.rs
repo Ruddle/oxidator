@@ -22,37 +22,7 @@ impl App {
                 let mut player_me = Player::new();
 
                 let mut kbots = HashMap::new();
-
-                let tank_example_part_tree = unit::PartTree {
-                    id: utils::rand_id(),
-                    placed_mesh: None,
-                    placed_collider: None,
-                    joint: unit::Joint::Fix,
-                    children: vec![unit::PartTree {
-                        id: utils::rand_id(),
-                        placed_mesh: Some(unit::PlacedMesh {
-                            position: Point3::new(0.0, 0.0, 0.0),
-                            dir: Vector3::new(1.0, 0.0, 0.0),
-                            mesh_path: Path::new("./src/asset/cube.obj").to_owned(),
-                        }),
-                        placed_collider: None,
-                        joint: unit::Joint::Fix,
-                        children: vec![
-                            //
-                            // unit::PartTree {
-                            //     id: utils::rand_id(),
-                            //     placed_mesh: Some(unit::PlacedMesh {
-                            //         position: Point3::new(0.0, 0.0, 0.0),
-                            //         dir: Vector3::new(1.0, 0.0, 0.0).normalize(),
-                            //         mesh_path: Path::new("./src/asset/tank/canon.obj").to_owned(),
-                            //     }),
-                            //     joint: unit::Joint::Fix,
-                            //     children: vec![],
-                            // }, //
-                        ],
-                    }],
-                };
-
+                
                 let tank_example = botdef::BotDef {
                     id: utils::rand_id(),
                     radius: 0.5,

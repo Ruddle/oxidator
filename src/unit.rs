@@ -10,8 +10,7 @@ use std::path::{Path, PathBuf};
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct PlacedMesh {
-    pub position: Point3<f32>,
-    pub dir: Vector3<f32>,
+    pub trans: Matrix4<f32>,
     pub mesh_path: PathBuf,
 }
 
@@ -45,16 +44,30 @@ pub struct PartTree {
     pub id: utils::Id<PartTree>,
     pub placed_mesh: Option<PlacedMesh>,
     pub placed_collider: Option<PlacedCollider>,
+    pub parent_to_self: Matrix4<f32>,
     pub joint: Joint,
     pub children: Vec<PartTree>,
 }
 
 impl PartTree {
-    pub fn find_node(&mut self, id: utils::Id<PartTree>) -> Option<&mut PartTree> {
+    pub fn find_node_mut(&mut self, id: utils::Id<PartTree>) -> Option<&mut PartTree> {
         if self.id == id {
             Some(self)
         } else {
             for c in self.children.iter_mut() {
+                match c.find_node_mut(id) {
+                    Some(node) => return Some(node),
+                    None => {}
+                }
+            }
+            None
+        }
+    }
+    pub fn find_node(&self, id: utils::Id<PartTree>) -> Option<&PartTree> {
+        if self.id == id {
+            Some(self)
+        } else {
+            for c in self.children.iter() {
                 match c.find_node(id) {
                     Some(node) => return Some(node),
                     None => {}
