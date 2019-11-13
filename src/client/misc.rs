@@ -215,7 +215,7 @@ impl App {
                 .filter(|e| e.1.is_in_screen && e.1.distance_to_camera < unit_icon_distance)
             {
                 let distance =
-                    (self.game_state.position_smooth.coords - kbot.position.coords).magnitude();
+                    (self.game_state.position_smooth.coords - client_kbot.position.coords).magnitude();
 
                 let alpha_range = 10.0;
                 let max_dist = 100.0;
@@ -245,12 +245,12 @@ impl App {
                     // u is direction above kbot in camera space
                     // right cross camera_to_unit = u
                     let camera_to_unit =
-                        kbot.position.coords - self.game_state.position_smooth.coords;
+                        client_kbot.position.coords - self.game_state.position_smooth.coords;
                     let right = Vector3::new(1.0, 0.0, 0.0);
 
                     let u = right.cross(&camera_to_unit).normalize();
 
-                    let world_pos = kbot.position + u * botdef.radius * 1.5;
+                    let world_pos = client_kbot.position + u * botdef.radius * 1.5;
                     let r = view_proj * world_pos.to_homogeneous();
                     let r = r / r.w;
 
