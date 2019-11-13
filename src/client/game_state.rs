@@ -204,7 +204,9 @@ impl State {
                             client_kbot0.distance_to_camera = distance_to_camera;
                             client_kbot0.screen_pos = screen_pos;
                         }
-                        _ => {}
+                        _ => {
+                            client_kbot0.is_in_screen = false;
+                        }
                     }
                 }
             });
