@@ -18,7 +18,7 @@ layout(set = 0, binding = 0) uniform Locals {
 };
 
 void main() {
-    float min = 0.0003;
+    float min = -0.00000;
     float max = 1.0-min;
     vec2 tc = vec2(0.0);
     switch(gl_VertexIndex) {

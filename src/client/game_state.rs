@@ -232,7 +232,10 @@ impl State {
     }
 
     pub fn near(&self) -> f32 {
-        if self.position_smooth.z > 515.0 {
+        if self.position_smooth.z > 515.0
+            || self.position_smooth.coords.x < -500.0
+            || self.position_smooth.coords.y < -500.0
+        {
             10.0
         } else {
             0.3

@@ -62,43 +62,43 @@ void main() {
 
    
     if(pos_xy.x<-stride){
-        pos.x= 0.0;
+        pos.x= -1.0;
         pos.z = rock_bottom;    
         color = vec3(0,0,1);
     } else if(pos_xy.x<=0.0){
-        pos.x= 0.0;
+        pos.x= -1.0;
         color = vec3(1,0,0);
     }
 
   
     if(pos_xy.x> width+stride){
-        pos.x= width;
+        pos.x= width+1;
         pos.z = rock_bottom;    
         color = vec3(0,1,1);
     } else
     if(pos_xy.x> width){
-        pos.x= width;
+        pos.x= width+1;
         color = vec3(1,0,0);
     }
 
  
     if(pos_xy.y> height + stride){
-        pos.y= height+0;
+        pos.y= height+1;
         pos.z = rock_bottom;  
         color = vec3(0,0,1);  
     }else
     if(pos_xy.y>height){
-        pos.y= height;
+        pos.y= height+1;
         color = vec3(1,0,0);
     }
 
      if(pos_xy.y<-stride){
-        pos.y= 0;
+        pos.y= -1.0;
         pos.z = rock_bottom;  
         color = vec3(0,0,1);  
     }else
     if(pos_xy.y<-0.0){
-        pos.y= 0;
+        pos.y= -1.0;
         color = vec3(1,0,0);
     }
 
