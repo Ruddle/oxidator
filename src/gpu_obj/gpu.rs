@@ -13,12 +13,16 @@ pub struct WgpuState {
 impl WgpuState {
     pub fn new(window: winit::window::Window) -> Self {
         let (hidpi_factor, size, surface) = {
-            window.set_inner_size(winit::dpi::LogicalSize {
+            let hidpi_factor = window.hidpi_factor();
+
+            let physical_wanted = winit::dpi::PhysicalSize {
                 width: 1280.0,
                 height: 720.0,
-            });
+            };
+            let logical_wanted = physical_wanted.to_logical(hidpi_factor);
+            window.set_inner_size(logical_wanted);
             window.set_title("Oxidator");
-            let hidpi_factor = window.hidpi_factor();
+            log::info!("hidpi scaling: {}", hidpi_factor);
             let size = window.inner_size().to_physical(hidpi_factor);
             let surface = wgpu::Surface::create(&window);
             (hidpi_factor, size, surface)

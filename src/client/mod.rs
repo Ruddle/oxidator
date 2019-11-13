@@ -689,7 +689,7 @@ impl App {
                 ..
             } => {
                 let physical = size.to_physical(self.gpu.hidpi_factor);
-                info!("Resizing to {:?}", physical);
+                info!("Resizing to logical {:?} physical {:?}", size, physical);
                 self.gpu.sc_desc.width = physical.width.round() as u32;
                 self.gpu.sc_desc.height = physical.height.round() as u32;
                 self.gpu.swap_chain = self
