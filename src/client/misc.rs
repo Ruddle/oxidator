@@ -9,7 +9,7 @@ impl App {
         self.game_state.selected.clear();
         self.game_state.explosions.clear();
         self.game_state.kinematic_projectiles_cache.clear();
-        self.unit_editor.root.children.clear();
+        // self.unit_editor.root.children.clear();
         self.kbot_gpu.update_instance_dirty(&[], &self.gpu.device);
         self.health_bar.update_instance(&[], &self.gpu.device);
         self.unit_icon.update_instance(&[], &self.gpu.device);
@@ -85,18 +85,20 @@ impl App {
                 }
 
                 let identity = utils::face_towards_dir(
-                    &Vector3::new(0.0_f32, 0.0, 0.0),
+                    &Vector3::new(300.0_f32, 100.0, 0.50),
                     &Vector3::new(1.0, 0.0, 0.0),
                     &Vector3::new(0.0, 0.0, 1.0),
                 ); //Matrix4::identity();
 
-                Self::visit_part_tree(
-                    &self.unit_editor.root,
-                    &identity,
-                    &mut self.generic_gpu,
-                    0.0,
-                    0.0,
-                );
+                if self.main_menu == MainMode::UnitEditor {
+                    Self::visit_part_tree(
+                        &self.unit_editor.root,
+                        &identity,
+                        &mut self.generic_gpu,
+                        0.0,
+                        0.0,
+                    );
+                }
 
                 //Kbot
                 {
@@ -214,8 +216,9 @@ impl App {
                 .iter()
                 .filter(|e| e.1.is_in_screen && e.1.distance_to_camera < unit_icon_distance)
             {
-                let distance =
-                    (self.game_state.position_smooth.coords - client_kbot.position.coords).magnitude();
+                let distance = (self.game_state.position_smooth.coords
+                    - client_kbot.position.coords)
+                    .magnitude();
 
                 let alpha_range = 10.0;
                 let max_dist = 100.0;

@@ -57,7 +57,7 @@ impl App {
                     id: utils::rand_id(),
                     radius: 0.5,
                     max_life: 100,
-                    part_tree: tank_example_part_tree,
+                    part_tree: self.unit_editor.root.clone(),
                 };
 
                 for i in (100..300).step_by(4) {

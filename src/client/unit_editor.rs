@@ -18,7 +18,21 @@ impl UnitEditor {
     pub fn new() -> Self {
         let root = PartTree {
             id: utils::rand_id(),
-            children: Vec::new(),
+            children: vec![
+                //
+                unit::PartTree {
+                    id: utils::rand_id(),
+                    placed_mesh: Some(unit::PlacedMesh {
+                        position: Point3::new(0.0, 0.0, 0.0),
+                        dir: Vector3::new(1.0, 0.0, 0.0).normalize(),
+                        mesh_path: Path::new("./src/asset/cube.obj").to_owned(),
+                    }),
+                    placed_collider: None,
+                    joint: unit::Joint::Fix,
+                    children: vec![],
+                },
+                //
+            ],
             placed_mesh: None,
             placed_collider: None,
             joint: Joint::Fix,
@@ -59,14 +73,14 @@ impl UnitEditor {
         match self.root.find_node(self.selected_id) {
             Some(node) => node.children.push(PartTree {
                 placed_mesh: Some(PlacedMesh {
-                    position: self.orbit.clone(),
+                    position: Point3::new(0.0, 0.0, 0.0),
                     dir: Vector3::new(1.0, 0.0, 0.0),
                     mesh_path: path,
                 }),
                 placed_collider: None,
                 joint: Joint::Fix,
                 id: utils::rand_id(),
-                children: Vec::new(),
+                children: vec![],
             }),
             None => {}
         }
