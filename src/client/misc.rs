@@ -55,7 +55,18 @@ impl App {
                 match generic_gpu.get_mut(&placed_mesh.mesh_path) {
                     Some(GenericGpuState::Ready(generic_cpu)) => {
                         let buf = &mut generic_cpu.instance_attr_cpu_buf;
-                        buf.extend_from_slice(combined.as_slice());
+
+                        let isometry: Isometry3<f32> = unsafe {
+                            na::convert_unchecked::<Matrix4<f32>, Isometry3<f32>>(combined)
+                        };
+                        let euler = isometry.rotation.euler_angles();
+
+                        buf.push(combined[12]);
+                        buf.push(combined[13]);
+                        buf.push(combined[14]);
+                        buf.push(euler.0);
+                        buf.push(euler.1);
+                        buf.push(euler.2);
                         buf.push(selected);
                         buf.push(team);
                     }
@@ -179,8 +190,16 @@ impl App {
 
                 let team = -1.0;
 
-                self.vertex_attr_buffer_f32
-                    .extend_from_slice(mat.as_slice());
+                let isometry: Isometry3<f32> =
+                    unsafe { na::convert_unchecked::<Matrix4<f32>, Isometry3<f32>>(mat) };
+                let euler = isometry.rotation.euler_angles();
+
+                self.vertex_attr_buffer_f32.push(mat[12]);
+                self.vertex_attr_buffer_f32.push(mat[13]);
+                self.vertex_attr_buffer_f32.push(mat[14]);
+                self.vertex_attr_buffer_f32.push(euler.0);
+                self.vertex_attr_buffer_f32.push(euler.1);
+                self.vertex_attr_buffer_f32.push(euler.2);
                 self.vertex_attr_buffer_f32.push(is_selected);
                 self.vertex_attr_buffer_f32.push(team)
             }

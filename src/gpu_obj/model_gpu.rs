@@ -131,38 +131,28 @@ impl ModelGpu {
                     ],
                 },
                 wgpu::VertexBufferDescriptor {
-                    stride: (4 * 18) as wgpu::BufferAddress,
+                    stride: (4 * 8) as wgpu::BufferAddress,
                     step_mode: wgpu::InputStepMode::Instance,
                     attributes: &[
                         wgpu::VertexAttributeDescriptor {
-                            format: wgpu::VertexFormat::Float4,
+                            format: wgpu::VertexFormat::Float3,
                             offset: 0,
                             shader_location: 2,
                         },
                         wgpu::VertexAttributeDescriptor {
-                            format: wgpu::VertexFormat::Float4,
-                            offset: 4 * 4,
+                            format: wgpu::VertexFormat::Float3,
+                            offset: 4 * 3,
                             shader_location: 3,
                         },
                         wgpu::VertexAttributeDescriptor {
-                            format: wgpu::VertexFormat::Float4,
-                            offset: 4 * 8,
+                            format: wgpu::VertexFormat::Float,
+                            offset: 4 * 6,
                             shader_location: 4,
                         },
                         wgpu::VertexAttributeDescriptor {
-                            format: wgpu::VertexFormat::Float4,
-                            offset: 4 * 12,
+                            format: wgpu::VertexFormat::Float,
+                            offset: 4 * 7,
                             shader_location: 5,
-                        },
-                        wgpu::VertexAttributeDescriptor {
-                            format: wgpu::VertexFormat::Float,
-                            offset: 4 * 16,
-                            shader_location: 6,
-                        },
-                        wgpu::VertexAttributeDescriptor {
-                            format: wgpu::VertexFormat::Float,
-                            offset: 4 * 17,
-                            shader_location: 7,
                         },
                     ],
                 },
@@ -190,7 +180,7 @@ impl ModelGpu {
             .fill_from_slice(instance_attr);
 
         std::mem::replace(&mut self.instance_buf, temp_buf);
-        self.instance_count = instance_attr.len() as u32 / 18;
+        self.instance_count = instance_attr.len() as u32 / 8;
     }
 
     pub fn update_instance_dirty_own_buffer(&mut self, device: &wgpu::Device) {
@@ -200,7 +190,7 @@ impl ModelGpu {
             .fill_from_slice(&self.instance_attr_cpu_buf);
 
         std::mem::replace(&mut self.instance_buf, temp_buf);
-        self.instance_count = self.instance_attr_cpu_buf.len() as u32 / 18;
+        self.instance_count = self.instance_attr_cpu_buf.len() as u32 / 8;
     }
 
     pub fn update_instance(
@@ -242,7 +232,7 @@ impl ModelGpu {
         //     instance_attr.len() as u64 * 4,
         // );
 
-        self.instance_count = instance_attr.len() as u32 / 18;
+        self.instance_count = instance_attr.len() as u32 / 8;
     }
 }
 

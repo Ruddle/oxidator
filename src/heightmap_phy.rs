@@ -32,13 +32,25 @@ impl HeightmapPhy {
         }
     }
 
-    //nearest interpolation
+    ///unsafe nearest interpolation
+    #[inline]
     pub fn z(&self, x: f32, y: f32) -> f32 {
         let i = x as usize + (y as usize) * self.width as usize;
         self.texels[i]
     }
-    //linear interpolation
+
+    ///safe nearest interpolation
+    #[inline]
+    pub fn safe_z(&self, x: f32, y: f32) -> f32 {
+        let x = x.max(0.0).min(self.width as f32 - 1.0);
+        let y = y.max(0.0).min(self.height as f32 - 1.0);
+        self.z(x, y)
+    }
+
+    ///safe linear interpolation
     pub fn z_linear(&self, x: f32, y: f32) -> f32 {
+        let x = x.max(0.0).min(self.width as f32 - 2.0);
+        let y = y.max(0.0).min(self.height as f32 - 2.0);
         let imin = x.trunc() as usize;
         let imax = imin + 1;
         let jmin = y.trunc() as usize;
@@ -58,11 +70,15 @@ impl HeightmapPhy {
         z
     }
 
+    ///safe normal interpolation
     pub fn normal(&self, x: f32, y: f32) -> Vector3<f32> {
+        let x = x.max(1.0).min(self.width as f32 - 2.0);
+        let y = y.max(1.0).min(self.height as f32 - 2.0);
+
         let r = self.z_linear(x + 1.0, y);
         let l = self.z_linear(x - 1.0, y);
         let u = self.z_linear(x, y - 1.0);
         let d = self.z_linear(x, y + 1.0);
-        Vector3::new(-(r - l), (d - u), 2.0).normalize()
+        Vector3::new(-(r - l), d - u, 2.0).normalize()
     }
 }

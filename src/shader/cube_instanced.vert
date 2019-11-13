@@ -3,12 +3,10 @@
 layout(location = 0) in vec4 a_Pos;
 layout(location = 1) in vec2 a_TexCoord;
 
-layout(location = 2) in vec4 mata;
-layout(location = 3) in vec4 matb;
-layout(location = 4) in vec4 matc;
-layout(location = 5) in vec4 matd;
-layout(location = 6) in float selected;
-layout(location = 7) in float team;
+layout(location = 2) in vec3 inst_pos;
+layout(location = 3) in vec3 inst_euler;
+layout(location = 4) in float selected;
+layout(location = 5) in float team;
 
 
 layout(location = 0) out vec2 v_TexCoord;
@@ -35,8 +33,25 @@ void main() {
     v_team = team;
     v_selected = selected;
 
-    mat4 t = mat4(mata,matb,matc,matd);
+    float sr = sin(inst_euler.x);
+    float cr = cos(inst_euler.x);
+    float sp = sin(inst_euler.y);
+    float cp = cos(inst_euler.y);
+    float sy = sin(inst_euler.z);
+    float cy = cos(inst_euler.z);
 
-    gl_Position = cor_proj_view *t*a_Pos;
+    // mat4 t = mat4(
+    //     cy * cp,  cy * sp * sr - sy * cr,  cy * sp * cr + sy * sr,  inst_pos.x, 
+    //     sy * cp,  sy * sp * sr + cy * cr,  sy * sp * cr - cy * sr,  inst_pos.y,
+    //              -sp,            cp * sr,            cp * cr,  inst_pos.z, 
+    //              0,0,0,1);
+
+    mat4 t = mat4(
+        cy * cp,                 sy * cp,                -sp                ,0, 
+        cy * sp * sr - sy * cr,  sy * sp * sr + cy * cr, cp * sr            ,0,
+        cy * sp * cr + sy * sr,  sy * sp * cr - cy * sr, cp * cr            ,0, 
+        inst_pos.x,              inst_pos.y            , inst_pos.z         ,1);
+
+    gl_Position = cor_proj_view * t *a_Pos;
 //    world_pos = a_Pos.xyz +a_off;
 }
