@@ -416,6 +416,8 @@ pub fn update_units(
             mobile.position.z = heightmap_phy.z_linear(mobile.position.x, mobile.position.y) + 0.5;
             mobile.grounded = true;
             mobile.up = heightmap_phy.normal(mobile.position.x, mobile.position.y);
+
+            mobile.weapon0_dir = (mobile.weapon0_dir + mobile.dir).normalize();
         }
     }
     frame_profiler.add("02  movement", start.elapsed());
@@ -598,6 +600,8 @@ pub fn update_units(
         for shot in shots.iter() {
             let kbot = kbots.get_mut(&shot.bot).unwrap();
             let dir = (shot.target - kbot.position.coords).normalize();
+
+            kbot.weapon0_dir = dir;
             kbot.frame_last_shot = frame_count;
             let kbot_radius = bot_defs.get(&kbot.botdef_id).unwrap().radius;
             let proj = KinematicProjectile {

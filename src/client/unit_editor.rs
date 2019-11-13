@@ -111,6 +111,18 @@ impl App {
         if let FileTree::Unknown = unit_editor.asset_dir_cached {
             log::debug!("Reading all assets to build file directory cache");
             unit_editor.asset_dir_cached = FileTree::new(path.to_owned());
+            if let Ok(root) =
+                Self::load_part_tree_on_disk("src/asset/part_tree_def/unit_example.bin")
+            {
+                log::info!("Loaded {:#?}", root);
+                unit_editor.root = root;
+
+                for node in unit_editor.root.iter() {
+                    if let Some(mesh) = &node.placed_mesh {
+                        UnitEditor::open_obj(&mesh.mesh_path, generic_gpu);
+                    }
+                }
+            }
         }
 
         let window = imgui::Window::new(im_str!("Unit Editor"));
@@ -126,7 +138,57 @@ impl App {
                     true,
                     generic_gpu,
                 );
+
+                if ui.button(im_str!("load"), [0.0, 0.0]) {
+                    if let Ok(root) =
+                        Self::load_part_tree_on_disk("src/asset/part_tree_def/unit_example.bin")
+                    {
+                        log::info!("Loaded {:#?}", root);
+                        unit_editor.root = root;
+
+                        for node in unit_editor.root.iter() {
+                            if let Some(mesh) = &node.placed_mesh {
+                                UnitEditor::open_obj(&mesh.mesh_path, generic_gpu);
+                            }
+                        }
+                    }
+                }
+                if ui.button(im_str!("save"), [0.0, 0.0]) {
+                    Self::save_part_tree_on_disk(
+                        &unit_editor.root,
+                        "src/asset/part_tree_def/unit_example.bin",
+                    );
+                    log::info!("Saving {:#?}", unit_editor.root);
+                }
             });
+    }
+
+    pub fn save_part_tree_on_disk(part_tree: &PartTree, path: &str) {
+        use std::fs::OpenOptions;
+        use std::io::prelude::*;
+        use std::io::{BufReader, BufWriter};
+        let file = OpenOptions::new()
+            .read(true)
+            .write(true)
+            .create(true)
+            .open(path)
+            .unwrap();
+        let mut buf_w = BufWriter::new(file);
+        bincode::serialize_into(buf_w, part_tree);
+    }
+
+    pub fn load_part_tree_on_disk(path: &str) -> bincode::Result<PartTree> {
+        use std::fs::OpenOptions;
+        use std::io::prelude::*;
+        use std::io::{BufReader, BufWriter};
+        let file = OpenOptions::new()
+            .read(true)
+            .write(true)
+            .create(true)
+            .open(path)
+            .unwrap();
+        let mut buf_r = BufReader::new(file);
+        Ok(bincode::deserialize_from(buf_r)?)
     }
 
     fn ui_part_tree(

@@ -22,14 +22,14 @@ pub enum PlacedCollider {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum Joint {
     Fix,
-    Spherical,
+    AimWeapon0,
 }
 
 impl Joint {
     pub fn next(&self) -> Self {
         match self {
-            Joint::Fix => Joint::Spherical,
-            Joint::Spherical => Joint::Fix,
+            Joint::Fix => Joint::AimWeapon0,
+            Joint::AimWeapon0 => Joint::Fix,
         }
     }
 
@@ -48,8 +48,26 @@ pub struct PartTree {
     pub joint: Joint,
     pub children: Vec<PartTree>,
 }
+pub struct PartTreeIter<'a> {
+    stack: Vec<&'a PartTree>,
+}
+
+impl<'a> Iterator for PartTreeIter<'a> {
+    type Item = &'a PartTree;
+    fn next(&mut self) -> Option<&'a PartTree> {
+        let item = self.stack.pop()?;
+        for c in item.children.iter() {
+            self.stack.push(c)
+        }
+        Some(item)
+    }
+}
 
 impl PartTree {
+    pub fn iter(&self) -> PartTreeIter {
+        PartTreeIter { stack: vec![self] }
+    }
+
     pub fn find_node_mut(&mut self, id: utils::Id<PartTree>) -> Option<&mut PartTree> {
         if self.id == id {
             Some(self)

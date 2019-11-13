@@ -193,6 +193,8 @@ impl State {
                             if let Some(kbot_m) = kbot_m_opt {
                                 client_kbot0.dir = kbot_0.dir * i0 + kbot_m.dir * im;
                                 client_kbot0.up = kbot_0.up * i0 + kbot_m.up * im;
+                                client_kbot0.weapon0_dir =
+                                    kbot_0.weapon0_dir * i0 + kbot_m.weapon0_dir * im;
                             }
                             client_kbot0.is_in_screen = true;
                             let mat = utils::face_towards_dir(

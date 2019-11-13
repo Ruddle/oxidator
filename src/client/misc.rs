@@ -32,12 +32,25 @@ impl App {
         generic_gpu: &mut HashMap<PathBuf, GenericGpuState>,
         selected: f32,
         team: f32,
+        weapon0_dir: Vector3<f32>,
     ) {
         for c in part_tree.children.iter() {
             if let Some(placed_mesh) = &c.placed_mesh {
                 let display_model = &placed_mesh;
 
-                let combined = root_trans * c.parent_to_self;
+                let combined = match &c.joint {
+                    unit::Joint::Fix => root_trans * c.parent_to_self,
+                    unit::Joint::AimWeapon0 => {
+                        let comb = root_trans * c.parent_to_self;
+
+                        utils::face_towards_dir(
+                            &Vector3::new(comb[12], comb[13], comb[14]),
+                            &weapon0_dir,
+                            &Vector3::new(0.0, 0.0, 1.0),
+                        )
+                    }
+                };
+
                 let for_display = combined * display_model.trans;
                 // log::warn!(
                 //     "root {:?}\nlocal {:?}\ncombined {:?}\n",
@@ -54,7 +67,6 @@ impl App {
                             na::convert_unchecked::<Matrix4<f32>, Isometry3<f32>>(for_display)
                         };
                         let euler = isometry.rotation.euler_angles();
-
                         buf.push(for_display[12]);
                         buf.push(for_display[13]);
                         buf.push(for_display[14]);
@@ -66,9 +78,9 @@ impl App {
                     }
                     _ => {}
                 }
-                Self::visit_part_tree(c, &combined, generic_gpu, selected, team);
+                Self::visit_part_tree(c, &combined, generic_gpu, selected, team, weapon0_dir);
             } else {
-                Self::visit_part_tree(c, root_trans, generic_gpu, selected, team);
+                Self::visit_part_tree(c, root_trans, generic_gpu, selected, team, weapon0_dir);
             }
         }
     }
@@ -95,6 +107,7 @@ impl App {
                     &Vector3::new(0.0, 0.0, 1.0),
                 ); //Matrix4::identity();
 
+                let t = self.game_state.start_time.elapsed().as_secs_f32();
                 if self.main_menu == MainMode::UnitEditor {
                     Self::visit_part_tree(
                         &self.unit_editor.root,
@@ -102,6 +115,7 @@ impl App {
                         &mut self.generic_gpu,
                         0.0,
                         0.0,
+                        Vector3::new(f32::cos(t), f32::sin(t), f32::sin(t / 5.0) * 0.1).normalize(),
                     );
                 }
 
@@ -129,6 +143,7 @@ impl App {
                                 &mut self.generic_gpu,
                                 is_selected,
                                 team as f32,
+                                client_kbot.weapon0_dir,
                             );
                         }
                     }

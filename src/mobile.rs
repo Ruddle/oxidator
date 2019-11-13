@@ -26,33 +26,9 @@ pub struct KBot {
     pub team: i32,
     pub grounded: bool,
     pub frame_last_shot: i32,
+    pub weapon0_dir: Vector3<f32>,
     pub reload_frame_count: i32,
     pub botdef_id: Id<botdef::BotDef>,
-}
-
-pub struct ClientKbot {
-    pub position: Point3<f32>,
-    pub dir: Vector3<f32>,
-    pub up: Vector3<f32>,
-
-    pub trans: Option<Matrix4<f32>>,
-    pub is_in_screen: bool,
-    pub distance_to_camera: f32,
-    pub screen_pos: Vector2<f32>,
-}
-
-impl ClientKbot {
-    pub fn new(position: Point3<f32>) -> Self {
-        ClientKbot {
-            position,
-            dir: Vector3::new(0.0, 0.0, 0.0),
-            up: Vector3::new(0.0, 0.0, 0.0),
-            trans: None,
-            is_in_screen: false,
-            distance_to_camera: 0.0,
-            screen_pos: Vector2::new(0.0, 0.0),
-        }
-    }
 }
 
 impl KBot {
@@ -67,9 +43,38 @@ impl KBot {
             id: utils::rand_id(),
             frame_last_shot: 0,
             reload_frame_count: 3,
+            weapon0_dir: Vector3::new(1.0, 0.0, 0.0),
             life: 100,
             grounded: false,
             botdef_id,
+        }
+    }
+}
+
+pub struct ClientKbot {
+    pub position: Point3<f32>,
+    pub dir: Vector3<f32>,
+    pub up: Vector3<f32>,
+
+    pub weapon0_dir: Vector3<f32>,
+
+    pub trans: Option<Matrix4<f32>>,
+    pub is_in_screen: bool,
+    pub distance_to_camera: f32,
+    pub screen_pos: Vector2<f32>,
+}
+
+impl ClientKbot {
+    pub fn new(position: Point3<f32>) -> Self {
+        ClientKbot {
+            position,
+            dir: Vector3::new(1.0, 0.0, 0.0),
+            up: Vector3::new(0.0, 0.0, 1.0),
+            weapon0_dir: Vector3::new(1.0, 0.0, 0.0),
+            trans: None,
+            is_in_screen: false,
+            distance_to_camera: 0.0,
+            screen_pos: Vector2::new(0.0, 0.0),
         }
     }
 }
