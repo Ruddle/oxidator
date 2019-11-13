@@ -528,6 +528,18 @@ impl App {
             &secon_color_att_view,
         );
 
+        let mut unit_editor = unit_editor::UnitEditor::new();
+        if let Ok(root) = App::load_part_tree_on_disk("src/asset/part_tree_def/unit_example.bin") {
+            log::info!("Loaded {:#?}", root);
+            unit_editor.root = root;
+
+            for node in unit_editor.root.iter() {
+                if let Some(mesh) = &node.placed_mesh {
+                    unit_editor::UnitEditor::open_obj(&mesh.mesh_path, &mut generic_gpu);
+                }
+            }
+        }
+
         // Done
         let this = App {
             gpu,
@@ -562,7 +574,7 @@ impl App {
             imgui_wrap,
             main_menu: MainMode::Home,
             net_mode: NetMode::Offline,
-            unit_editor: unit_editor::UnitEditor::new(),
+            unit_editor,
 
             sender_to_client,
             receiver_to_client,

@@ -22,7 +22,7 @@ impl App {
                 let mut player_me = Player::new();
 
                 let mut kbots = HashMap::new();
-                
+
                 let tank_example = botdef::BotDef {
                     id: utils::rand_id(),
                     radius: 0.5,

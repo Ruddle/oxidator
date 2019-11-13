@@ -111,18 +111,6 @@ impl App {
         if let FileTree::Unknown = unit_editor.asset_dir_cached {
             log::debug!("Reading all assets to build file directory cache");
             unit_editor.asset_dir_cached = FileTree::new(path.to_owned());
-            if let Ok(root) =
-                Self::load_part_tree_on_disk("src/asset/part_tree_def/unit_example.bin")
-            {
-                log::info!("Loaded {:#?}", root);
-                unit_editor.root = root;
-
-                for node in unit_editor.root.iter() {
-                    if let Some(mesh) = &node.placed_mesh {
-                        UnitEditor::open_obj(&mesh.mesh_path, generic_gpu);
-                    }
-                }
-            }
         }
 
         let window = imgui::Window::new(im_str!("Unit Editor"));
