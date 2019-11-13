@@ -50,13 +50,18 @@ the test for this goal would be to be able implement a [Zero-k](https://zero-k.i
 - Map editor
     - [x] raise, lower, flatten, blur, noise pencil
     - [ ] texture layer
-    - [ ] water level
+    - [ ] changeable map size/water level
     - [ ] resources placing
     - [ ] save and load from file system (try the current save, load button at your own risk)
     - [ ] save and load from online repository  
 
 - Unit editor
-    - [ ] N/A
+    - [x] basic imgui editor to create node hierarchy
+    - [x] joint selection
+    - [x] mesh selection
+    - [~] save/load from filesystem
+    - [ ] graphical editor
+    - [ ] integration with online repository
 
 - Mod editor
     - [ ] N/A
@@ -65,7 +70,7 @@ the test for this goal would be to be able implement a [Zero-k](https://zero-k.i
     - [ ] N/A
 
 - Multiplayer
-    - [x] working draft localhost tcp client/server (1/2 will fry your computer and consume 1 Mo/s) 
+    - [x] working PoC localhost tcp client/server (1/2 will fry your computer and consume 1 Mo/s) 
     - [ ] optimise to reach 300 Ko/sec with 100k units moving
     - [ ] lobby
     - [ ] live swapping host if current host disconnect
@@ -73,8 +78,9 @@ the test for this goal would be to be able implement a [Zero-k](https://zero-k.i
     - [ ] ability to draw on the map, and tag place/units
 - Rendering 
     - [x] basic display of 3D models (with instancing)
-    - [x] basic display a heightmap (with a poor man's [Geometry Clipmaps](https://developer.nvidia.com/gpugems/GPUGems2/gpugems2_chapter02.html)) 
+    - [x] basic display a heightmap (from [this blog](http://casual-effects.blogspot.com/2014/04/fast-terrain-rendering-with-continuous.html)) 
     - [x] fxaa (from [this blog](http://blog.simonrodriguez.fr/articles/30-07-2016_implementing_fxaa.html))
+    - [x] screen space reflection for water
     - [ ] materials
     - [ ] particles
     - [ ] sounds
@@ -94,6 +100,7 @@ the test for this goal would be to be able implement a [Zero-k](https://zero-k.i
 - UI
     - [x] select units
     - [x] give move order
+    - [x] display current move order (Hold LShift)
     - [ ] give user defined, unit specific order
     - [ ] display info about game state (current resources etc)
     - [ ] display info about selected units
@@ -104,7 +111,7 @@ the test for this goal would be to be able implement a [Zero-k](https://zero-k.i
 
  * Windows (dx12 and vulkan)
  * Linux (vulkan)
- * Mac Untested (*should work by enabling the feature "metal"*)
+ * Mac Untested (*should work TM*)
 
 All thanks to WebGPU and [wgpu-rs](https://github.com/gfx-rs/wgpu-rs) (and [winit](https://github.com/rust-windowing/winit)). No efforts was made by me in this regard. If anything I posted a stupid issue there that was solved in 0.03 second.
  
