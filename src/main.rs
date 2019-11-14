@@ -69,10 +69,7 @@ fn do_the_thing() {
 
     let (s_to_event_loop, r_to_event_loop) = unbounded::<EventLoopMsg>();
     let event_loop = winit::event_loop::EventLoop::new();
-    let builder = winit::window::WindowBuilder::new().with_inner_size(winit::dpi::LogicalSize {
-        width: 400.0,
-        height: 300.0,
-    });
+    let builder = winit::window::WindowBuilder::new();
     let window = builder.build(&event_loop).unwrap();
 
     let mut client = client::App::new(

@@ -140,6 +140,8 @@ pub struct App {
     profiler: frame::ProfilerMap,
     global_info: Option<manager::GlobalInfo>,
     threadpool: rayon::ThreadPool,
+
+    frame_count: i32,
 }
 
 impl App {
@@ -592,6 +594,7 @@ impl App {
                 // .num_threads(8)
                 .build()
                 .unwrap(),
+            frame_count: 0,
         };
 
         (this)

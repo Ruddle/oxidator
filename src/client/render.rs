@@ -12,6 +12,11 @@ use wgpu::{BufferMapAsyncResult, Extent3d};
 
 impl App {
     pub fn render(&mut self) {
+        if self.frame_count == 1 {
+            self.gpu.window.set_maximized(true);
+        }
+        self.frame_count += 1;
+
         let frame_time = self.game_state.last_frame.elapsed();
         self.profiler.mix("frame_time", frame_time, 20);
 
