@@ -33,6 +33,7 @@ impl App {
         selected: f32,
         team: f32,
         weapon0_dir: Vector3<f32>,
+        wheel0_angle: f32,
     ) {
         for c in part_tree.children.iter() {
             if let Some(placed_mesh) = &c.placed_mesh {
@@ -47,6 +48,15 @@ impl App {
                             &Vector3::new(comb[12], comb[13], comb[14]),
                             &weapon0_dir,
                             &Vector3::new(0.0, 0.0, 1.0),
+                        )
+                    }
+                    unit::Joint::Wheel0 => {
+                        let comb = root_trans * c.parent_to_self;
+
+                        comb * utils::face_towards_dir(
+                            &Vector3::new(0.0, 0.0, 0.0),
+                            &Vector3::new(0.0, 1.0, 0.0),
+                            &Vector3::new(f32::cos(wheel0_angle), 0.0, f32::sin(wheel0_angle)),
                         )
                     }
                 };
@@ -78,9 +88,25 @@ impl App {
                     }
                     _ => {}
                 }
-                Self::visit_part_tree(c, &combined, generic_gpu, selected, team, weapon0_dir);
+                Self::visit_part_tree(
+                    c,
+                    &combined,
+                    generic_gpu,
+                    selected,
+                    team,
+                    weapon0_dir,
+                    wheel0_angle,
+                );
             } else {
-                Self::visit_part_tree(c, root_trans, generic_gpu, selected, team, weapon0_dir);
+                Self::visit_part_tree(
+                    c,
+                    root_trans,
+                    generic_gpu,
+                    selected,
+                    team,
+                    weapon0_dir,
+                    wheel0_angle,
+                );
             }
         }
     }
@@ -116,6 +142,7 @@ impl App {
                         0.0,
                         0.0,
                         Vector3::new(f32::cos(t), f32::sin(t), f32::sin(t / 5.0) * 0.1).normalize(),
+                        (t * 2.0),
                     );
                 }
 
@@ -144,6 +171,7 @@ impl App {
                                 is_selected,
                                 team as f32,
                                 client_kbot.weapon0_dir,
+                                client_kbot.wheel0_angle,
                             );
                         }
                     }

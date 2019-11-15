@@ -195,6 +195,8 @@ impl State {
                                 client_kbot0.up = kbot_0.up * i0 + kbot_m.up * im;
                                 client_kbot0.weapon0_dir =
                                     kbot_0.weapon0_dir * i0 + kbot_m.weapon0_dir * im;
+                                client_kbot0.wheel0_angle =
+                                    kbot_0.wheel0_angle * i0 + kbot_m.wheel0_angle * im;
                             }
                             client_kbot0.is_in_screen = true;
                             let mat = utils::face_towards_dir(

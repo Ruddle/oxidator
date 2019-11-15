@@ -118,6 +118,7 @@ pub struct KBot {
     pub grounded: bool,
     pub frame_last_shot: i32,
     pub weapon0_dir: Vector3<f32>,
+    pub wheel0_angle: f32,
     pub reload_frame_count: i32,
     pub botdef_id: Id<botdef::BotDef>,
 }
@@ -136,6 +137,7 @@ impl KBot {
             frame_last_shot: 0,
             reload_frame_count: 3,
             weapon0_dir: Vector3::new(1.0, 0.0, 0.0),
+            wheel0_angle: 0.0,
             life: 100,
             grounded: false,
             botdef_id,
@@ -150,6 +152,7 @@ pub struct ClientKbot {
     pub up: Vector3<f32>,
 
     pub weapon0_dir: Vector3<f32>,
+    pub wheel0_angle: f32,
 
     pub trans: Option<Matrix4<f32>>,
     pub is_in_screen: bool,
@@ -164,6 +167,7 @@ impl ClientKbot {
             dir: Vector3::new(1.0, 0.0, 0.0),
             up: Vector3::new(0.0, 0.0, 1.0),
             weapon0_dir: Vector3::new(1.0, 0.0, 0.0),
+            wheel0_angle: 0.0,
             trans: None,
             is_in_screen: false,
             distance_to_camera: 0.0,

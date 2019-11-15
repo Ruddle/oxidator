@@ -23,13 +23,15 @@ pub enum PlacedCollider {
 pub enum Joint {
     Fix,
     AimWeapon0,
+    Wheel0,
 }
 
 impl Joint {
     pub fn next(&self) -> Self {
         match self {
             Joint::Fix => Joint::AimWeapon0,
-            Joint::AimWeapon0 => Joint::Fix,
+            Joint::AimWeapon0 => Joint::Wheel0,
+            Joint::Wheel0 => Joint::Fix,
         }
     }
 
