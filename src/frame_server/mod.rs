@@ -480,167 +480,91 @@ pub fn update_units(
             let to_remove = neighbors_id.iter().position(|e| e == id).unwrap();
             neighbors_id.remove(to_remove);
 
-            let mut collision_avoid_dir = Vector2::new(0.0_f32, 0.0);
-            let mut collision_avoid_priority = 0.0_f32;
+            let avoidance_force = avoid_neighbors_force(mobile, neighbors_id, &mobiles2);
 
-            let mut neighbor_dir = Vector2::new(0.0_f32, 0.0);
-            let mut neighbor_dir_priority = 0.0_f32;
+            let TargetForce {
+                target_force,
+                stop_tracking,
+            } = to_target_force(mobile, botdef);
 
-            if neighbors_id.len() == 0 {
-            } else {
-                let frame_prediction = 1.0;
-                let mut nearest = None;
-                let mut dist_min = None;
-                for neighbor_id in neighbors_id.iter() {
-                    let neighbor = mobiles2.get(neighbor_id).unwrap();
-                    let dist = (neighbor.position + neighbor.speed * frame_prediction
-                        - &mobile.position
-                        - mobile.speed * frame_prediction)
-                        .norm_squared();
+            // arrows.push(Arrow {
+            //     position: mobile.position,
+            //     color: [target_force.norm(), 0.0, 0.0, 0.0],
+            //     end: mobile.position
+            //         + Vector3::new(target_force.x * 2.0, target_force.y * 2.0, 0.0),
+            // });
 
-                    let is_better = match dist_min {
-                        None => true,
-                        Some(dist_min) => dist_min > dist,
-                    };
+            // arrows.push(Arrow {
+            //     position: mobile.position,
+            //     color: [0.0, avoidance_force.norm(), 0.0, 0.0],
+            //     end: mobile.position
+            //         + Vector3::new(avoidance_force.x * 2.0, avoidance_force.y * 2.0, 0.0),
+            // });
 
-                    if is_better {
-                        dist_min = Some(dist);
-                        nearest = Some(neighbor);
-                    }
-                }
-
-                let dist_min = dist_min.unwrap().sqrt();
-                let nearest = nearest.unwrap();
-
-                if dist_min < 4.0 {
-                    let closeness = (mobile.position.coords + mobile.speed * frame_prediction
-                        - nearest.position.coords
-                        - nearest.speed * frame_prediction)
-                        .xy()
-                        .magnitude();
-
-                    collision_avoid_priority = ((4.0 - closeness) / 4.0).max(0.0).min(0.5);
-
-                    collision_avoid_dir = if nearest.speed.xy().norm_squared() < 0.01
-                        || mobile.speed.xy().dot(&nearest.speed.xy()) < 0.0
-                    {
-                        let u = (mobile.position.coords - nearest.position.coords)
-                            .xy()
-                            .normalize();
-
-                        let v = Vector2::<f32>::new(u.y, -u.x).normalize();
-                        let w = Vector2::<f32>::new(-u.y, u.x).normalize();
-
-                        if v.dot(&mobile.speed.xy()) > w.dot(&mobile.speed.xy()) {
-                            v
-                        } else {
-                            w
-                        }
-                    } else {
-                        let him_to_me = (mobile.position.coords - nearest.position.coords)
-                            .xy()
-                            .normalize();
-                        him_to_me
-                    };
-
-                    // arrows.push(Arrow {
-                    //     position: mobile.position,
-                    //     color: [collision_avoid_priority, 0.0, 0.0, 0.0],
-                    //     end: mobile.position
-                    //         + Vector3::new(
-                    //             collision_avoid_dir.x * 2.0,
-                    //             collision_avoid_dir.y * 2.0,
-                    //             0.0,
-                    //         ),
-                    // });
-
-                    let speed_closeness = mobile.speed.xy().dot(&nearest.speed.xy());
-                    neighbor_dir_priority = if speed_closeness > 0.0 && nearest.speed.norm() > 0.1 {
-                        speed_closeness
-                            .max(0.0)
-                            .min((1.0 - collision_avoid_priority) * 0.0)
-                    } else {
-                        0.0
-                    };
-
-                    neighbor_dir = nearest
-                        .speed
-                        .xy()
-                        .try_normalize(0.001)
-                        .unwrap_or(Vector2::new(0.0, 0.0));
-
-                    // arrows.push(Arrow {
-                    //     position: mobile.position,
-                    //     color: [0.0, neighbor_dir_priority, 0.0, 0.0],
-                    //     end: mobile.position
-                    //         + Vector3::new(neighbor_dir.x * 2.0, neighbor_dir.y * 2.0, 0.0),
-                    // });
-                }
+            if stop_tracking {
+                mobile.target = None;
             }
 
-            let mut dir_intensity = 0.0;
+            let dir = avoidance_force + target_force;
+            let dir_intensity = (avoidance_force.norm() + target_force.norm())
+                .max(0.0)
+                .min(1.0);
 
-            if let Some(target) = mobile.target {
-                let to_target = (target.coords - (mobile.position.coords + mobile.speed)).xy();
-                let to_target_distance = to_target.norm();
-                let will_to_go_target = if to_target_distance > 1.0 {
-                    (to_target_distance / 2.0).min(1.0)
-                } else {
-                    0.0
-                };
+            //Clamp in cone
+            let wanted_angle: Angle = dir.into();
+            let current_angle = mobile.angle;
 
-                let target_dir = to_target.normalize();
-                let available = (1.0 - collision_avoid_priority - neighbor_dir_priority).max(0.0);
-                let target_prio = available.min(will_to_go_target);
-                let dir = target_dir * target_prio
-                    + collision_avoid_dir * collision_avoid_priority
-                    + neighbor_dir * neighbor_dir_priority;
-
-                dir_intensity = target_prio + collision_avoid_priority + neighbor_dir_priority;
-
-                // mobile.dir = mobile.dir * 0.50 + Vector3::new(dir.x, dir.y, 0.0) * 0.5;
-
-                //Clamp in cone
-                let wanted_angle: Angle = dir.into();
-                let current_angle = mobile.angle;
-
-                fn clamp_abs(x: f32, max_abs: f32) -> f32 {
-                    let sign = x.signum();
-                    sign * (x.abs().min(max_abs))
-                }
-
-                let diff = (wanted_angle - (current_angle + mobile.angular_velocity.into())).rad;
-
-                mobile.angular_velocity = clamp_abs(
-                    mobile.angular_velocity + clamp_abs(diff, botdef.turn_accel),
-                    botdef.max_turn_rate,
-                );
-
-                let new_angle = current_angle + mobile.angular_velocity.into();
-                // current_angle.clamp_around(wanted_angle, mobile.angular_velocity.into());
-                mobile.angle = new_angle;
-                let dir: Vector2<f32> = new_angle.into();
-                mobile.dir = Vector3::new(dir.x, dir.y, 0.0);
-
-                if will_to_go_target < 0.01 {
-                    mobile.target = None;
-                }
+            fn clamp_abs(x: f32, max_abs: f32) -> f32 {
+                let sign = x.signum();
+                sign * (x.abs().min(max_abs))
             }
+
+            let diff = (wanted_angle - (current_angle + mobile.angular_velocity.into())).rad;
+
+            mobile.angular_velocity = clamp_abs(
+                mobile.angular_velocity + clamp_abs(diff, botdef.turn_accel),
+                botdef.max_turn_rate,
+            );
+
+            let new_angle = current_angle + mobile.angular_velocity.into();
+            // current_angle.clamp_around(wanted_angle, mobile.angular_velocity.into());
+            mobile.angle = new_angle;
+            let new_dir: Vector2<f32> = new_angle.into();
+            mobile.dir = Vector3::new(new_dir.x, new_dir.y, 0.0);
 
             //TODO drift factor ?
             //drift = 1 (adherence = 0)
             // mobile.speed = mobile.speed + mobile.dir * botdef.accel * dir_intensity;
             //drift = 0 (adherence = 1)
 
-            if mobile.target != None {
-                mobile.speed =
-                    mobile.dir * (botdef.accel * dir_intensity + mobile.speed.magnitude());
+            let speed_scalar = mobile.speed.xy().magnitude();
+            let thrust = if speed_scalar > 0.01 {
+                dir.normalize().dot(&(mobile.speed.xy() / speed_scalar))
             } else {
-                {
-                    mobile.speed =
-                        mobile.dir * (-botdef.break_accel + mobile.speed.magnitude()).max(0.0);
-                }
-            }
+                1.0
+            };
+
+            let accel = if mobile.target != None && thrust > 0.0 {
+                botdef.accel * dir_intensity * thrust
+            } else {
+                -botdef.break_accel * thrust.abs()
+            };
+
+            // arrows.push(Arrow {
+            //     position: mobile.position + Vector3::new(0.0, 0.0, 2.0),
+            //     color: [0.0, 0.0, accel, 0.0],
+            //     end: mobile.position
+            //         + Vector3::new(dir.x, dir.y, 0.0) * 4.0
+            //         + Vector3::new(0.0, 0.0, 2.0),
+            // });
+
+            // arrows.push(Arrow {
+            //     position: mobile.position + Vector3::new(0.0, 0.0, 1.0),
+            //     color: [0.0, 0.0, accel, 0.0],
+            //     end: mobile.position + mobile.dir * accel * 4.0 + Vector3::new(0.0, 0.0, 1.0),
+            // });
+
+            mobile.speed = mobile.dir * (accel + mobile.speed.magnitude()).max(0.0);
 
             let speed = mobile.speed.magnitude();
             if speed > botdef.max_speed {
@@ -682,5 +606,56 @@ pub fn update_units(
 
     for id in kbots_dead.iter() {
         kbots.remove(id);
+    }
+}
+
+fn avoid_neighbors_force(
+    me: &KBot,
+    neighbors_id: Vec<Id<KBot>>,
+    kbots: &HashMap<Id<KBot>, KBot>,
+) -> Vector2<f32> {
+    // could be speed/ brake
+    // let prediction = 1.0;
+    let pos = me.position + me.speed;
+
+    let mut avoidance = Vector2::new(0.0, 0.0);
+    for other_id in neighbors_id.iter() {
+        let other = kbots.get(other_id).unwrap();
+        let o_pos = other.position + other.speed;
+
+        let to_other = (o_pos.coords - pos.coords).xy();
+        let distance = to_other.magnitude();
+        let inv_distance = 1.0 / distance;
+
+        let to_other_normalized = to_other * inv_distance;
+
+        avoidance += -to_other_normalized * inv_distance;
+    }
+    avoidance
+}
+
+struct TargetForce {
+    target_force: Vector2<f32>,
+    stop_tracking: bool,
+}
+fn to_target_force(me: &KBot, botdef: &botdef::BotDef) -> TargetForce {
+    if let Some(target) = me.target {
+        let to_target = (target.coords - (me.position.coords + me.speed)).xy();
+        let to_target_distance = to_target.norm();
+        let will_to_go_target = if to_target_distance > botdef.radius {
+            1.0
+        } else {
+            1.0 - ((botdef.radius - to_target_distance) / botdef.radius)
+        };
+
+        TargetForce {
+            target_force: (to_target / to_target_distance) * will_to_go_target,
+            stop_tracking: to_target_distance < botdef.radius / 2.0,
+        }
+    } else {
+        TargetForce {
+            target_force: Vector2::new(0.0, 0.0),
+            stop_tracking: true,
+        }
     }
 }
