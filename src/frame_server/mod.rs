@@ -268,159 +268,6 @@ pub fn update_units(
     }
 
     frame_profiler.add("01  grid", start.elapsed());
-    let start = std::time::Instant::now();
-    let mobiles2 = kbots.clone();
-    //Movement compute
-
-    for (id, mobile) in kbots.iter_mut() {
-        if mobile.speed.magnitude_squared() > 0.001 || mobile.target.is_some() || !mobile.grounded {
-            let grid_pos = grid_pos(mobile);
-            let mut neighbors_id: Vec<Id<KBot>> = grid[grid_pos].clone();
-            let to_remove = neighbors_id.iter().position(|e| e == id).unwrap();
-            neighbors_id.remove(to_remove);
-
-            let mut collision_avoid_dir = Vector2::new(0.0_f32, 0.0);
-            let mut collision_avoid_priority = 0.0_f32;
-
-            let mut neighbor_dir = Vector2::new(0.0_f32, 0.0);
-            let mut neighbor_dir_priority = 0.0_f32;
-
-            if neighbors_id.len() == 0 {
-            } else {
-                let frame_prediction = 1.5;
-                let mut nearest = None;
-                let mut dist_min = None;
-                for neighbor_id in neighbors_id.iter() {
-                    let neighbor = mobiles2.get(neighbor_id).unwrap();
-                    let dist = (neighbor.position + neighbor.speed * frame_prediction
-                        - &mobile.position
-                        - mobile.speed * frame_prediction)
-                        .norm_squared();
-
-                    let is_better = match dist_min {
-                        None => true,
-                        Some(dist_min) => dist_min > dist,
-                    };
-
-                    if is_better {
-                        dist_min = Some(dist);
-                        nearest = Some(neighbor);
-                    }
-                }
-
-                let dist_min = dist_min.unwrap().sqrt();
-                let nearest = nearest.unwrap();
-
-                if dist_min < 4.0 {
-                    let closeness = (mobile.position.coords + mobile.speed * frame_prediction
-                        - nearest.position.coords
-                        - nearest.speed * frame_prediction)
-                        .xy()
-                        .magnitude();
-
-                    collision_avoid_priority = ((4.0 - closeness) / 4.0).max(0.0).min(0.8);
-
-                    collision_avoid_dir = if nearest.speed.xy().norm_squared() < 0.01
-                        || mobile.speed.xy().dot(&nearest.speed.xy()) < 0.0
-                    {
-                        let u = (mobile.position.coords - nearest.position.coords)
-                            .xy()
-                            .normalize();
-
-                        let v = Vector2::<f32>::new(u.y, -u.x).normalize();
-                        let w = Vector2::<f32>::new(-u.y, u.x).normalize();
-
-                        if v.dot(&mobile.speed.xy()) > w.dot(&mobile.speed.xy()) {
-                            v
-                        } else {
-                            w
-                        }
-                    } else {
-                        let him_to_me = (mobile.position.coords - nearest.position.coords)
-                            .xy()
-                            .normalize();
-                        him_to_me
-                    };
-
-                    // arrows.push(Arrow {
-                    //     position: mobile.position,
-                    //     color: [collision_avoid_priority, 0.0, 0.0, 0.0],
-                    //     end: mobile.position
-                    //         + Vector3::new(
-                    //             collision_avoid_dir.x * 2.0,
-                    //             collision_avoid_dir.y * 2.0,
-                    //             0.0,
-                    //         ),
-                    // });
-
-                    let speed_closeness = mobile.speed.xy().dot(&nearest.speed.xy());
-                    neighbor_dir_priority = if speed_closeness > 0.0 && nearest.speed.norm() > 0.1 {
-                        speed_closeness
-                            .max(0.0)
-                            .min((1.0 - collision_avoid_priority) * 0.2)
-                    } else {
-                        0.0
-                    };
-
-                    neighbor_dir = nearest
-                        .speed
-                        .xy()
-                        .try_normalize(0.001)
-                        .unwrap_or(Vector2::new(0.0, 0.0));
-
-                    // arrows.push(Arrow {
-                    //     position: mobile.position,
-                    //     color: [0.0, neighbor_dir_priority, 0.0, 0.0],
-                    //     end: mobile.position
-                    //         + Vector3::new(neighbor_dir.x * 2.0, neighbor_dir.y * 2.0, 0.0),
-                    // });
-                }
-            }
-
-            let mut dir_intensity = 0.0;
-
-            if let Some(target) = mobile.target {
-                let to_target = (target.coords - mobile.position.coords).xy();
-                let to_target_distance = to_target.norm();
-                let will_to_go_target = if to_target_distance > 0.5 {
-                    (to_target_distance / 2.0).min(1.0)
-                } else {
-                    0.0
-                };
-
-                let target_dir = to_target.normalize();
-                let available = (1.0 - collision_avoid_priority - neighbor_dir_priority).max(0.0);
-                let target_prio = available.min(will_to_go_target);
-                let dir = target_dir * target_prio
-                    + collision_avoid_dir * collision_avoid_priority
-                    + neighbor_dir * neighbor_dir_priority;
-
-                dir_intensity = target_prio + collision_avoid_priority + neighbor_dir_priority;
-                mobile.dir = mobile.dir * 0.50 + Vector3::new(dir.x, dir.y, 0.0) * 0.5;
-                if will_to_go_target < 0.01 {
-                    mobile.target = None;
-                }
-            }
-            mobile.speed = (mobile.speed + mobile.dir * 10.8 * dir_intensity) * 0.1;
-            mobile.position += mobile.speed;
-            mobile.position.x = mobile
-                .position
-                .x
-                .max(0.0)
-                .min(heightmap_phy.width as f32 - 1.0);
-            mobile.position.y = mobile
-                .position
-                .y
-                .max(0.0)
-                .min(heightmap_phy.height as f32 - 1.0);
-            mobile.position.z = heightmap_phy.z_linear(mobile.position.x, mobile.position.y) + 0.5;
-            mobile.grounded = true;
-            mobile.up = heightmap_phy.normal(mobile.position.x, mobile.position.y);
-
-            mobile.weapon0_dir = (mobile.weapon0_dir + mobile.dir).normalize();
-        }
-    }
-    frame_profiler.add("02  movement", start.elapsed());
 
     //AABB for kbot and proj
     {
@@ -620,6 +467,185 @@ pub fn update_units(
         }
         frame_profiler.add("07  kbot_fire", start.elapsed());
     }
+
+    let start = std::time::Instant::now();
+    let mobiles2 = kbots.clone();
+    //Movement compute
+
+    for (id, mobile) in kbots.iter_mut() {
+        if mobile.speed.magnitude_squared() > 0.001 || mobile.target.is_some() || !mobile.grounded {
+            let botdef = bot_defs.get(&mobile.botdef_id).unwrap();
+            let grid_pos = grid_pos(mobile);
+            let mut neighbors_id: Vec<Id<KBot>> = grid[grid_pos].clone();
+            let to_remove = neighbors_id.iter().position(|e| e == id).unwrap();
+            neighbors_id.remove(to_remove);
+
+            let mut collision_avoid_dir = Vector2::new(0.0_f32, 0.0);
+            let mut collision_avoid_priority = 0.0_f32;
+
+            let mut neighbor_dir = Vector2::new(0.0_f32, 0.0);
+            let mut neighbor_dir_priority = 0.0_f32;
+
+            if neighbors_id.len() == 0 {
+            } else {
+                let frame_prediction = 1.0;
+                let mut nearest = None;
+                let mut dist_min = None;
+                for neighbor_id in neighbors_id.iter() {
+                    let neighbor = mobiles2.get(neighbor_id).unwrap();
+                    let dist = (neighbor.position + neighbor.speed * frame_prediction
+                        - &mobile.position
+                        - mobile.speed * frame_prediction)
+                        .norm_squared();
+
+                    let is_better = match dist_min {
+                        None => true,
+                        Some(dist_min) => dist_min > dist,
+                    };
+
+                    if is_better {
+                        dist_min = Some(dist);
+                        nearest = Some(neighbor);
+                    }
+                }
+
+                let dist_min = dist_min.unwrap().sqrt();
+                let nearest = nearest.unwrap();
+
+                if dist_min < 4.0 {
+                    let closeness = (mobile.position.coords + mobile.speed * frame_prediction
+                        - nearest.position.coords
+                        - nearest.speed * frame_prediction)
+                        .xy()
+                        .magnitude();
+
+                    collision_avoid_priority = ((4.0 - closeness) / 4.0).max(0.0).min(0.8);
+
+                    collision_avoid_dir = if nearest.speed.xy().norm_squared() < 0.01
+                        || mobile.speed.xy().dot(&nearest.speed.xy()) < 0.0
+                    {
+                        let u = (mobile.position.coords - nearest.position.coords)
+                            .xy()
+                            .normalize();
+
+                        let v = Vector2::<f32>::new(u.y, -u.x).normalize();
+                        let w = Vector2::<f32>::new(-u.y, u.x).normalize();
+
+                        if v.dot(&mobile.speed.xy()) > w.dot(&mobile.speed.xy()) {
+                            v
+                        } else {
+                            w
+                        }
+                    } else {
+                        let him_to_me = (mobile.position.coords - nearest.position.coords)
+                            .xy()
+                            .normalize();
+                        him_to_me
+                    };
+
+                    // arrows.push(Arrow {
+                    //     position: mobile.position,
+                    //     color: [collision_avoid_priority, 0.0, 0.0, 0.0],
+                    //     end: mobile.position
+                    //         + Vector3::new(
+                    //             collision_avoid_dir.x * 2.0,
+                    //             collision_avoid_dir.y * 2.0,
+                    //             0.0,
+                    //         ),
+                    // });
+
+                    let speed_closeness = mobile.speed.xy().dot(&nearest.speed.xy());
+                    neighbor_dir_priority = if speed_closeness > 0.0 && nearest.speed.norm() > 0.1 {
+                        speed_closeness
+                            .max(0.0)
+                            .min((1.0 - collision_avoid_priority) * 0.2)
+                    } else {
+                        0.0
+                    };
+
+                    neighbor_dir = nearest
+                        .speed
+                        .xy()
+                        .try_normalize(0.001)
+                        .unwrap_or(Vector2::new(0.0, 0.0));
+
+                    // arrows.push(Arrow {
+                    //     position: mobile.position,
+                    //     color: [0.0, neighbor_dir_priority, 0.0, 0.0],
+                    //     end: mobile.position
+                    //         + Vector3::new(neighbor_dir.x * 2.0, neighbor_dir.y * 2.0, 0.0),
+                    // });
+                }
+            }
+
+            let mut dir_intensity = 0.0;
+
+            if let Some(target) = mobile.target {
+                let to_target = (target.coords - mobile.position.coords).xy();
+                let to_target_distance = to_target.norm();
+                let will_to_go_target = if to_target_distance > 0.5 {
+                    (to_target_distance / 2.0).min(1.0)
+                } else {
+                    0.0
+                };
+
+                let target_dir = to_target.normalize();
+                let available = (1.0 - collision_avoid_priority - neighbor_dir_priority).max(0.0);
+                let target_prio = available.min(will_to_go_target);
+                let dir = target_dir * target_prio
+                    + collision_avoid_dir * collision_avoid_priority
+                    + neighbor_dir * neighbor_dir_priority;
+
+                dir_intensity = target_prio + collision_avoid_priority + neighbor_dir_priority;
+
+                // mobile.dir = mobile.dir * 0.50 + Vector3::new(dir.x, dir.y, 0.0) * 0.5;
+
+                //Clamp in cone
+                let wanted_angle: Angle = dir.into();
+                let current_angle = mobile.angle;
+
+                fn clamp_abs(x: f32, max_abs: f32) -> f32 {
+                    let sign = x.signum();
+                    sign * (x.abs().min(max_abs))
+                }
+
+                let diff = (wanted_angle - (current_angle + mobile.angular_velocity.into())).rad;
+
+                mobile.angular_velocity = clamp_abs(
+                    mobile.angular_velocity + clamp_abs(diff, botdef.turn_accel),
+                    botdef.max_turn_rate,
+                );
+
+                let new_angle = current_angle + mobile.angular_velocity.into();
+                // current_angle.clamp_around(wanted_angle, mobile.angular_velocity.into());
+                mobile.angle = new_angle;
+                let dir: Vector2<f32> = new_angle.into();
+                mobile.dir = Vector3::new(dir.x, dir.y, 0.0);
+
+                if will_to_go_target < 0.01 {
+                    mobile.target = None;
+                }
+            }
+            mobile.speed = (mobile.speed + mobile.dir * 10.8 * dir_intensity) * 0.1;
+            mobile.position += mobile.speed;
+            mobile.position.x = mobile
+                .position
+                .x
+                .max(0.0)
+                .min(heightmap_phy.width as f32 - 1.0);
+            mobile.position.y = mobile
+                .position
+                .y
+                .max(0.0)
+                .min(heightmap_phy.height as f32 - 1.0);
+            mobile.position.z = heightmap_phy.z_linear(mobile.position.x, mobile.position.y) + 0.5;
+            mobile.grounded = true;
+            mobile.up = heightmap_phy.normal(mobile.position.x, mobile.position.y);
+
+            mobile.weapon0_dir = (mobile.weapon0_dir + mobile.dir).normalize();
+        }
+    }
+    frame_profiler.add("02  movement", start.elapsed());
 
     //Remove dead kbot
     for (id, kbot) in kbots.iter() {

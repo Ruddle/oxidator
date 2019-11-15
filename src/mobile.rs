@@ -14,12 +14,103 @@ pub struct ExplosionEvent {
     pub life_time: f32,
 }
 
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq)]
+pub struct Angle {
+    pub rad: f32,
+}
+impl Angle {
+    pub fn from(x: f32, y: f32) -> Self {
+        Angle {
+            rad: f32::atan2(y, x),
+        }
+        .modulo()
+    }
+
+    pub fn new(rad: f32) -> Self {
+        Angle { rad }.modulo()
+    }
+
+    pub fn clamp_around(self, other: Angle, cone_angle: Angle) -> Self {
+        let max = other + cone_angle;
+        let min = other - cone_angle;
+        let diff = (other - self);
+        let diff = diff.rad.max(-cone_angle.rad).min(cone_angle.rad);
+        self + Angle::new(diff)
+    }
+
+    pub fn modulo(&self) -> Self {
+        Angle {
+            rad: (self.rad + std::f32::consts::PI).rem_euclid(2.0 * std::f32::consts::PI)
+                - std::f32::consts::PI,
+        }
+    }
+}
+
+impl std::ops::Add<Angle> for Angle {
+    type Output = Angle;
+
+    fn add(self, rhs: Angle) -> Angle {
+        Angle {
+            rad: (self.rad + rhs.rad),
+        }
+        .modulo()
+    }
+}
+
+impl std::ops::Sub<Angle> for Angle {
+    type Output = Angle;
+
+    fn sub(self, rhs: Angle) -> Angle {
+        Angle {
+            rad: (self.rad - rhs.rad),
+        }
+        .modulo()
+    }
+}
+
+impl std::ops::Neg for Angle {
+    type Output = Angle;
+
+    fn neg(self) -> Angle {
+        Angle {
+            rad: (self.rad + std::f32::consts::PI),
+        }
+        .modulo()
+    }
+}
+
+impl From<Vector2<f32>> for Angle {
+    fn from(dir: Vector2<f32>) -> Self {
+        Self::from(dir.x, dir.y)
+    }
+}
+
+impl Into<Vector2<f32>> for Angle {
+    fn into(self) -> Vector2<f32> {
+        Vector2::new(f32::cos(self.rad), f32::sin(self.rad))
+    }
+}
+
+impl From<(f32, f32)> for Angle {
+    fn from(dir: (f32, f32)) -> Self {
+        Self::from(dir.0, dir.1)
+    }
+}
+
+impl From<f32> for Angle {
+    fn from(rad: f32) -> Self {
+        Self::new(rad)
+    }
+}
+
 #[derive(Clone, TypeName, Debug, Serialize, Deserialize, PartialEq)]
 pub struct KBot {
     pub id: Id<KBot>,
     pub position: Point3<f32>,
     pub speed: Vector3<f32>,
     pub dir: Vector3<f32>,
+    pub angle: Angle,
+    pub angular_velocity: f32,
     pub up: Vector3<f32>,
     pub target: Option<Point3<f32>>,
     pub life: i32,
@@ -38,6 +129,7 @@ impl KBot {
             speed: Vector3::new(0.0, 0.0, 0.0),
             team: 0,
             dir: Vector3::new(1.0, 0.0, 0.0),
+            angle: Angle::new(0.0),
             up: Vector3::new(0.0, 0.0, 1.0),
             target: None,
             id: utils::rand_id(),
@@ -47,6 +139,7 @@ impl KBot {
             life: 100,
             grounded: false,
             botdef_id,
+            angular_velocity: 0.0,
         }
     }
 }

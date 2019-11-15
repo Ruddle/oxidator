@@ -27,6 +27,10 @@ impl App {
                     id: utils::rand_id(),
                     radius: 0.5,
                     max_life: 100,
+                    turn_accel: 1.5,
+                    max_turn_rate: 1.5,
+                    accel: 0.1,
+                    max_speed: 1.0,
                     part_tree: self.unit_editor.root.clone(),
                 };
 
