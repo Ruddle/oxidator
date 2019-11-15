@@ -110,7 +110,7 @@ impl App {
                 let t = self.game_state.start_time.elapsed().as_secs_f32();
                 if self.main_menu == MainMode::UnitEditor {
                     Self::visit_part_tree(
-                        &self.unit_editor.root,
+                        &self.unit_editor.botdef.part_tree,
                         &identity,
                         &mut self.generic_gpu,
                         0.0,

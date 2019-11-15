@@ -1,4 +1,5 @@
 use super::client::*;
+use crate::botdef::BotDef;
 use crate::model::*;
 use crate::utils::FileTree;
 use crate::*;
@@ -10,7 +11,7 @@ use unit::*;
 
 pub struct UnitEditor {
     pub orbit: Point3<f32>,
-    pub root: PartTree,
+    pub botdef: BotDef,
     pub asset_dir_cached: FileTree,
     pub selected_id: utils::Id<PartTree>,
 }
@@ -42,11 +43,23 @@ impl UnitEditor {
             parent_to_self: Matrix4::identity(),
             joint: Joint::Fix,
         };
+
+        let botdef = botdef::BotDef {
+            id: utils::rand_id(),
+            radius: 0.5,
+            max_life: 100,
+            turn_accel: 1.5,
+            max_turn_rate: 1.5,
+            accel: 0.1,
+            max_speed: 1.0,
+            part_tree: root,
+        };
+
         UnitEditor {
             orbit: Point3::new(300.0, 100.0, 0.5),
             asset_dir_cached: FileTree::Unknown,
-            selected_id: root.id,
-            root,
+            selected_id: botdef.part_tree.id,
+            botdef,
         }
     }
 
@@ -71,7 +84,7 @@ impl UnitEditor {
     fn add_to_parts(&mut self, path: PathBuf) {
         log::debug!("adding {:?} to {}", path, self.selected_id);
 
-        match self.root.find_node_mut(self.selected_id) {
+        match self.botdef.part_tree.find_node_mut(self.selected_id) {
             Some(node) => node.children.push(PartTree {
                 placed_mesh: Some(PlacedMesh {
                     trans: utils::face_towards_dir(
@@ -121,20 +134,20 @@ impl App {
             .build(&ui, || {
                 Self::ui_part_tree(
                     ui,
-                    &mut unit_editor.root.clone(),
+                    &mut unit_editor.botdef.part_tree.clone(),
                     unit_editor,
                     true,
                     generic_gpu,
                 );
 
                 if ui.button(im_str!("load"), [0.0, 0.0]) {
-                    if let Ok(root) =
-                        Self::load_part_tree_on_disk("src/asset/part_tree_def/unit_example.bin")
+                    if let Ok(botdef) =
+                        Self::load_botdef_on_disk("src/asset/botdef/unit_example.bin")
                     {
-                        log::info!("Loaded {:#?}", root);
-                        unit_editor.root = root;
+                        log::info!("Loaded {:#?}", botdef);
+                        unit_editor.botdef = botdef;
 
-                        for node in unit_editor.root.iter() {
+                        for node in unit_editor.botdef.part_tree.iter() {
                             if let Some(mesh) = &node.placed_mesh {
                                 UnitEditor::open_obj(&mesh.mesh_path, generic_gpu);
                             }
@@ -142,16 +155,16 @@ impl App {
                     }
                 }
                 if ui.button(im_str!("save"), [0.0, 0.0]) {
-                    Self::save_part_tree_on_disk(
-                        &unit_editor.root,
-                        "src/asset/part_tree_def/unit_example.bin",
+                    Self::save_botdef_on_disk(
+                        &unit_editor.botdef,
+                        "src/asset/botdef/unit_example.bin",
                     );
-                    log::info!("Saving {:#?}", unit_editor.root);
+                    log::info!("Saving {:#?}", unit_editor.botdef.part_tree);
                 }
             });
     }
 
-    pub fn save_part_tree_on_disk(part_tree: &PartTree, path: &str) {
+    pub fn save_botdef_on_disk(bot_def: &BotDef, path: &str) {
         use std::fs::OpenOptions;
         use std::io::prelude::*;
         use std::io::{BufReader, BufWriter};
@@ -162,10 +175,10 @@ impl App {
             .open(path)
             .unwrap();
         let mut buf_w = BufWriter::new(file);
-        bincode::serialize_into(buf_w, part_tree);
+        bincode::serialize_into(buf_w, bot_def);
     }
 
-    pub fn load_part_tree_on_disk(path: &str) -> bincode::Result<PartTree> {
+    pub fn load_botdef_on_disk(path: &str) -> bincode::Result<BotDef> {
         use std::fs::OpenOptions;
         use std::io::prelude::*;
         use std::io::{BufReader, BufWriter};
@@ -197,7 +210,7 @@ impl App {
             if !is_root {
                 ui.same_line(0.0);
                 if ui.button(im_str!("remove##{:?}", part_tree.id).as_ref(), [0.0, 0.0]) {
-                    let deleter = unit_editor.root.remove_node(part_tree.id);
+                    let deleter = unit_editor.botdef.part_tree.remove_node(part_tree.id);
                     if part_tree.id == unit_editor.selected_id {
                         for d in deleter.iter() {
                             unit_editor.selected_id = *d;
@@ -299,7 +312,8 @@ impl App {
                                             if ui.small_button(im_str!("swap##{:?}", c.id).as_ref())
                                             {
                                                 unit_editor
-                                                    .root
+                                                    .botdef
+                                                    .part_tree
                                                     .find_node_mut(c.id)
                                                     .unwrap()
                                                     .joint
@@ -331,7 +345,8 @@ impl App {
                                             ui.text(im_str!("mesh transform:"));
                                             let new_placed_mesh =
                                                 if let Some(Some(old_placed_mesh)) = unit_editor
-                                                    .root
+                                                    .botdef
+                                                    .part_tree
                                                     .find_node(c.id)
                                                     .map(|e| &e.placed_mesh)
                                                 {
@@ -349,7 +364,8 @@ impl App {
                                                     None
                                                 };
 
-                                            if let Some(node) = unit_editor.root.find_node_mut(c.id)
+                                            if let Some(node) =
+                                                unit_editor.botdef.part_tree.find_node_mut(c.id)
                                             {
                                                 node.parent_to_self = new_parent_to_self;
                                                 node.placed_mesh = new_placed_mesh;
@@ -450,7 +466,11 @@ impl App {
                     ui.same_line(0.0);
 
                     let mut replace_exe = || {
-                        if let Some(child) = unit_editor.root.find_node_mut(id_to_mesh_replace) {
+                        if let Some(child) = unit_editor
+                            .botdef
+                            .part_tree
+                            .find_node_mut(id_to_mesh_replace)
+                        {
                             if let Some(old) = &child.placed_mesh {
                                 child.placed_mesh = Some(PlacedMesh {
                                     mesh_path: path.clone(),

@@ -531,11 +531,11 @@ impl App {
         );
 
         let mut unit_editor = unit_editor::UnitEditor::new();
-        if let Ok(root) = App::load_part_tree_on_disk("src/asset/part_tree_def/unit_example.bin") {
-            log::info!("Loaded {:#?}", root);
-            unit_editor.root = root;
+        if let Ok(botdef) = App::load_botdef_on_disk("src/asset/botdef/unit_example.bin") {
+            log::info!("Loaded {:#?}", botdef);
+            unit_editor.botdef = botdef;
 
-            for node in unit_editor.root.iter() {
+            for node in unit_editor.botdef.part_tree.iter() {
                 if let Some(mesh) = &node.placed_mesh {
                     unit_editor::UnitEditor::open_obj(&mesh.mesh_path, &mut generic_gpu);
                 }

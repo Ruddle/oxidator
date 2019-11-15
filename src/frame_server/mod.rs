@@ -558,7 +558,7 @@ pub fn update_units(
                     neighbor_dir_priority = if speed_closeness > 0.0 && nearest.speed.norm() > 0.1 {
                         speed_closeness
                             .max(0.0)
-                            .min((1.0 - collision_avoid_priority) * 0.2)
+                            .min((1.0 - collision_avoid_priority) * 0.6)
                     } else {
                         0.0
                     };
