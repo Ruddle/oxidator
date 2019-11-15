@@ -16,6 +16,8 @@ pub struct BotDef {
     pub max_turn_rate: f32,
     ///m/frame²
     pub accel: f32,
+    ///m/frame²
+    pub break_accel: f32,
     ///m/frame
     pub max_speed: f32,
 

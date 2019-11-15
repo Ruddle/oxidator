@@ -51,6 +51,7 @@ impl UnitEditor {
             turn_accel: 1.5,
             max_turn_rate: 1.5,
             accel: 0.1,
+            break_accel: 0.3,
             max_speed: 1.0,
             part_tree: root,
         };
@@ -132,6 +133,75 @@ impl App {
             .position([3.0, 115.0], imgui::Condition::FirstUseEver)
             .collapsed(false, imgui::Condition::FirstUseEver)
             .build(&ui, || {
+                let BotDef {
+                    id,
+                    radius,
+                    max_life,
+                    turn_accel,
+                    max_turn_rate,
+                    accel,
+                    break_accel,
+                    max_speed,
+                    part_tree,
+                } = &unit_editor.botdef;
+
+                let to_rev = 0.5 / std::f32::consts::PI;
+                let to_rad = 1.0 / to_rev;
+                let to_sec = 10.0;
+                let to_frame = 1.0 / to_sec;
+
+                let mut max_turn_rate_human = max_turn_rate * to_sec * to_rev;
+                ui.drag_float(
+                    im_str!("maximum turn rate (rev/sec)"),
+                    &mut max_turn_rate_human,
+                )
+                .speed(0.01)
+                .min(0.01)
+                .max(100.0)
+                .build();
+
+                let mut turn_accel_human = turn_accel * to_sec * to_sec * to_rev;
+                ui.drag_float(
+                    im_str!("turn acceleration (rev/sec²)"),
+                    &mut turn_accel_human,
+                )
+                .speed(0.01)
+                .min(0.01)
+                .max(100.0)
+                .build();
+
+                let mut max_speed_human = max_speed * to_sec;
+                ui.drag_float(im_str!("max speed (m/sec)"), &mut max_speed_human)
+                    .speed(0.01)
+                    .min(0.01)
+                    .max(100.0)
+                    .build();
+
+                let mut accel_human = accel * to_sec * to_sec;
+                ui.drag_float(im_str!("acceleration (m/sec²)"), &mut accel_human)
+                    .speed(0.01)
+                    .min(0.01)
+                    .max(100.0)
+                    .build();
+
+                let mut break_accel_human = break_accel * to_sec * to_sec;
+                ui.drag_float(im_str!("break accel (m/sec²)"), &mut break_accel_human)
+                    .speed(0.01)
+                    .min(0.01)
+                    .max(100.0)
+                    .build();
+
+                let mut life = max_life.clone();
+                ui.drag_int(im_str!("health"), &mut life).build();
+
+                unit_editor.botdef.max_turn_rate = max_turn_rate_human * to_frame * to_rad;
+
+                unit_editor.botdef.turn_accel = turn_accel_human * to_frame * to_frame * to_rad;
+                unit_editor.botdef.max_speed = max_speed_human * to_frame;
+                unit_editor.botdef.accel = accel_human * to_frame * to_frame;
+                unit_editor.botdef.break_accel = break_accel_human * to_frame * to_frame;
+                unit_editor.botdef.max_life = life.max(0);
+                ui.separator();
                 Self::ui_part_tree(
                     ui,
                     &mut unit_editor.botdef.part_tree.clone(),

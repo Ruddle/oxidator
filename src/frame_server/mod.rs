@@ -519,7 +519,7 @@ pub fn update_units(
                         .xy()
                         .magnitude();
 
-                    collision_avoid_priority = ((4.0 - closeness) / 4.0).max(0.0).min(0.8);
+                    collision_avoid_priority = ((4.0 - closeness) / 4.0).max(0.0).min(0.5);
 
                     collision_avoid_dir = if nearest.speed.xy().norm_squared() < 0.01
                         || mobile.speed.xy().dot(&nearest.speed.xy()) < 0.0
@@ -558,7 +558,7 @@ pub fn update_units(
                     neighbor_dir_priority = if speed_closeness > 0.0 && nearest.speed.norm() > 0.1 {
                         speed_closeness
                             .max(0.0)
-                            .min((1.0 - collision_avoid_priority) * 0.6)
+                            .min((1.0 - collision_avoid_priority) * 0.0)
                     } else {
                         0.0
                     };
@@ -581,9 +581,9 @@ pub fn update_units(
             let mut dir_intensity = 0.0;
 
             if let Some(target) = mobile.target {
-                let to_target = (target.coords - mobile.position.coords).xy();
+                let to_target = (target.coords - (mobile.position.coords + mobile.speed)).xy();
                 let to_target_distance = to_target.norm();
-                let will_to_go_target = if to_target_distance > 0.5 {
+                let will_to_go_target = if to_target_distance > 1.0 {
                     (to_target_distance / 2.0).min(1.0)
                 } else {
                     0.0
@@ -626,7 +626,27 @@ pub fn update_units(
                     mobile.target = None;
                 }
             }
-            mobile.speed = (mobile.speed + mobile.dir * 10.8 * dir_intensity) * 0.1;
+
+            //TODO drift factor ?
+            //drift = 1 (adherence = 0)
+            // mobile.speed = mobile.speed + mobile.dir * botdef.accel * dir_intensity;
+            //drift = 0 (adherence = 1)
+
+            if mobile.target != None {
+                mobile.speed =
+                    mobile.dir * (botdef.accel * dir_intensity + mobile.speed.magnitude());
+            } else {
+                {
+                    mobile.speed =
+                        mobile.dir * (-botdef.break_accel + mobile.speed.magnitude()).max(0.0);
+                }
+            }
+
+            let speed = mobile.speed.magnitude();
+            if speed > botdef.max_speed {
+                mobile.speed /= speed / botdef.max_speed;
+            }
+
             mobile.position += mobile.speed;
             mobile.position.x = mobile
                 .position
