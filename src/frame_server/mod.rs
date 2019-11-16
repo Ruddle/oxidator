@@ -480,7 +480,7 @@ pub fn update_units(
             let to_remove = neighbors_id.iter().position(|e| e == id).unwrap();
             neighbors_id.remove(to_remove);
 
-            let avoidance_force = avoid_neighbors_force(mobile, neighbors_id, &mobiles2);
+            let avoidance_force = avoid_neighbors_force(mobile, neighbors_id, &mobiles2) * 0.3;
 
             let TargetForce {
                 target_force,
@@ -626,11 +626,9 @@ fn avoid_neighbors_force(
         let o_pos = other.position + other.speed;
 
         let to_other = (o_pos.coords - pos.coords).xy();
-        let distance = to_other.magnitude();
+        let distance = (to_other.magnitude() - 1.1).max(0.1);
         let inv_distance = 1.0 / distance;
-
         let to_other_normalized = to_other * inv_distance;
-
         avoidance += -to_other_normalized * inv_distance;
     }
     avoidance
