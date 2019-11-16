@@ -7,10 +7,15 @@ This project is inspired by Total Annihilation, Supreme Commander, [Spring Engin
 ## Demo
 
 ![Map editor](etc/map_editor.gif)
-Map editor [HQ version](https://streamable.com/q0odh)
+Map editor [HQ version](https://streamable.com/e5zdj)
+
+![Unit editor](etc/unit_editor.gif)
+Unit editor [HQ version](https://streamable.com/ywr44)
 
 ![Play mode](etc/play.gif)
-Gameplay (35000 units) [HQ version](https://streamable.com/38lop)
+Gameplay (35000 units) [HQ version](https://streamable.com/499j0)
+
+
 
 ## Goal
 
@@ -57,9 +62,10 @@ the test for this goal would be to be able implement a [Zero-k](https://zero-k.i
 
 - Unit editor
     - [x] basic imgui editor to create node hierarchy
-    - [x] joint selection
+    - [x] joint selection (Fix, weapon aim, wheel)
     - [x] mesh selection
-    - [~] save/load from filesystem
+    - [x] parameter editing (speed, turn rate, health...)
+    - [ ] save/load from filesystem
     - [ ] graphical editor
     - [ ] integration with online repository
 
@@ -111,7 +117,7 @@ the test for this goal would be to be able implement a [Zero-k](https://zero-k.i
 
  * Windows (dx12 and vulkan)
  * Linux (vulkan)
- * Mac Untested (*should work TM*)
+ * Mac Untested (*should just work TM*)
 
 All thanks to WebGPU and [wgpu-rs](https://github.com/gfx-rs/wgpu-rs) (and [winit](https://github.com/rust-windowing/winit)). No efforts was made by me in this regard. If anything I posted a stupid issue there that was solved in 0.03 second.
  
