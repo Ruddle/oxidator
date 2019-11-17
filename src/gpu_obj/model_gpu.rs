@@ -66,8 +66,8 @@ impl ModelGpu {
         });
         let vertex_size = std::mem::size_of::<model::Vertex>();
         // Create the render pipeline
-        let vs_bytes = glsl_compiler::load("./src/shader/cube_instanced.vert").unwrap();
-        let fs_bytes = glsl_compiler::load("./src/shader/cube_instanced.frag").unwrap();
+        let vs_bytes = glsl_compiler::load("./src/shader/cube_instanced.vert")?;
+        let fs_bytes = glsl_compiler::load("./src/shader/cube_instanced.frag")?;
 
         let vs_module = device.create_shader_module(&vs_bytes);
         let fs_module = device.create_shader_module(&fs_bytes);
@@ -100,7 +100,7 @@ impl ModelGpu {
                     format: wgpu::TextureFormat::Rgba32Float,
                     color_blend: wgpu::BlendDescriptor::REPLACE,
                     alpha_blend: wgpu::BlendDescriptor::REPLACE,
-                    write_mask: wgpu::ColorWrite::ALPHA,
+                    write_mask: wgpu::ColorWrite::ALL,
                 },
             ],
             depth_stencil_state: Some(wgpu::DepthStencilStateDescriptor {
@@ -124,9 +124,14 @@ impl ModelGpu {
                             shader_location: 0,
                         },
                         wgpu::VertexAttributeDescriptor {
-                            format: wgpu::VertexFormat::Float2,
+                            format: wgpu::VertexFormat::Float3,
                             offset: 4 * 4,
                             shader_location: 1,
+                        },
+                        wgpu::VertexAttributeDescriptor {
+                            format: wgpu::VertexFormat::Float2,
+                            offset: 4 * 7,
+                            shader_location: 2,
                         },
                     ],
                 },
@@ -137,22 +142,22 @@ impl ModelGpu {
                         wgpu::VertexAttributeDescriptor {
                             format: wgpu::VertexFormat::Float3,
                             offset: 0,
-                            shader_location: 2,
+                            shader_location: 3,
                         },
                         wgpu::VertexAttributeDescriptor {
                             format: wgpu::VertexFormat::Float3,
                             offset: 4 * 3,
-                            shader_location: 3,
-                        },
-                        wgpu::VertexAttributeDescriptor {
-                            format: wgpu::VertexFormat::Float,
-                            offset: 4 * 6,
                             shader_location: 4,
                         },
                         wgpu::VertexAttributeDescriptor {
                             format: wgpu::VertexFormat::Float,
-                            offset: 4 * 7,
+                            offset: 4 * 6,
                             shader_location: 5,
+                        },
+                        wgpu::VertexAttributeDescriptor {
+                            format: wgpu::VertexFormat::Float,
+                            offset: 4 * 7,
+                            shader_location: 6,
                         },
                     ],
                 },

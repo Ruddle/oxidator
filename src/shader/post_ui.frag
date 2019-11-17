@@ -97,4 +97,6 @@ void main() {
     }
 
     o_Target = vec4(color,alpha);
+
+    // o_Target= vec4(pos_attachment.xyz,1.0);
 }

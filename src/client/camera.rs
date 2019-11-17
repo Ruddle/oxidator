@@ -11,10 +11,7 @@ pub fn create_view(pos: &Point3<f32>, dir: &Vector3<f32>) -> Matrix4<f32> {
 }
 
 pub fn create_normal(pos: &Point3<f32>, dir: &Vector3<f32>) -> Matrix4<f32> {
-    Matrix4::look_at_rh(pos, &(pos + dir), &Vector3::new(0.0, 0.0, 1.0))
-        .try_inverse()
-        .unwrap()
-        .transpose()
+    create_view(pos, dir).try_inverse().unwrap().transpose()
 }
 
 pub fn create_proj(aspect_ratio: f32, near: f32) -> Matrix4<f32> {

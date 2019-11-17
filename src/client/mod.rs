@@ -874,6 +874,17 @@ impl App {
                         &self.bind_group_layout,
                         self.gpu.sc_desc.format,
                     );
+                    for (model_gpu_state) in self.unit_part_gpu.states.iter_mut() {
+                        match model_gpu_state {
+                            unit_part_gpu::ModelGpuState::Ready(model_gpu) => model_gpu
+                                .reload_shader(
+                                    &self.gpu.device,
+                                    &self.bind_group_layout,
+                                    self.gpu.sc_desc.format,
+                                ),
+                            _ => {}
+                        }
+                    }
                 }
 
                 if event.paths.iter().any(|p| {
