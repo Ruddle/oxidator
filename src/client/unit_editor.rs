@@ -8,36 +8,17 @@ use na::{Matrix4, Point3, Vector2, Vector3, Vector4};
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use unit::*;
-
+use unit_part_gpu::*;
 pub struct UnitEditor {
     pub orbit: Point3<f32>,
     pub botdef: BotDef,
     pub asset_dir_cached: FileTree,
-    pub selected_id: utils::Id<PartTree>,
 }
 impl UnitEditor {
     pub fn new() -> Self {
         let root = PartTree {
             id: utils::rand_id(),
-            children: vec![
-                //
-                unit::PartTree {
-                    id: utils::rand_id(),
-                    placed_mesh: Some(unit::PlacedMesh {
-                        trans: utils::face_towards_dir(
-                            &Vector3::new(0.0, 0.0, 0.0),
-                            &Vector3::new(1.0, 0.0, 0.0),
-                            &Vector3::new(0.0, 0.0, 1.0),
-                        ),
-                        mesh_path: Path::new("./src/asset/cube.obj").to_owned(),
-                    }),
-                    placed_collider: None,
-                    parent_to_self: Matrix4::identity(),
-                    joint: unit::Joint::Fix,
-                    children: vec![],
-                },
-                //
-            ],
+            children: vec![],
             placed_mesh: None,
             placed_collider: None,
             parent_to_self: Matrix4::identity(),
@@ -59,33 +40,14 @@ impl UnitEditor {
         UnitEditor {
             orbit: Point3::new(300.0, 100.0, 0.5),
             asset_dir_cached: FileTree::Unknown,
-            selected_id: botdef.part_tree.id,
             botdef,
         }
     }
 
-    pub fn open_obj(path: &Path, generic_gpu: &mut HashMap<PathBuf, GenericGpuState>) -> bool {
-        log::debug!("open_obj {:?}", path);
-        match crate::model::open_obj(path.to_str().unwrap()) {
-            Ok(triangle_list) => {
-                generic_gpu.insert(
-                    path.to_owned(),
-                    GenericGpuState::ToLoad(triangle_list.clone()),
-                );
-                return true;
-            }
-            Err(e) => {
-                log::warn!("Can't load {:?}: {:?}", path, e);
-                generic_gpu.insert(path.to_owned(), GenericGpuState::Error(e));
-                return false;
-            }
-        }
-    }
+    fn add_to_parts(&mut self, parent: utils::Id<PartTree>, path: PathBuf, mesh_index: usize) {
+        log::debug!("adding {:?} to {}", path, parent);
 
-    fn add_to_parts(&mut self, path: PathBuf) {
-        log::debug!("adding {:?} to {}", path, self.selected_id);
-
-        match self.botdef.part_tree.find_node_mut(self.selected_id) {
+        match self.botdef.part_tree.find_node_mut(parent) {
             Some(node) => node.children.push(PartTree {
                 placed_mesh: Some(PlacedMesh {
                     trans: utils::face_towards_dir(
@@ -94,6 +56,7 @@ impl UnitEditor {
                         &Vector3::new(0.0, 0.0, 1.0),
                     ),
                     mesh_path: path,
+                    mesh_index,
                 }),
                 placed_collider: None,
                 parent_to_self: Matrix4::identity(),
@@ -118,7 +81,7 @@ impl App {
     pub fn draw_unit_editor_ui(
         ui: &Ui,
         unit_editor: &mut UnitEditor,
-        generic_gpu: &mut HashMap<PathBuf, GenericGpuState>,
+        unit_part_gpu: &mut UnitPartGpu,
     ) {
         let path = std::path::Path::new("./src/asset/");
 
@@ -207,29 +170,22 @@ impl App {
                     &mut unit_editor.botdef.part_tree.clone(),
                     unit_editor,
                     true,
-                    generic_gpu,
+                    unit_part_gpu,
                 );
 
                 if ui.button(im_str!("load"), [0.0, 0.0]) {
-                    if let Ok(botdef) =
-                        Self::load_botdef_on_disk("src/asset/botdef/unit_example.bin")
-                    {
-                        log::info!("Loaded {:#?}", botdef);
-                        unit_editor.botdef = botdef;
-
-                        for node in unit_editor.botdef.part_tree.iter() {
-                            if let Some(mesh) = &node.placed_mesh {
-                                UnitEditor::open_obj(&mesh.mesh_path, generic_gpu);
-                            }
-                        }
-                    }
+                    Self::load_botdef_in_editor(
+                        "src/asset/botdef/unit_example.json",
+                        unit_editor,
+                        unit_part_gpu,
+                    );
                 }
                 if ui.button(im_str!("save"), [0.0, 0.0]) {
                     Self::save_botdef_on_disk(
                         &unit_editor.botdef,
-                        "src/asset/botdef/unit_example.bin",
+                        "src/asset/botdef/unit_example.json",
                     );
-                    log::info!("Saving {:#?}", unit_editor.botdef.part_tree);
+                    log::info!("Saving {:?}", unit_editor.botdef.part_tree);
                 }
             });
     }
@@ -245,10 +201,11 @@ impl App {
             .open(path)
             .unwrap();
         let mut buf_w = BufWriter::new(file);
-        bincode::serialize_into(buf_w, bot_def);
+        serde_json::to_writer_pretty(buf_w, bot_def);
+        // bincode::serialize_into(buf_w, bot_def);
     }
 
-    pub fn load_botdef_on_disk(path: &str) -> bincode::Result<BotDef> {
+    pub fn load_botdef_on_disk(path: &str) -> serde_json::Result<BotDef> {
         use std::fs::OpenOptions;
         use std::io::prelude::*;
         use std::io::{BufReader, BufWriter};
@@ -259,7 +216,32 @@ impl App {
             .open(path)
             .unwrap();
         let mut buf_r = BufReader::new(file);
-        Ok(bincode::deserialize_from(buf_r)?)
+        serde_json::from_reader(buf_r)
+    }
+
+    pub fn load_botdef_in_editor(
+        path: &str,
+        unit_editor: &mut UnitEditor,
+        unit_part_gpu: &mut unit_part_gpu::UnitPartGpu,
+    ) {
+        if let Ok(botdef) = Self::load_botdef_on_disk(path) {
+            log::info!("Loaded {:#?}", botdef);
+            unit_editor.botdef = botdef;
+
+            //Might need to clone
+            for node in unit_editor.botdef.clone().part_tree.iter() {
+                if let Some(mesh) = &node.placed_mesh {
+                    let index = unit_part_gpu.index_of_or_create_if_na(mesh.mesh_path.clone());
+
+                    //Update the mesh index, because it depend on the load order in the unit_part_gpu
+                    for node_mut in unit_editor.botdef.part_tree.find_node_mut(node.id) {
+                        for pm in &mut node_mut.placed_mesh {
+                            pm.mesh_index = index;
+                        }
+                    }
+                }
+            }
+        }
     }
 
     fn ui_part_tree(
@@ -267,31 +249,18 @@ impl App {
         part_tree: &PartTree,
         unit_editor: &mut UnitEditor,
         is_root: bool,
-        generic_gpu: &mut HashMap<PathBuf, GenericGpuState>,
+        unit_part_gpu: &mut UnitPartGpu,
     ) {
         {
-            if unit_editor.selected_id == part_tree.id {
-                ui.text(im_str!("Selected"));
-            } else {
-                if ui.button(im_str!("select##{:?}", part_tree.id).as_ref(), [0.0, 0.0]) {
-                    unit_editor.selected_id = part_tree.id;
-                }
-            }
             if !is_root {
                 ui.same_line(0.0);
                 if ui.button(im_str!("remove##{:?}", part_tree.id).as_ref(), [0.0, 0.0]) {
                     let deleter = unit_editor.botdef.part_tree.remove_node(part_tree.id);
-                    if part_tree.id == unit_editor.selected_id {
-                        for d in deleter.iter() {
-                            unit_editor.selected_id = *d;
-                        }
-                    }
                 }
             }
 
             let add_str = im_str!("Add child##{:?}", part_tree.id);
             if ui.button(add_str.as_ref(), [0.0, 0.0]) {
-                unit_editor.selected_id = part_tree.id;
                 ui.open_popup(add_str.as_ref());
             }
             ui.popup_modal(add_str.as_ref())
@@ -301,7 +270,8 @@ impl App {
                         &unit_editor.asset_dir_cached.clone(),
                         ui,
                         unit_editor,
-                        generic_gpu,
+                        unit_part_gpu,
+                        part_tree.id,
                     );
 
                     if ui.button(im_str!("Close"), [0.0, 0.0]) {
@@ -404,7 +374,7 @@ impl App {
                                                         &unit_editor.asset_dir_cached.clone(),
                                                         ui,
                                                         unit_editor,
-                                                        generic_gpu,
+                                                        unit_part_gpu,
                                                         c.id,
                                                     );
                                                     if ui.button(im_str!("Close"), [0.0, 0.0]) {
@@ -428,6 +398,7 @@ impl App {
                                                         mesh_path: old_placed_mesh
                                                             .mesh_path
                                                             .clone(),
+                                                        mesh_index: old_placed_mesh.mesh_index,
                                                     };
                                                     Some(new_placed_mesh)
                                                 } else {
@@ -446,7 +417,7 @@ impl App {
                                                 &c,
                                                 unit_editor,
                                                 false,
-                                                generic_gpu,
+                                                unit_part_gpu,
                                             );
                                         })
                                 });
@@ -460,7 +431,8 @@ impl App {
         dir: &FileTree,
         ui: &Ui,
         unit_editor: &mut UnitEditor,
-        generic_gpu: &mut HashMap<PathBuf, GenericGpuState>,
+        unit_part_gpu: &mut UnitPartGpu,
+        parent: utils::Id<PartTree>,
     ) {
         match dir {
             FileTree::Unknown => {
@@ -473,32 +445,23 @@ impl App {
                     ui.text(im_str!("{:?}", file_name));
                     ui.same_line(0.0);
 
-                    let state = generic_gpu.get(path);
+                    let (index, state) = unit_part_gpu.path_get_or_create_if_na(path.to_owned());
                     match state {
-                        None => {
+                        ModelGpuState::Ready(_) | ModelGpuState::ToLoad(_) => {
                             if ui.small_button(im_str!("add to parts##{:?}", path).as_ref()) {
                                 log::debug!("add to parts {:?}", path);
-                                log::debug!("was not open {:?}", path);
-                                if UnitEditor::open_obj(&path, generic_gpu) {
-                                    unit_editor.add_to_parts(path.clone());
-                                }
-                            }
-                        }
-                        Some(GenericGpuState::Ready(_)) | Some(GenericGpuState::ToLoad(_)) => {
-                            if ui.small_button(im_str!("add to parts##{:?}", path).as_ref()) {
-                                log::debug!("add to parts {:?}", path);
-                                unit_editor.add_to_parts(path.clone());
+                                unit_editor.add_to_parts(parent, path.clone(), index);
                             }
                             ui.same_line(0.0);
                             if ui.small_button(im_str!("reload##{:?}", path).as_ref()) {
-                                UnitEditor::open_obj(&path, generic_gpu);
+                                unit_part_gpu.reload(path.clone());
                             }
                         }
-                        Some(GenericGpuState::Error(e)) => {
+                        ModelGpuState::Error(e) => {
                             ui.text_colored([1.0, 0.0, 0.0, 1.0], im_str!("Error"));
                             ui.same_line(0.0);
                             if ui.small_button(im_str!("reload##{:?}", path).as_ref()) {
-                                UnitEditor::open_obj(&path, generic_gpu);
+                                unit_part_gpu.reload(path.clone());
                             }
                         }
                     }
@@ -510,7 +473,13 @@ impl App {
                 )
                 .build(|| {
                     for child in children {
-                        Self::visit_dirs_for_add_child(&child, ui, unit_editor, generic_gpu);
+                        Self::visit_dirs_for_add_child(
+                            &child,
+                            ui,
+                            unit_editor,
+                            unit_part_gpu,
+                            parent,
+                        );
                     }
                 });
             }
@@ -521,7 +490,7 @@ impl App {
         dir: &FileTree,
         ui: &Ui,
         unit_editor: &mut UnitEditor,
-        generic_gpu: &mut HashMap<PathBuf, GenericGpuState>,
+        unit_part_gpu: &mut UnitPartGpu,
         id_to_mesh_replace: utils::Id<PartTree>,
     ) {
         match dir {
@@ -535,7 +504,7 @@ impl App {
                     ui.text(im_str!("{:?}", file_name));
                     ui.same_line(0.0);
 
-                    let mut replace_exe = || {
+                    let mut replace_exe = |mesh_index| {
                         if let Some(child) = unit_editor
                             .botdef
                             .part_tree
@@ -543,11 +512,13 @@ impl App {
                         {
                             if let Some(old) = &child.placed_mesh {
                                 child.placed_mesh = Some(PlacedMesh {
+                                    mesh_index,
                                     mesh_path: path.clone(),
                                     trans: old.trans.clone(),
                                 });
                             } else {
                                 child.placed_mesh = Some(PlacedMesh {
+                                    mesh_index,
                                     mesh_path: path.clone(),
                                     trans: Matrix4::identity(),
                                 });
@@ -555,32 +526,33 @@ impl App {
                         }
                     };
 
-                    let state = generic_gpu.get(path);
+                    let state = unit_part_gpu.path_get(path.to_owned());
                     match state {
                         None => {
                             if ui.small_button(im_str!("replace with this##{:?}", path).as_ref()) {
                                 log::debug!("replace with this {:?}", path);
                                 log::debug!("was not open {:?}", path);
-                                if UnitEditor::open_obj(&path, generic_gpu) {
-                                    replace_exe();
-                                }
+
+                                let index = unit_part_gpu.index_of_or_create_if_na(path.to_owned());
+                                replace_exe(index);
                             }
                         }
-                        Some(GenericGpuState::Ready(_)) | Some(GenericGpuState::ToLoad(_)) => {
+                        Some(ModelGpuState::Ready(_)) | Some(ModelGpuState::ToLoad(_)) => {
                             if ui.small_button(im_str!("replace with this##{:?}", path).as_ref()) {
                                 log::debug!("replace with this {:?}", path);
-                                replace_exe();
+                                let index = unit_part_gpu.index_of_or_create_if_na(path.to_owned());
+                                replace_exe(index);
                             }
                             ui.same_line(0.0);
                             if ui.small_button(im_str!("reload##{:?}", path).as_ref()) {
-                                UnitEditor::open_obj(&path, generic_gpu);
+                                unit_part_gpu.reload(path.clone());
                             }
                         }
-                        Some(GenericGpuState::Error(e)) => {
+                        Some(ModelGpuState::Error(e)) => {
                             ui.text_colored([1.0, 0.0, 0.0, 1.0], im_str!("Error"));
                             ui.same_line(0.0);
                             if ui.small_button(im_str!("reload##{:?}", path).as_ref()) {
-                                UnitEditor::open_obj(&path, generic_gpu);
+                                unit_part_gpu.reload(path.clone());
                             }
                         }
                     }
@@ -596,7 +568,7 @@ impl App {
                             &child,
                             ui,
                             unit_editor,
-                            generic_gpu,
+                            unit_part_gpu,
                             id_to_mesh_replace,
                         );
                     }

@@ -12,6 +12,7 @@ use std::path::{Path, PathBuf};
 pub struct PlacedMesh {
     pub trans: Matrix4<f32>,
     pub mesh_path: PathBuf,
+    pub mesh_index: usize,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]

@@ -1,6 +1,6 @@
 use super::client::*;
 use crate::*;
-
+use unit_part_gpu::*;
 impl App {
     pub fn clear_gpu_instance_and_game_state(&mut self) {
         self.game_state.players.clear();
@@ -14,9 +14,9 @@ impl App {
         self.health_bar.update_instance(&[], &self.gpu.device);
         self.unit_icon.update_instance(&[], &self.gpu.device);
         self.explosion_gpu.update_instance(&[], &self.gpu.device);
-        for (_, generic_gpu_state) in self.generic_gpu.iter_mut() {
-            match generic_gpu_state {
-                GenericGpuState::Ready(model_gpu) => {
+        for (model_gpu_state) in self.unit_part_gpu.states.iter_mut() {
+            match model_gpu_state {
+                ModelGpuState::Ready(model_gpu) => {
                     model_gpu.update_instance_dirty(&[], &self.gpu.device)
                 }
                 _ => {}
@@ -29,7 +29,7 @@ impl App {
     pub fn visit_part_tree(
         part_tree: &unit::PartTree,
         root_trans: &Matrix4<f32>,
-        generic_gpu: &mut HashMap<PathBuf, GenericGpuState>,
+        unit_part_gpu: &mut UnitPartGpu,
         selected: f32,
         team: f32,
         weapon0_dir: Vector3<f32>,
@@ -69,8 +69,10 @@ impl App {
                 //     combined
                 // );
 
-                match generic_gpu.get_mut(&placed_mesh.mesh_path) {
-                    Some(GenericGpuState::Ready(generic_cpu)) => {
+                //TODO fix performance : HALF OF TIME IS IN GET_MUT
+                match unit_part_gpu.get_mut(placed_mesh.mesh_index) {
+                    //}  get_mut(&placed_mesh.mesh_path) {
+                    ModelGpuState::Ready(generic_cpu) => {
                         let buf = &mut generic_cpu.instance_attr_cpu_buf;
 
                         let isometry: Isometry3<f32> = unsafe {
@@ -91,7 +93,7 @@ impl App {
                 Self::visit_part_tree(
                     c,
                     &combined,
-                    generic_gpu,
+                    unit_part_gpu,
                     selected,
                     team,
                     weapon0_dir,
@@ -101,7 +103,7 @@ impl App {
                 Self::visit_part_tree(
                     c,
                     root_trans,
-                    generic_gpu,
+                    unit_part_gpu,
                     selected,
                     team,
                     weapon0_dir,
@@ -118,9 +120,9 @@ impl App {
 
             //generic_gpu
             {
-                for (path, model_gpu) in self.generic_gpu.iter_mut() {
+                for model_gpu in self.unit_part_gpu.states.iter_mut() {
                     match model_gpu {
-                        GenericGpuState::Ready(model_gpu) => {
+                        ModelGpuState::Ready(model_gpu) => {
                             model_gpu.instance_attr_cpu_buf.clear();
                         }
                         _ => {}
@@ -138,7 +140,7 @@ impl App {
                     Self::visit_part_tree(
                         &self.unit_editor.botdef.part_tree,
                         &identity,
-                        &mut self.generic_gpu,
+                        &mut self.unit_part_gpu,
                         0.0,
                         0.0,
                         Vector3::new(f32::cos(t), f32::sin(t), f32::sin(t / 5.0) * 0.1).normalize(),
@@ -167,7 +169,7 @@ impl App {
                             Self::visit_part_tree(
                                 &botdef.part_tree,
                                 &mat,
-                                &mut self.generic_gpu,
+                                &mut self.unit_part_gpu,
                                 is_selected,
                                 team as f32,
                                 client_kbot.weapon0_dir,
@@ -177,9 +179,9 @@ impl App {
                     }
                 }
 
-                for (path, model_gpu) in self.generic_gpu.iter_mut() {
+                for model_gpu in self.unit_part_gpu.states.iter_mut() {
                     match model_gpu {
-                        GenericGpuState::Ready(model_gpu) => {
+                        ModelGpuState::Ready(model_gpu) => {
                             model_gpu.update_instance_dirty_own_buffer(&self.gpu.device);
                         }
                         _ => {}

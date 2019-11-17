@@ -15,6 +15,8 @@ use imgui_winit_support;
 use imgui_winit_support::WinitPlatform;
 mod camera;
 mod game_state;
+mod unit_part_gpu;
+use unit_part_gpu::UnitPartGpu;
 
 mod unit_editor;
 
@@ -77,12 +79,6 @@ pub enum NetMode {
     Client,
 }
 
-pub enum GenericGpuState {
-    ToLoad(model::TriangleList),
-    Ready(ModelGpu),
-    Error(String),
-}
-
 pub struct App {
     //Wgpu
     gpu: gpu::WgpuState,
@@ -95,7 +91,7 @@ pub struct App {
 
     heightmap_gpu: HeightmapGpu,
     water_gpu: WaterGpu,
-    generic_gpu: HashMap<PathBuf, GenericGpuState>,
+    unit_part_gpu: UnitPartGpu,
 
     kbot_gpu: ModelGpu,
     arrow_gpu: ArrowGpu,
@@ -383,22 +379,11 @@ impl App {
             &bind_group_layout,
         );
 
-        let mut generic_gpu = HashMap::new();
+        let mut unit_part_gpu = UnitPartGpu::new();
 
-        generic_gpu.insert(
-            Path::new("./src/asset/cube.obj").to_owned(),
-            GenericGpuState::ToLoad(model::open_obj("./src/asset/cube.obj").unwrap()),
-        );
-
-        generic_gpu.insert(
-            Path::new("./src/asset/axis_debug.obj").to_owned(),
-            GenericGpuState::ToLoad(model::open_obj("./src/asset/axis_debug.obj").unwrap()),
-        );
-
-        generic_gpu.insert(
-            Path::new("./src/asset/small_sphere.obj").to_owned(),
-            GenericGpuState::ToLoad(model::open_obj("./src/asset/small_sphere.obj").unwrap()),
-        );
+        unit_part_gpu.append(Path::new("./src/asset/cube.obj").to_owned());
+        unit_part_gpu.append(Path::new("./src/asset/axis_debug.obj").to_owned());
+        unit_part_gpu.append(Path::new("./src/asset/small_sphere.obj").to_owned());
 
         let health_bar =
             gpu_obj::health_bar::HealthBarGpu::new(&gpu.device, format, &bind_group_layout);
@@ -531,17 +516,11 @@ impl App {
         );
 
         let mut unit_editor = unit_editor::UnitEditor::new();
-        if let Ok(botdef) = App::load_botdef_on_disk("src/asset/botdef/unit_example.bin") {
-            log::info!("Loaded {:#?}", botdef);
-            unit_editor.botdef = botdef;
-
-            for node in unit_editor.botdef.part_tree.iter() {
-                if let Some(mesh) = &node.placed_mesh {
-                    unit_editor::UnitEditor::open_obj(&mesh.mesh_path, &mut generic_gpu);
-                }
-            }
-        }
-
+        Self::load_botdef_in_editor(
+            "src/asset/botdef/unit_example.json",
+            &mut unit_editor,
+            &mut unit_part_gpu,
+        );
         // Done
         let this = App {
             gpu,
@@ -550,7 +529,7 @@ impl App {
             bind_group_layout,
             ub_camera_mat,
             kbot_gpu,
-            generic_gpu,
+            unit_part_gpu,
             kinematic_projectile_gpu,
             arrow_gpu,
             heightmap_gpu,

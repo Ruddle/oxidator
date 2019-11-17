@@ -7,6 +7,8 @@ use imgui::*;
 use na::{IsometryMatrix3, Matrix4, Point3, Vector2, Vector3, Vector4};
 use std::time::Duration;
 use std::time::Instant;
+use unit_part_gpu;
+use unit_part_gpu::UnitPartGpu;
 use utils::time;
 use wgpu::{BufferMapAsyncResult, Extent3d};
 
@@ -134,16 +136,16 @@ impl App {
             .create_command_encoder(&wgpu::CommandEncoderDescriptor { todo: 0 });
 
         //Load pending generic gpu
-        for (path, generic_gpu_state) in self.generic_gpu.iter_mut() {
-            if let GenericGpuState::ToLoad(tri_list) = generic_gpu_state {
+        for (index, generic_gpu_state) in self.unit_part_gpu.states.iter_mut().enumerate() {
+            if let unit_part_gpu::ModelGpuState::ToLoad(tri_list) = generic_gpu_state {
                 let mut generic_gpu = ModelGpu::new(
                     &tri_list,
                     &self.gpu.device,
                     self.gpu.sc_desc.format,
                     &self.bind_group_layout,
                 );
-                log::debug!("Load pending generic gpu {:?} ", path);
-                let mut generic_gpu_state_new = GenericGpuState::Ready(generic_gpu);
+                log::debug!("Load pending generic gpu {:?} ", index);
+                let mut generic_gpu_state_new = unit_part_gpu::ModelGpuState::Ready(generic_gpu);
                 std::mem::replace(generic_gpu_state, generic_gpu_state_new);
             }
         }
@@ -467,7 +469,7 @@ impl App {
                         Self::draw_unit_editor_ui(
                             &ui,
                             &mut self.unit_editor,
-                            &mut self.generic_gpu,
+                            &mut self.unit_part_gpu,
                         );
                     }
                     MainMode::MultiplayerLobby => {
@@ -606,9 +608,9 @@ impl App {
             });
 
             self.heightmap_gpu.render(&mut rpass, &self.bind_group);
-            for (path, generic_gpu_state) in self.generic_gpu.iter_mut() {
-                match generic_gpu_state {
-                    GenericGpuState::Ready(model_gpu) => {
+            for model_gpu_state in self.unit_part_gpu.states.iter_mut() {
+                match model_gpu_state {
+                    unit_part_gpu::ModelGpuState::Ready(model_gpu) => {
                         model_gpu.render(&mut rpass, &self.bind_group);
                     }
                     _ => {}
