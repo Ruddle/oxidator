@@ -592,7 +592,7 @@ pub fn update_units(
 
             mobile.weapon0_dir = (mobile.weapon0_dir + mobile.dir).normalize();
             //w = v/r
-            mobile.wheel0_angle += mobile.speed.norm() * 1.0;
+            mobile.wheel0_angle += mobile.speed.norm() / 0.5;
         }
     }
     frame_profiler.add("02  movement", start.elapsed());

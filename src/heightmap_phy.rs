@@ -79,6 +79,6 @@ impl HeightmapPhy {
         let l = self.z_linear(x - 1.0, y);
         let u = self.z_linear(x, y - 1.0);
         let d = self.z_linear(x, y + 1.0);
-        Vector3::new(-(r - l), -(d - u), 2.0).normalize()
+        Vector3::new(l - r, u - d, 2.0).normalize()
     }
 }
