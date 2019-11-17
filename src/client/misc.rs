@@ -355,25 +355,41 @@ impl App {
             //Line
             self.vertex_attr_buffer_f32.clear();
             {
-                if self
+                let mut count = 0;
+                let see_all_order = self
                     .input_state
                     .key_pressed
-                    .contains(&winit::event::VirtualKeyCode::LShift)
+                    .contains(&winit::event::VirtualKeyCode::LShift);
                 {
-                    for (mobile, _) in self.game_state.kbots.iter() {
-                        if let Some(target) = mobile.target {
-                            let min = view_proj * mobile.position.to_homogeneous();
-                            let max = view_proj * target.to_homogeneous();
-
-                            if min.z > 0.0 && max.z > 0.0 {
-                                self.vertex_attr_buffer_f32.push(min.x / min.w);
-                                self.vertex_attr_buffer_f32.push(min.y / min.w);
-                                self.vertex_attr_buffer_f32.push(max.x / max.w);
-                                self.vertex_attr_buffer_f32.push(max.y / max.w);
-                                self.vertex_attr_buffer_f32.push(0.0);
-                                self.vertex_attr_buffer_f32.push(0.0);
+                    for (kbot, client_kbot) in self.game_state.kbots.iter() {
+                        if see_all_order || self.game_state.selected.contains(&kbot.id.value) {
+                            if let Some(target) = kbot.target {
+                                let min = view_proj * client_kbot.position.to_homogeneous();
+                                let max = view_proj * target.to_homogeneous();
+                                if (min.z > 0.0
+                                    && min.x > -min.w
+                                    && min.x < min.w
+                                    && min.y > -min.w
+                                    && min.y < min.w)
+                                    || (max.z > 0.0
+                                        && max.x > -max.w
+                                        && max.x < max.w
+                                        && max.y > -max.w
+                                        && max.y < max.w)
+                                {
+                                    count += 1;
+                                    self.vertex_attr_buffer_f32.push(min.x / min.w);
+                                    self.vertex_attr_buffer_f32.push(min.y / min.w);
+                                    self.vertex_attr_buffer_f32.push(max.x / max.w);
+                                    self.vertex_attr_buffer_f32.push(max.y / max.w);
+                                    self.vertex_attr_buffer_f32.push(0.0);
+                                    self.vertex_attr_buffer_f32.push(0.0);
+                                }
                             }
                         }
+                    }
+                    for i in (0..self.vertex_attr_buffer_f32.len()).step_by(6) {
+                        self.vertex_attr_buffer_f32[i + 5] = count as f32;
                     }
                 }
             }
