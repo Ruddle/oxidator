@@ -586,6 +586,10 @@ pub fn update_units(
             mobile.grounded = true;
             mobile.up = heightmap_phy.normal(mobile.position.x, mobile.position.y);
 
+            let y = -mobile.dir.cross(&mobile.up);
+            let x = y.cross(&mobile.up);
+            mobile.dir = x;
+
             mobile.weapon0_dir = (mobile.weapon0_dir + mobile.dir).normalize();
             //w = v/r
             mobile.wheel0_angle += mobile.speed.norm() * 1.0;

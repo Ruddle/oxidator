@@ -29,7 +29,7 @@ void main() {
     alpha = min(alpha, pow(sin(v_TexCoord.x*v_l*0.2)*0.5+0.5,2)  )  ;
     vec3 color = vec3(0,0.5+ 0.5*pow(alpha,0.7),pow(alpha,0.7)*0.5);
     
-    float calpha = pow(1.0/max(v_count-50.0,1.0),0.3);
+    float calpha = pow(1.0/max(v_count-50.0,1.0),0.25);
     alpha*=calpha;
     o_Target = vec4(color,alpha);
 }
