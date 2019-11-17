@@ -1,12 +1,12 @@
 [package]
 name = "oxidator"
-version = "0.1.0"
+version = "0.2.0"
 authors = ["Thomas SIMON <thomas.simon.work@gmail.com>"]
 edition = "2018"
 default-run = "oxidator"
 
 [features]
-#Choose one method of loading spirv out of the three. use_spirv use the precompiled shaders, but does not support hotreloading.
+#Choose one method of loading spirv out of the three. use_spirv uses the precompiled shaders, but does not support hotreloading.
 use_shaderc =["shaderc"]
 use_glsl_to_spirv =["glsl-to-spirv"]
 use_spirv =[]
