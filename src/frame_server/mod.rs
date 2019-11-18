@@ -582,7 +582,7 @@ pub fn update_units(
                 .y
                 .max(0.0)
                 .min(heightmap_phy.height as f32 - 1.0);
-            mobile.position.z = heightmap_phy.z_linear(mobile.position.x, mobile.position.y) + 0.5;
+            mobile.position.z = heightmap_phy.z_linear(mobile.position.x, mobile.position.y);
             mobile.grounded = true;
             mobile.up = heightmap_phy.normal(mobile.position.x, mobile.position.y);
 

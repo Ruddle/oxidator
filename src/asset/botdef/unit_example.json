@@ -80,7 +80,7 @@
           0.0,
           0.0,
           0.0,
-          0.0,
+          0.25,
           1.0
         ],
         "joint": "Fix",
@@ -110,7 +110,7 @@
                 1.0
               ],
               "mesh_path": "./src/asset/tank/canon.obj",
-              "mesh_index": 4
+              "mesh_index": 5
             },
             "placed_collider": null,
             "parent_to_self": [
@@ -159,7 +159,7 @@
                 1.0
               ],
               "mesh_path": "./src/asset/tank/wheel.obj",
-              "mesh_index": 6
+              "mesh_index": 4
             },
             "placed_collider": null,
             "parent_to_self": [
@@ -208,7 +208,7 @@
                 1.0
               ],
               "mesh_path": "./src/asset/tank/wheel.obj",
-              "mesh_index": 6
+              "mesh_index": 4
             },
             "placed_collider": null,
             "parent_to_self": [
@@ -257,7 +257,7 @@
                 1.0
               ],
               "mesh_path": "./src/asset/tank/wheel.obj",
-              "mesh_index": 6
+              "mesh_index": 4
             },
             "placed_collider": null,
             "parent_to_self": [
@@ -306,7 +306,7 @@
                 1.0
               ],
               "mesh_path": "./src/asset/tank/wheel.obj",
-              "mesh_index": 6
+              "mesh_index": 4
             },
             "placed_collider": null,
             "parent_to_self": [
