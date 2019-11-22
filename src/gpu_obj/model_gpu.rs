@@ -102,6 +102,12 @@ impl ModelGpu {
                     alpha_blend: wgpu::BlendDescriptor::REPLACE,
                     write_mask: wgpu::ColorWrite::ALL,
                 },
+                wgpu::ColorStateDescriptor {
+                    format: wgpu::TextureFormat::Rg16Float,
+                    color_blend: wgpu::BlendDescriptor::REPLACE,
+                    alpha_blend: wgpu::BlendDescriptor::REPLACE,
+                    write_mask: wgpu::ColorWrite::ALL,
+                },
             ],
             depth_stencil_state: Some(wgpu::DepthStencilStateDescriptor {
                 format: wgpu::TextureFormat::Depth32Float,
@@ -171,11 +177,13 @@ impl ModelGpu {
 
     pub fn render(&self, rpass: &mut RenderPass, main_bind_group: &BindGroup) {
         log::trace!("ModelGpu render");
-        rpass.set_pipeline(&self.pipeline);
-        rpass.set_bind_group(0, main_bind_group, &[]);
-        rpass.set_index_buffer(&self.index_buf, 0);
-        rpass.set_vertex_buffers(0, &[(&self.vertex_buf, 0), (&self.instance_buf, 0)]);
-        rpass.draw_indexed(0..self.index_count as u32, 0, 0..self.instance_count as u32);
+        if self.instance_count > 0 {
+            rpass.set_pipeline(&self.pipeline);
+            rpass.set_bind_group(0, main_bind_group, &[]);
+            rpass.set_index_buffer(&self.index_buf, 0);
+            rpass.set_vertex_buffers(0, &[(&self.vertex_buf, 0), (&self.instance_buf, 0)]);
+            rpass.draw_indexed(0..self.index_count as u32, 0, 0..self.instance_count as u32);
+        }
     }
 
     pub fn update_instance_dirty(&mut self, instance_attr: &[f32], device: &wgpu::Device) {

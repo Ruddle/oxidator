@@ -1,7 +1,7 @@
 use super::glsl_compiler;
 use crate::model;
 use wgpu::Device;
-use wgpu::{BindGroup, BindGroupLayout, RenderPass, TextureFormat};
+use wgpu::{BindGroup, BindGroupLayout, RenderPass, Texture, TextureFormat, TextureView};
 
 pub struct ExplosionGpu {
     instance_buf: wgpu::Buffer,
@@ -9,6 +9,7 @@ pub struct ExplosionGpu {
     pipeline: wgpu::RenderPipeline,
     bind_group_layout: BindGroupLayout,
     bind_group: BindGroup,
+    noise_texture: Texture,
 }
 
 impl ExplosionGpu {
@@ -17,6 +18,8 @@ impl ExplosionGpu {
         device: &Device,
         format: TextureFormat,
         main_bind_group_layout: &BindGroupLayout,
+        current_position_att: &TextureView,
+        normal_att: &TextureView,
     ) -> Self {
         log::trace!("ExplosionGpu new");
 
@@ -37,7 +40,6 @@ impl ExplosionGpu {
             usage: wgpu::TextureUsage::SAMPLED | wgpu::TextureUsage::COPY_DST,
         });
 
-        let texture_view = texture.create_default_view();
         let temp_buf = device
             .create_buffer_mapped(texels.len(), wgpu::BufferUsage::COPY_SRC)
             .fill_from_slice(&texels);
@@ -61,19 +63,6 @@ impl ExplosionGpu {
             texture_extent,
         );
 
-        // Create other resources
-        let sampler = device.create_sampler(&wgpu::SamplerDescriptor {
-            address_mode_u: wgpu::AddressMode::Repeat,
-            address_mode_v: wgpu::AddressMode::Repeat,
-            address_mode_w: wgpu::AddressMode::Repeat,
-            mag_filter: wgpu::FilterMode::Linear,
-            min_filter: wgpu::FilterMode::Linear,
-            mipmap_filter: wgpu::FilterMode::Linear,
-            lod_min_clamp: -100.0,
-            lod_max_clamp: 100.0,
-            compare_function: wgpu::CompareFunction::Always,
-        });
-
         let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             bindings: &[
                 wgpu::BindGroupLayoutBinding {
@@ -89,22 +78,43 @@ impl ExplosionGpu {
                     visibility: wgpu::ShaderStage::FRAGMENT,
                     ty: wgpu::BindingType::Sampler,
                 },
+                wgpu::BindGroupLayoutBinding {
+                    binding: 2,
+                    visibility: wgpu::ShaderStage::FRAGMENT,
+                    ty: wgpu::BindingType::SampledTexture {
+                        multisampled: false,
+                        dimension: wgpu::TextureViewDimension::D2,
+                    },
+                },
+                wgpu::BindGroupLayoutBinding {
+                    binding: 3,
+                    visibility: wgpu::ShaderStage::FRAGMENT,
+                    ty: wgpu::BindingType::Sampler,
+                },
+                wgpu::BindGroupLayoutBinding {
+                    binding: 4,
+                    visibility: wgpu::ShaderStage::FRAGMENT,
+                    ty: wgpu::BindingType::SampledTexture {
+                        multisampled: false,
+                        dimension: wgpu::TextureViewDimension::D2,
+                    },
+                },
+                wgpu::BindGroupLayoutBinding {
+                    binding: 5,
+                    visibility: wgpu::ShaderStage::FRAGMENT,
+                    ty: wgpu::BindingType::Sampler,
+                },
             ],
         });
 
-        let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-            layout: &bind_group_layout,
-            bindings: &[
-                wgpu::Binding {
-                    binding: 0,
-                    resource: wgpu::BindingResource::TextureView(&texture_view),
-                },
-                wgpu::Binding {
-                    binding: 1,
-                    resource: wgpu::BindingResource::Sampler(&sampler),
-                },
-            ],
-        });
+        let noise_texture_view = texture.create_default_view();
+        let bind_group = Self::create_bind_group(
+            device,
+            &bind_group_layout,
+            &noise_texture_view,
+            current_position_att,
+            normal_att,
+        );
 
         let positions: Vec<f32> = Vec::new();
 
@@ -125,7 +135,99 @@ impl ExplosionGpu {
             pipeline,
             bind_group,
             bind_group_layout,
+            noise_texture: texture,
         }
+    }
+
+    pub fn create_bind_group(
+        device: &Device,
+        bind_group_layout: &BindGroupLayout,
+        noise_texture_view: &TextureView,
+        current_position_att: &TextureView,
+        normal_att: &TextureView,
+    ) -> BindGroup {
+        // Create other resources
+        let sampler_noise = device.create_sampler(&wgpu::SamplerDescriptor {
+            address_mode_u: wgpu::AddressMode::Repeat,
+            address_mode_v: wgpu::AddressMode::Repeat,
+            address_mode_w: wgpu::AddressMode::Repeat,
+            mag_filter: wgpu::FilterMode::Linear,
+            min_filter: wgpu::FilterMode::Linear,
+            mipmap_filter: wgpu::FilterMode::Linear,
+            lod_min_clamp: -100.0,
+            lod_max_clamp: 100.0,
+            compare_function: wgpu::CompareFunction::Always,
+        });
+
+        let sampler_position = device.create_sampler(&wgpu::SamplerDescriptor {
+            address_mode_u: wgpu::AddressMode::ClampToEdge,
+            address_mode_v: wgpu::AddressMode::ClampToEdge,
+            address_mode_w: wgpu::AddressMode::ClampToEdge,
+            mag_filter: wgpu::FilterMode::Linear,
+            min_filter: wgpu::FilterMode::Linear,
+            mipmap_filter: wgpu::FilterMode::Linear,
+            lod_min_clamp: -100.0,
+            lod_max_clamp: 100.0,
+            compare_function: wgpu::CompareFunction::Always,
+        });
+
+        let sampler_normal = device.create_sampler(&wgpu::SamplerDescriptor {
+            address_mode_u: wgpu::AddressMode::ClampToEdge,
+            address_mode_v: wgpu::AddressMode::ClampToEdge,
+            address_mode_w: wgpu::AddressMode::ClampToEdge,
+            mag_filter: wgpu::FilterMode::Linear,
+            min_filter: wgpu::FilterMode::Linear,
+            mipmap_filter: wgpu::FilterMode::Linear,
+            lod_min_clamp: -100.0,
+            lod_max_clamp: 100.0,
+            compare_function: wgpu::CompareFunction::Always,
+        });
+
+        device.create_bind_group(&wgpu::BindGroupDescriptor {
+            layout: bind_group_layout,
+            bindings: &[
+                wgpu::Binding {
+                    binding: 0,
+                    resource: wgpu::BindingResource::TextureView(noise_texture_view),
+                },
+                wgpu::Binding {
+                    binding: 1,
+                    resource: wgpu::BindingResource::Sampler(&sampler_noise),
+                },
+                wgpu::Binding {
+                    binding: 2,
+                    resource: wgpu::BindingResource::TextureView(current_position_att),
+                },
+                wgpu::Binding {
+                    binding: 3,
+                    resource: wgpu::BindingResource::Sampler(&sampler_position),
+                },
+                wgpu::Binding {
+                    binding: 4,
+                    resource: wgpu::BindingResource::TextureView(normal_att),
+                },
+                wgpu::Binding {
+                    binding: 5,
+                    resource: wgpu::BindingResource::Sampler(&sampler_normal),
+                },
+            ],
+        })
+    }
+
+    pub fn update_bind_group(
+        &mut self,
+        device: &Device,
+        current_position_att: &TextureView,
+        normal_att: &TextureView,
+    ) {
+        let noise_texture_view = self.noise_texture.create_default_view();
+        self.bind_group = Self::create_bind_group(
+            device,
+            &self.bind_group_layout,
+            &noise_texture_view,
+            current_position_att,
+            normal_att,
+        );
     }
 
     pub fn create_pipeline(
@@ -165,7 +267,7 @@ impl ExplosionGpu {
                 format: format,
                 color_blend: wgpu::BlendDescriptor {
                     src_factor: wgpu::BlendFactor::SrcAlpha,
-                    dst_factor: wgpu::BlendFactor::OneMinusSrcAlpha,
+                    dst_factor: wgpu::BlendFactor::One,
                     operation: wgpu::BlendOperation::Add,
                 },
                 alpha_blend: wgpu::BlendDescriptor::REPLACE,
@@ -174,27 +276,27 @@ impl ExplosionGpu {
             depth_stencil_state: None,
             index_format: wgpu::IndexFormat::Uint32,
             vertex_buffers: &[wgpu::VertexBufferDescriptor {
-                stride: (4 * (5)) as wgpu::BufferAddress,
+                stride: (4 * (6)) as wgpu::BufferAddress,
                 step_mode: wgpu::InputStepMode::Instance,
                 attributes: &[
                     wgpu::VertexAttributeDescriptor {
-                        format: wgpu::VertexFormat::Float2,
+                        format: wgpu::VertexFormat::Float3,
                         offset: 0,
                         shader_location: 0,
                     },
                     wgpu::VertexAttributeDescriptor {
                         format: wgpu::VertexFormat::Float,
-                        offset: 4 * 2,
+                        offset: 4 * 3,
                         shader_location: 1,
                     },
                     wgpu::VertexAttributeDescriptor {
                         format: wgpu::VertexFormat::Float,
-                        offset: 4 * 3,
+                        offset: 4 * 4,
                         shader_location: 2,
                     },
                     wgpu::VertexAttributeDescriptor {
                         format: wgpu::VertexFormat::Float,
-                        offset: 4 * 4,
+                        offset: 4 * 5,
                         shader_location: 3,
                     },
                 ],
@@ -233,11 +335,13 @@ impl ExplosionGpu {
 
     pub fn render(&self, rpass: &mut RenderPass, main_bind_group: &BindGroup) {
         log::trace!("ExplosionGpu render");
-        rpass.set_pipeline(&self.pipeline);
-        rpass.set_vertex_buffers(0, &[(&self.instance_buf, 0)]);
-        rpass.set_bind_group(0, main_bind_group, &[]);
-        rpass.set_bind_group(1, &self.bind_group, &[]);
-        rpass.draw(0..4, 0..self.instance_count as u32);
+        if self.instance_count > 0 {
+            rpass.set_pipeline(&self.pipeline);
+            rpass.set_vertex_buffers(0, &[(&self.instance_buf, 0)]);
+            rpass.set_bind_group(0, main_bind_group, &[]);
+            rpass.set_bind_group(1, &self.bind_group, &[]);
+            rpass.draw(0..4, 0..self.instance_count as u32);
+        }
     }
 
     pub fn update_instance(&mut self, instance_attr: &[f32], device: &wgpu::Device) {
@@ -247,7 +351,7 @@ impl ExplosionGpu {
             .fill_from_slice(instance_attr);
 
         std::mem::replace(&mut self.instance_buf, temp_buf);
-        self.instance_count = instance_attr.len() as u32 / 5;
+        self.instance_count = instance_attr.len() as u32 / 6;
     }
 }
 

@@ -8,6 +8,7 @@ layout(location = 4) in vec3 v_world_normal;
 
 layout(location = 0) out vec4 o_Target;
 layout(location = 1) out vec4 position_att;
+layout(location = 2) out vec2 o_normal;
 layout(set = 0, binding = 0) uniform Locals {
     mat4 cor_proj_view;
     mat4 u_View;
@@ -51,7 +52,7 @@ void main() {
     vec3 lightDir = normalize(lightPos - vertPos);
     vec3 normal = v_world_normal;
 
-    float lambertian = 0.35+max(dot(lightDir,normal), 0.0);
+    float lambertian = max(dot(lightDir,normal), 0.0);
     float specular = 0.0;
 
     if(lambertian > 0.0) {
@@ -67,5 +68,30 @@ void main() {
     lambertian* diffuse +
     specular*specColor);
 
-    o_Target =    vec4(phong, 1.0);
+
+    // bool diag = int((gl_FragCoord.x +gl_FragCoord.y )/3.0) %2 == 0;
+    // bool hori = int((gl_FragCoord.y)/2.0) %2==0;
+
+    // bool hatch = true;
+    // if (length(phong) <0.5){
+    //     hatch = diag||hori;
+    // }else if (length(phong) <0.8){
+    //      hatch = diag;
+    // } else {
+    //     hatch = false;
+    // } 
+
+    // float m = 0.3;
+    // float f = 1+m;
+    // if ( hatch){
+    //     f= 1-m;
+    // }
+
+    // phong = vec3(ambientColor*f +
+    // lambertian* diffuse*f +
+    // specular*specColor*f);
+    
+
+    o_normal = normal.xy;
+    o_Target = vec4(phong, 1.0);
 }

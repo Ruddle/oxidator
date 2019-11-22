@@ -124,7 +124,7 @@ pub struct KBot {
 }
 
 impl KBot {
-    pub fn new(position: Point3<f32>, botdef_id: Id<botdef::BotDef>) -> Self {
+    pub fn new(position: Point3<f32>, botdef: &botdef::BotDef) -> Self {
         KBot {
             position,
             speed: Vector3::new(0.0, 0.0, 0.0),
@@ -138,9 +138,9 @@ impl KBot {
             reload_frame_count: 3,
             weapon0_dir: Vector3::new(1.0, 0.0, 0.0),
             wheel0_angle: 0.0,
-            life: 100,
+            life: botdef.max_life,
             grounded: false,
-            botdef_id,
+            botdef_id: botdef.id,
             angular_velocity: 0.0,
         }
     }

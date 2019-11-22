@@ -29,7 +29,7 @@ impl App {
                     for j in (100..500).step_by(4) {
                         let m = mobile::KBot::new(
                             Point3::new(i as f32, j as f32, 100.0),
-                            tank_example.id,
+                            &tank_example,
                         );
                         player_me.kbots.insert(m.id);
                         kbots.insert(m.id, m);
@@ -43,7 +43,7 @@ impl App {
                     for j in (100..500).step_by(4) {
                         let mut m = mobile::KBot::new(
                             Point3::new(i as f32, j as f32, 100.0),
-                            tank_example.id,
+                            &tank_example,
                         );
                         m.team = 1;
                         player_ennemy.kbots.insert(m.id);

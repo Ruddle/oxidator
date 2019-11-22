@@ -406,20 +406,16 @@ impl App {
                     && screen_pos.y > -screen_pos.w
                     && screen_pos.y < screen_pos.w
                 {
-                    let distance =
-                        (self.game_state.position_smooth.coords - explosion.position.coords).norm();
-                    self.vertex_attr_buffer_f32
-                        .push(screen_pos.x / screen_pos.w);
-                    self.vertex_attr_buffer_f32
-                        .push(screen_pos.y / screen_pos.w);
-                    self.vertex_attr_buffer_f32
-                        .push(explosion.size * 2500.0 / distance);
+                    self.vertex_attr_buffer_f32.push(explosion.position.x);
+                    self.vertex_attr_buffer_f32.push(explosion.position.y);
+                    self.vertex_attr_buffer_f32.push(explosion.position.z);
 
                     self.vertex_attr_buffer_f32.push(
                         (self.game_state.server_sec - explosion.born_sec)
                             / (explosion.death_sec - explosion.born_sec),
                     );
                     self.vertex_attr_buffer_f32.push(explosion.seed);
+                    self.vertex_attr_buffer_f32.push(explosion.size);
                 }
             }
             self.explosion_gpu

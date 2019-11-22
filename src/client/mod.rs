@@ -85,6 +85,7 @@ pub struct App {
 
     first_color_att_view: wgpu::TextureView,
     secon_color_att_view: wgpu::TextureView,
+    normal_att_view: wgpu::TextureView,
     forward_depth: wgpu::TextureView,
     position_att: wgpu::Texture,
     position_att_view: wgpu::TextureView,
@@ -393,13 +394,6 @@ impl App {
         let unit_icon =
             gpu_obj::unit_icon::UnitIconGpu::new(&gpu.device, format, &bind_group_layout);
 
-        let explosion_gpu = gpu_obj::explosion::ExplosionGpu::new(
-            &mut init_encoder,
-            &gpu.device,
-            format,
-            &bind_group_layout,
-        );
-
         let depth_texture = gpu.device.create_texture(&wgpu::TextureDescriptor {
             size: wgpu::Extent3d {
                 width: gpu.sc_desc.width,
@@ -413,6 +407,8 @@ impl App {
             format: wgpu::TextureFormat::Depth32Float,
             usage: wgpu::TextureUsage::OUTPUT_ATTACHMENT,
         });
+
+        let forward_depth = depth_texture.create_default_view();
 
         let position_att = gpu.device.create_texture(&wgpu::TextureDescriptor {
             size: wgpu::Extent3d {
@@ -431,8 +427,6 @@ impl App {
         });
 
         let position_att_view = position_att.create_default_view();
-
-        gpu.queue.submit(&[init_encoder.finish()]);
 
         let game_state = game_state::State::new();
 
@@ -466,7 +460,9 @@ impl App {
             sample_count: 1,
             dimension: wgpu::TextureDimension::D2,
             format: wgpu::TextureFormat::Bgra8UnormSrgb,
-            usage: wgpu::TextureUsage::OUTPUT_ATTACHMENT | wgpu::TextureUsage::SAMPLED,
+            usage: wgpu::TextureUsage::OUTPUT_ATTACHMENT
+                | wgpu::TextureUsage::SAMPLED
+                | wgpu::TextureUsage::COPY_SRC,
         });
 
         let first_color_att_view = first_color_att.create_default_view();
@@ -482,10 +478,37 @@ impl App {
             sample_count: 1,
             dimension: wgpu::TextureDimension::D2,
             format: wgpu::TextureFormat::Bgra8UnormSrgb,
-            usage: wgpu::TextureUsage::OUTPUT_ATTACHMENT | wgpu::TextureUsage::SAMPLED,
+            usage: wgpu::TextureUsage::OUTPUT_ATTACHMENT
+                | wgpu::TextureUsage::SAMPLED
+                | wgpu::TextureUsage::COPY_SRC,
         });
 
         let secon_color_att_view = secon_color_att.create_default_view();
+
+        let normal_att = gpu.device.create_texture(&wgpu::TextureDescriptor {
+            size: wgpu::Extent3d {
+                width: gpu.sc_desc.width,
+                height: gpu.sc_desc.height,
+                depth: 1,
+            },
+            array_layer_count: 1,
+            mip_level_count: 1,
+            sample_count: 1,
+            dimension: wgpu::TextureDimension::D2,
+            format: wgpu::TextureFormat::Rg16Float,
+            usage: wgpu::TextureUsage::OUTPUT_ATTACHMENT | wgpu::TextureUsage::SAMPLED,
+        });
+
+        let normal_att_view = normal_att.create_default_view();
+
+        let explosion_gpu = gpu_obj::explosion::ExplosionGpu::new(
+            &mut init_encoder,
+            &gpu.device,
+            format,
+            &bind_group_layout,
+            &position_att_view,
+            &normal_att_view,
+        );
 
         let water_gpu = WaterGpu::new(
             &gpu.device,
@@ -521,6 +544,8 @@ impl App {
             &mut unit_editor,
             &mut unit_part_gpu,
         );
+
+        gpu.queue.submit(&[init_encoder.finish()]);
         // Done
         let this = App {
             gpu,
@@ -538,7 +563,8 @@ impl App {
 
             first_color_att_view,
             secon_color_att_view,
-            forward_depth: depth_texture.create_default_view(),
+            normal_att_view,
+            forward_depth,
             position_att_view,
             position_att,
 
@@ -582,6 +608,22 @@ impl App {
     fn resize(&mut self) -> Option<wgpu::CommandBuffer> {
         log::trace!("resize");
 
+        let normal_att = self.gpu.device.create_texture(&wgpu::TextureDescriptor {
+            size: wgpu::Extent3d {
+                width: self.gpu.sc_desc.width,
+                height: self.gpu.sc_desc.height,
+                depth: 1,
+            },
+            array_layer_count: 1,
+            mip_level_count: 1,
+            sample_count: 1,
+            dimension: wgpu::TextureDimension::D2,
+            format: wgpu::TextureFormat::Rg16Float,
+            usage: wgpu::TextureUsage::OUTPUT_ATTACHMENT | wgpu::TextureUsage::SAMPLED,
+        });
+
+        self.normal_att_view = normal_att.create_default_view();
+
         let first_color_att = self.gpu.device.create_texture(&wgpu::TextureDescriptor {
             size: wgpu::Extent3d {
                 width: self.gpu.sc_desc.width,
@@ -593,7 +635,9 @@ impl App {
             sample_count: 1,
             dimension: wgpu::TextureDimension::D2,
             format: wgpu::TextureFormat::Bgra8UnormSrgb,
-            usage: wgpu::TextureUsage::OUTPUT_ATTACHMENT | wgpu::TextureUsage::SAMPLED,
+            usage: wgpu::TextureUsage::OUTPUT_ATTACHMENT
+                | wgpu::TextureUsage::SAMPLED
+                | wgpu::TextureUsage::COPY_SRC,
         });
 
         self.first_color_att_view = first_color_att.create_default_view();
@@ -609,7 +653,9 @@ impl App {
             sample_count: 1,
             dimension: wgpu::TextureDimension::D2,
             format: wgpu::TextureFormat::Bgra8UnormSrgb,
-            usage: wgpu::TextureUsage::OUTPUT_ATTACHMENT | wgpu::TextureUsage::SAMPLED,
+            usage: wgpu::TextureUsage::OUTPUT_ATTACHMENT
+                | wgpu::TextureUsage::SAMPLED
+                | wgpu::TextureUsage::COPY_SRC,
         });
 
         self.secon_color_att_view = secon_color_att.create_default_view();
@@ -662,6 +708,12 @@ impl App {
         self.postfx
             .update_pos_att_view(&self.gpu.device, &self.position_att_view);
         self.position_att = position_att;
+
+        self.explosion_gpu.update_bind_group(
+            &self.gpu.device,
+            &self.position_att_view,
+            &self.normal_att_view,
+        );
 
         None
     }

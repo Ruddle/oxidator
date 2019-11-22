@@ -5,7 +5,8 @@ layout(location = 1) in vec3 color;
 layout(location = 2) in float min_lod;
 layout(location = 3) in float max_mip;
 layout(location = 0) out vec4 o_Target;
-layout(location = 1) out vec4 position_att;
+layout(location = 1) out vec4 o_position_att;
+layout(location = 2) out vec2 o_normal;
 
 layout(set = 0, binding = 0) uniform Locals {
     mat4 cor_proj_view;
@@ -127,6 +128,7 @@ void main() {
         phong= vec3(0.1);
     }
 
-    position_att = vec4(pos, 0.0);
+    o_normal = normal.xy;
+    o_position_att = vec4(pos, 0.0);
     o_Target =   vec4(phong,1.0);
 }

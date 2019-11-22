@@ -496,6 +496,12 @@ impl HeightmapGpu {
                     alpha_blend: wgpu::BlendDescriptor::REPLACE,
                     write_mask: wgpu::ColorWrite::ALL,
                 },
+                wgpu::ColorStateDescriptor {
+                    format: wgpu::TextureFormat::Rg16Float,
+                    color_blend: wgpu::BlendDescriptor::REPLACE,
+                    alpha_blend: wgpu::BlendDescriptor::REPLACE,
+                    write_mask: wgpu::ColorWrite::ALL,
+                },
             ],
             depth_stencil_state: Some(wgpu::DepthStencilStateDescriptor {
                 format: wgpu::TextureFormat::Depth32Float,
@@ -625,7 +631,7 @@ impl HeightmapGpu {
             )
             .fill_from_slice(&map_size_cam_pos);
 
-        encoder.copy_buffer_to_buffer(&uniform_buf, 0, &self.uniform_buf, 0, 64);
+        encoder.copy_buffer_to_buffer(&uniform_buf, 0, &self.uniform_buf, 0, 20);
     }
 
     pub fn step(&mut self, device: &Device, encoder: &mut CommandEncoder) {

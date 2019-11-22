@@ -170,82 +170,6 @@ impl App {
         self.profiler
             .mix("heightmap_gpu_step", heightmap_gpu_step_duration, 20);
 
-        let cursor_sample_position = self
-            .gpu
-            .device
-            .create_buffer_mapped::<f32>(
-                4,
-                wgpu::BufferUsage::COPY_DST | wgpu::BufferUsage::MAP_READ,
-            )
-            .finish();
-
-        let screen_center_sample_position = self
-            .gpu
-            .device
-            .create_buffer_mapped::<f32>(
-                4,
-                wgpu::BufferUsage::COPY_DST | wgpu::BufferUsage::MAP_READ,
-            )
-            .finish();
-
-        encoder_render.copy_texture_to_buffer(
-            wgpu::TextureCopyView {
-                texture: &self.position_att,
-                mip_level: 0,
-                array_layer: 0,
-                origin: wgpu::Origin3d {
-                    x: self
-                        .input_state
-                        .cursor_pos
-                        .0
-                        .max(0)
-                        .min(self.gpu.sc_desc.width - 1) as f32,
-                    y: self
-                        .input_state
-                        .cursor_pos
-                        .1
-                        .max(0)
-                        .min(self.gpu.sc_desc.height - 1) as f32,
-                    z: 0.0,
-                },
-            },
-            wgpu::BufferCopyView {
-                buffer: &cursor_sample_position,
-                offset: 0,
-                row_pitch: 4 * 4,
-                image_height: 1,
-            },
-            Extent3d {
-                width: 1,
-                height: 1,
-                depth: 1,
-            },
-        );
-
-        encoder_render.copy_texture_to_buffer(
-            wgpu::TextureCopyView {
-                texture: &self.position_att,
-                mip_level: 0,
-                array_layer: 0,
-                origin: wgpu::Origin3d {
-                    x: self.gpu.sc_desc.width as f32 / 2.0,
-                    y: self.gpu.sc_desc.height as f32 / 2.0,
-                    z: 0.0,
-                },
-            },
-            wgpu::BufferCopyView {
-                buffer: &screen_center_sample_position,
-                offset: 0,
-                row_pitch: 4 * 4,
-                image_height: 1,
-            },
-            Extent3d {
-                width: 1,
-                height: 1,
-                depth: 1,
-            },
-        );
-
         let mut start_drag = (
             self.input_state.cursor_pos.0 as f32,
             self.input_state.cursor_pos.1 as f32,
@@ -566,7 +490,7 @@ impl App {
 
         let frame = &self.gpu.swap_chain.get_next_texture();
         let now = Instant::now();
-        //Pass
+        // Pass
         {
             log::trace!("begin_render_pass");
             let mut rpass = encoder_render.begin_render_pass(&wgpu::RenderPassDescriptor {
@@ -585,6 +509,18 @@ impl App {
                     },
                     wgpu::RenderPassColorAttachmentDescriptor {
                         attachment: &self.position_att_view,
+                        resolve_target: None,
+                        load_op: wgpu::LoadOp::Clear,
+                        store_op: wgpu::StoreOp::Store,
+                        clear_color: wgpu::Color {
+                            r: -1.0,
+                            g: -1.0,
+                            b: -1.0,
+                            a: -1.0,
+                        },
+                    },
+                    wgpu::RenderPassColorAttachmentDescriptor {
+                        attachment: &self.normal_att_view,
                         resolve_target: None,
                         load_op: wgpu::LoadOp::Clear,
                         store_op: wgpu::StoreOp::Store,
@@ -672,6 +608,7 @@ impl App {
                 depth_stencil_attachment: None,
             });
 
+            self.explosion_gpu.render(&mut rpass, &self.bind_group);
             self.postfx
                 .render(&mut rpass, &self.gpu.device, &self.bind_group);
         }
@@ -702,7 +639,7 @@ impl App {
 
         //Custom Ui pass
         {
-            log::trace!("begin_post_render_pass");
+            log::trace!("begin curtom ui renderpass");
             let mut rpass = encoder_render.begin_render_pass(&wgpu::RenderPassDescriptor {
                 color_attachments: &[wgpu::RenderPassColorAttachmentDescriptor {
                     attachment: &self.secon_color_att_view,
@@ -722,12 +659,12 @@ impl App {
 
             self.health_bar.render(&mut rpass, &self.bind_group);
             self.unit_icon.render(&mut rpass, &self.bind_group);
-            self.explosion_gpu.render(&mut rpass, &self.bind_group);
             self.line_gpu.render(&mut rpass, &self.bind_group);
         }
 
         //Copy on frame view
         {
+            log::trace!("copy on frame view render pass");
             let mut rpass = encoder_render.begin_render_pass(&wgpu::RenderPassDescriptor {
                 color_attachments: &[wgpu::RenderPassColorAttachmentDescriptor {
                     attachment: &frame.view,
@@ -757,6 +694,82 @@ impl App {
             .renderer
             .render(ui, &self.gpu.device, &mut encoder_render, &frame.view)
             .expect("Rendering failed");
+
+        let cursor_sample_position = self
+            .gpu
+            .device
+            .create_buffer_mapped::<f32>(
+                4,
+                wgpu::BufferUsage::COPY_DST | wgpu::BufferUsage::MAP_READ,
+            )
+            .finish();
+
+        let screen_center_sample_position = self
+            .gpu
+            .device
+            .create_buffer_mapped::<f32>(
+                4,
+                wgpu::BufferUsage::COPY_DST | wgpu::BufferUsage::MAP_READ,
+            )
+            .finish();
+
+        encoder_render.copy_texture_to_buffer(
+            wgpu::TextureCopyView {
+                texture: &self.position_att,
+                mip_level: 0,
+                array_layer: 0,
+                origin: wgpu::Origin3d {
+                    x: self
+                        .input_state
+                        .cursor_pos
+                        .0
+                        .max(0)
+                        .min(self.gpu.sc_desc.width - 1) as f32,
+                    y: self
+                        .input_state
+                        .cursor_pos
+                        .1
+                        .max(0)
+                        .min(self.gpu.sc_desc.height - 1) as f32,
+                    z: 0.0,
+                },
+            },
+            wgpu::BufferCopyView {
+                buffer: &cursor_sample_position,
+                offset: 0,
+                row_pitch: 4 * 4,
+                image_height: 1,
+            },
+            Extent3d {
+                width: 1,
+                height: 1,
+                depth: 1,
+            },
+        );
+
+        encoder_render.copy_texture_to_buffer(
+            wgpu::TextureCopyView {
+                texture: &self.position_att,
+                mip_level: 0,
+                array_layer: 0,
+                origin: wgpu::Origin3d {
+                    x: self.gpu.sc_desc.width as f32 / 2.0,
+                    y: self.gpu.sc_desc.height as f32 / 2.0,
+                    z: 0.0,
+                },
+            },
+            wgpu::BufferCopyView {
+                buffer: &screen_center_sample_position,
+                offset: 0,
+                row_pitch: 4 * 4,
+                image_height: 1,
+            },
+            Extent3d {
+                width: 1,
+                height: 1,
+                depth: 1,
+            },
+        );
 
         let start = Instant::now();
         self.gpu.queue.submit(&[encoder_render.finish()]);

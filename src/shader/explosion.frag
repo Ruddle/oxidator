@@ -9,6 +9,8 @@ layout(location = 1) in vec2 v_center;
 layout(location = 2) in float v_size;
 layout(location = 3) in float v_life;
 layout(location = 4) in float v_seed;
+layout(location = 5) in vec3 v_world_pos;
+layout(location = 6) in vec2 v_screen_pos;
 
 layout(location = 0) out vec4 o_Target;
 
@@ -28,6 +30,11 @@ layout(set = 0, binding = 0) uniform Locals {
 layout(set = 1, binding = 0) uniform texture2D t_noise;
 layout(set = 1, binding = 1) uniform sampler s_noise;
 
+layout(set = 1, binding = 2) uniform texture2D t_world_pos;
+layout(set = 1, binding = 3) uniform sampler s_world_pos;
+
+layout(set = 1, binding = 4) uniform texture2D t_world_normal;
+layout(set = 1, binding = 5) uniform sampler s_world_normal;
 
 float expRadius;
 vec3 expCenter;
@@ -205,7 +212,8 @@ void main(){
 	// get aspect corrected normalized pixel coordinate
     vec2 q = v_TexCoord;
     vec2 p = -1.0 + 2.0*q;
-    p.x *= 1.0;
+    p *= 1.0;
+	//   p *= 10.0;
     
     expRadius = 1.75;
 	expCenter = vec3(0.,expRadius,0.);
@@ -224,7 +232,40 @@ void main(){
         o_Target.w = pow(length(col),4)*alpha_max;
     }
 	
+
+
+	// vec3 nor_world =  texture(sampler2D(t_world_normal,s_world_normal), v_screen_pos ).xyz;
+	// nor_world.z = sqrt(1- (nor_world.x*nor_world.x + nor_world.y*nor_world.y));
+
+	// vec3 mesh_pos_world = texture(sampler2D(t_world_pos,s_world_pos), v_screen_pos ).xyz;
+
+	// vec3 lightPos=  v_world_pos;
+
+	// float dist_to_light = length(mesh_pos_world -lightPos);
+	// float attenuation = 1*min( 0.05 * pow(v_size/ dist_to_light,2) ,1);
+
+	// vec3 lightDir = normalize(lightPos - mesh_pos_world);
+
+    // float lambertian = max(dot(lightDir,nor_world), 0.0);
+    // float specular = 0.0;
+
+    // if(lambertian > 0.0) {
+    //     mat3 rot = mat3(u_View);
+    //     vec3 camera_pos = -u_View[3].xyz*rot;
+    //     vec3 viewDir = normalize( camera_pos - mesh_pos_world);
+    //     vec3 halfDir = normalize(lightDir + viewDir);
+    //     float specAngle = max(dot(halfDir, nor_world), 0.0);
+    //     specular = 1.0*pow(specAngle, 32.0);
+    // }
+    // vec3 diffuse= vec3(1,pow(alpha_max,1),pow(alpha_max,3));
+    // vec3 phong = attenuation*vec3(
+    // lambertian* diffuse +
+    // specular*mix(diffuse,vec3(1),0.5));
+
+
     // smoothstep final color to add contrast
     o_Target.xyz =  col.xyz*col.xyz*(3.0-2.0*col.xyz);
+	// o_Target.xyz =  phong*alpha_max;
+	// o_Target.a = 1.0;
     
 }

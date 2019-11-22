@@ -114,10 +114,12 @@ impl HealthBarGpu {
 
     pub fn render(&self, rpass: &mut RenderPass, main_bind_group: &BindGroup) {
         log::trace!("HealthBarGpu render");
-        rpass.set_pipeline(&self.pipeline);
-        rpass.set_vertex_buffers(0, &[(&self.instance_buf, 0)]);
-        rpass.set_bind_group(0, main_bind_group, &[]);
-        rpass.draw(0..4, 0..self.instance_count as u32);
+        if self.instance_count > 0 {
+            rpass.set_pipeline(&self.pipeline);
+            rpass.set_vertex_buffers(0, &[(&self.instance_buf, 0)]);
+            rpass.set_bind_group(0, main_bind_group, &[]);
+            rpass.draw(0..4, 0..self.instance_count as u32);
+        }
     }
 
     pub fn update_instance(&mut self, instance_attr: &[f32], device: &wgpu::Device) {
