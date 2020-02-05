@@ -225,7 +225,7 @@ impl App {
         unit_part_gpu: &mut unit_part_gpu::UnitPartGpu,
     ) {
         if let Ok(botdef) = Self::load_botdef_on_disk(path) {
-            log::info!("Loaded {:#?}", botdef);
+            log::info!("Loaded {:?}", botdef.id);
             unit_editor.botdef = botdef;
 
             //Might need to clone

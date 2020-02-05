@@ -336,8 +336,6 @@ impl App {
                 //Main menu
                 match main_menu {
                     MainMode::Home => {
-                        let w = 216.0;
-                        let h = 324.0;
                         let home_window = imgui::Window::new(im_str!("Home"));
 
                         let mut next_mode = MainMode::Home;
@@ -345,9 +343,13 @@ impl App {
                         home_window
                             // .size([w, h], imgui::Condition::Always)
                             .position(
-                                [(self.gpu.sc_desc.width as f32 - w) / 2.0, 100.0],
+                                [
+                                    (self.gpu.sc_desc.width as f32) / 2.0,
+                                    (self.gpu.sc_desc.height as f32) / 2.0,
+                                ],
                                 imgui::Condition::Always,
                             )
+                            .position_pivot([0.5, 0.5])
                             .title_bar(false)
                             .always_auto_resize(true)
                             .resizable(false)
