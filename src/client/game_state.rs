@@ -159,8 +159,15 @@ impl State {
         ) -> Option<(Id<KBot>, Vector2<f32>, f32)> {
             let p = position.to_homogeneous();
             let r = view_proj * p;
+            let margin = 1.2;
+            let rw_with_margin = r.w * margin;
             //Keeping those of the clipped space in screen (-1 1, -1 1 , 0 1)
-            if r.z > 0.0 && r.x < r.w && r.x > -r.w && r.y < r.w && r.y > -r.w {
+            if r.z > 0.0
+                && r.x < rw_with_margin
+                && r.x > -rw_with_margin
+                && r.y < rw_with_margin
+                && r.y > -rw_with_margin
+            {
                 // log::debug!("z {}", r.w);
                 // log::debug!("d {}", (position.coords - cam_pos.coords).norm());
                 Some((id, Vector2::new(r.x / r.w, r.y / r.w), r.w))
