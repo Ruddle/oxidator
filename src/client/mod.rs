@@ -314,7 +314,7 @@ impl App {
             platform.attach_window(
                 imgui.io_mut(),
                 &gpu.window,
-                imgui_winit_support::HiDpiMode::Rounded,
+                imgui_winit_support::HiDpiMode::Locked(1.0),
             );
             imgui.set_ini_filename(None);
 
