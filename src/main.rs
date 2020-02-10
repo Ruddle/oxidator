@@ -8,6 +8,7 @@ mod heightmap_phy;
 mod manager;
 mod mobile;
 mod model;
+mod moddef;
 mod net_client;
 mod net_server;
 mod procedural_texels;

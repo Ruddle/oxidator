@@ -62,9 +62,15 @@ impl App {
                 let mut bot_defs = HashMap::new();
                 bot_defs.insert(tank_example.id, tank_example);
 
+                let mut moddef = crate::moddef::ModDef {
+                    units_id: bot_defs.keys().copied().collect(),
+                    con_map: HashMap::new(),
+                };
+
                 let replacer = FrameEventFromPlayer::ReplaceFrame(frame::Frame {
                     number: 0,
                     players: self.game_state.players.clone(),
+                    moddef,
                     kbots,
                     kbots_dead: HashSet::new(),
                     kinematic_projectiles_dead: Vec::new(),

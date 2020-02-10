@@ -385,7 +385,38 @@ impl App {
                             self.main_menu = next_mode;
                         }
                     }
-                    MainMode::Play => {}
+                    MainMode::Play => {
+                        let mut botdef_selected_for_con = self.game_state.botdef_selected_for_con;
+                        let can_be_built = self
+                            .game_state
+                            .frame_zero
+                            .moddef
+                            .units_id
+                            .iter()
+                            .next()
+                            .cloned();
+                        let command_window = imgui::Window::new(im_str!("Command"));
+                        command_window
+                            .size([400.0, 300.0], imgui::Condition::FirstUseEver)
+                            .position([3.0, 415.0], imgui::Condition::FirstUseEver)
+                            .collapsed(false, imgui::Condition::FirstUseEver)
+                            .build(&ui, || {
+                                if ui.small_button(im_str!("Create")) {
+                                    //TODO
+                                    // self.game_state.botdef_selected_for_con = Some()
+                                    botdef_selected_for_con = can_be_built;
+                                }
+                            });
+
+                        if self.game_state.botdef_selected_for_con != botdef_selected_for_con {
+                            log::debug!(
+                                "Con state from {:?} to {:?}",
+                                self.game_state.botdef_selected_for_con,
+                                botdef_selected_for_con
+                            );
+                            self.game_state.botdef_selected_for_con = botdef_selected_for_con;
+                        }
+                    }
                     MainMode::MapEditor => {
                         self.game_state
                             .heightmap_editor
@@ -778,6 +809,7 @@ impl App {
         self.profiler
             .mix("device queue submit", start.elapsed(), 20);
 
+        //Handle right click
         if let (true, Some(id), Some(mouse_world_pos)) = (
             self.input_state
                 .mouse_trigger
@@ -785,13 +817,27 @@ impl App {
             self.game_state.my_player_id,
             self.game_state.mouse_world_pos,
         ) {
-            let player_input = FrameEventFromPlayer::MoveOrder {
-                id,
-                selected: self.game_state.selected.clone(),
-                mouse_world_pos,
+            let player_input = match self.game_state.botdef_selected_for_con {
+                None => FrameEventFromPlayer::MoveOrder {
+                    id,
+                    selected: self.game_state.selected.clone(),
+                    mouse_world_pos,
+                },
+
+                Some(id_to_con) => {
+                    self.game_state.botdef_selected_for_con = None;
+
+                    FrameEventFromPlayer::ConOrder {
+                        id,
+                        selected: self.game_state.selected.clone(),
+                        mouse_world_pos,
+                        botdef_id: id_to_con,
+                    }
+                }
             };
 
-            log::info!("Move order from {}", id);
+            let order_type = &format!("{:?}", player_input)[..8];
+            log::info!("order {} from {}", order_type, id);
 
             let _ = self
                 .sender_from_client_to_manager

@@ -4,6 +4,7 @@ use crate::heightmap_phy;
 
 use crate::botdef;
 use crate::mobile;
+use crate::moddef;
 use crate::utils;
 use na::{Point3, Vector3};
 use std::collections::{HashMap, HashSet};
@@ -34,6 +35,12 @@ impl Player {
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub enum FrameEventFromPlayer {
+    ConOrder {
+        id: Id<Player>,
+        selected: HashSet<IdValue>,
+        mouse_world_pos: Vector3<f32>,
+        botdef_id: Id<botdef::BotDef>,
+    },
     MoveOrder {
         id: Id<Player>,
         selected: HashSet<IdValue>,
@@ -94,6 +101,7 @@ pub struct Frame {
     pub heightmap_phy: Option<heightmap_phy::HeightmapPhy>,
     pub players: HashMap<Id<Player>, Player>,
     pub kbots: HashMap<Id<KBot>, KBot>,
+    pub moddef: moddef::ModDef,
     // relevant to send to client once
     pub bot_defs: HashMap<Id<botdef::BotDef>, botdef::BotDef>,
     // relevant to send to client always
@@ -110,6 +118,7 @@ impl Frame {
         Frame {
             number: 0,
             players: HashMap::new(),
+            moddef : moddef::ModDef::new(),
             kbots: HashMap::new(),
             kinematic_projectiles: HashMap::new(),
             arrows: Vec::new(),

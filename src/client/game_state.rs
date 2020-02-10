@@ -1,5 +1,6 @@
 extern crate nalgebra as na;
 use super::heightmap_editor;
+use crate::botdef;
 use crate::frame::Frame;
 use crate::mobile;
 use crate::utils;
@@ -46,6 +47,7 @@ pub struct State {
     pub kinematic_projectiles: Vec<Point3<f32>>,
 
     pub selected: HashSet<IdValue>,
+    pub botdef_selected_for_con: Option<Id<botdef::BotDef>>,
 
     pub start_time: Instant,
     pub last_frame: Instant,
@@ -85,6 +87,7 @@ impl State {
             server_sec: 0.0,
 
             selected: HashSet::new(),
+            botdef_selected_for_con: None,
 
             players: HashMap::new(),
             my_player_id: None,

@@ -98,7 +98,33 @@ impl FrameServerCache {
                     selected,
                     mouse_world_pos,
                 } => {
+                    //TODO Validate selected are owned by id
                     update_mobile_target(mouse_world_pos, &selected, &mut frame.kbots);
+                }
+                FrameEventFromPlayer::ConOrder {
+                    id,
+                    selected,
+                    mouse_world_pos,
+                    botdef_id,
+                } => {
+                    //TODO Validate selected are owned by id && botdef_id is constructable by at least 1 selected
+                    log::debug!(
+                        "ConOrder {:?}",
+                        FrameEventFromPlayer::ConOrder {
+                            id,
+                            selected,
+                            mouse_world_pos,
+                            botdef_id,
+                        }
+                    );
+
+                    let botdef = frame.bot_defs.get(&botdef_id).unwrap();
+                    let mut m = KBot::new(Point3::from(mouse_world_pos), botdef);
+                    m.con_completed = 0.0;
+
+                    let player = frame.players.get_mut(&id).unwrap();
+                    player.kbots.insert(m.id);
+                    frame.kbots.insert(m.id, m);
                 }
                 _ => {}
             }
