@@ -6,8 +6,8 @@ layout(location = 2) in vec2 a_TexCoord;
 
 layout(location = 3) in vec3 inst_pos;
 layout(location = 4) in vec3 inst_euler;
-layout(location = 5) in float selected;
-layout(location = 6) in float team;
+layout(location = 5) in float bitpack_selected_team_na_na;
+layout(location = 6) in float con_completed;
 
 
 layout(location = 0) out vec2 v_TexCoord;
@@ -15,7 +15,8 @@ layout(location = 1) out vec3 world_pos;
 
 layout(location = 2) out float v_selected;
 layout(location = 3) out float v_team;
-layout(location = 4) out vec3 v_world_normal;
+layout(location = 4) out float v_con_completed;
+layout(location = 5) out vec3 v_world_normal;
 layout(set = 0, binding = 0) uniform Locals {
     mat4 cor_proj_view;
     mat4 u_View;
@@ -32,8 +33,9 @@ layout(set = 0, binding = 0) uniform Locals {
 
 void main() {
     v_TexCoord = a_TexCoord;
-    v_team = team;
-    v_selected = selected;
+    v_team = abs(bitpack_selected_team_na_na)-0.5;
+    v_selected = bitpack_selected_team_na_na <= 0.0 ? 1.0 : 0.0;
+    v_con_completed = con_completed;
 
     float sr = sin(inst_euler.x);
     float cr = cos(inst_euler.x);

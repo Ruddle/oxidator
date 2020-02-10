@@ -20,6 +20,10 @@ pub struct BotDef {
     pub break_accel: f32,
     ///m/frame
     pub max_speed: f32,
+    ///metal/frame
+    pub build_power: i32,
+    ///m
+    pub build_dist: f32,
 
     pub part_tree: unit::PartTree,
 }

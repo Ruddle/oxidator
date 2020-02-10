@@ -232,7 +232,7 @@ pub fn update_mobile_target(
     for ((id, _), (spot_id, _)) in id_to_proj.iter().zip(&projected_spot[..]) {
         if let Some(mobile) = kbots.get_mut(id) {
             log::trace!("New order for {}", mobile.id);
-            mobile.target = Some(Point3::<f32>::from(spot[*spot_id]));
+            mobile.move_target = Some(Point3::<f32>::from(spot[*spot_id]));
         }
     }
 }
@@ -440,30 +440,34 @@ pub fn update_units(
         let mut shots = Vec::new();
 
         for (me, me_kbot) in kbots.iter() {
-            let grid_pos = grid_pos(me_kbot);
+            if me_kbot.con_completed == 1.0 {
+                let grid_pos = grid_pos(me_kbot);
 
-            let my_team = id_to_team.get(me).unwrap();
+                let my_team = id_to_team.get(me).unwrap();
 
-            // let ennemies_in_cell = &team_to_ennemy_grid.get(my_team).unwrap()[grid_pos];
+                // let ennemies_in_cell = &team_to_ennemy_grid.get(my_team).unwrap()[grid_pos];
 
-            let mut ennemies_in_cell: Vec<Id<KBot>> = grid[grid_pos].clone();
-            let to_remove = ennemies_in_cell.iter().position(|e| e == me).unwrap();
-            ennemies_in_cell.remove(to_remove);
+                let mut ennemies_in_cell: Vec<Id<KBot>> = grid[grid_pos].clone();
+                let to_remove = ennemies_in_cell.iter().position(|e| e == me).unwrap();
+                ennemies_in_cell.remove(to_remove);
 
-            let can_shoot =// *my_team == 0&&
+                let can_shoot =// *my_team == 0&&
                  frame_count - me_kbot.frame_last_shot > me_kbot.reload_frame_count;
-            if can_shoot {
-                //We choose the first ennemy in the cell, we could sort by distance or something else here
-                'meloop: for potential_ennemy in ennemies_in_cell {
-                    if id_to_team.get(&potential_ennemy).unwrap() != my_team {
-                        let ennemy_kbot = kbots.get(&potential_ennemy).unwrap();
-                        if (ennemy_kbot.position.coords - me_kbot.position.coords).magnitude() < 6.0
-                        {
-                            shots.push(Shot {
-                                bot: *me,
-                                target: ennemy_kbot.position.coords,
-                            });
-                            break 'meloop;
+                if can_shoot {
+                    //We choose the first ennemy in the cell, we could sort by distance or something else here
+                    //TODO Configurable strategy
+                    'meloop: for potential_ennemy in ennemies_in_cell {
+                        if id_to_team.get(&potential_ennemy).unwrap() != my_team {
+                            let ennemy_kbot = kbots.get(&potential_ennemy).unwrap();
+                            if (ennemy_kbot.position.coords - me_kbot.position.coords).magnitude()
+                                < 6.0
+                            {
+                                shots.push(Shot {
+                                    bot: *me,
+                                    target: ennemy_kbot.position.coords,
+                                });
+                                break 'meloop;
+                            }
                         }
                     }
                 }
@@ -481,7 +485,7 @@ pub fn update_units(
                 id: rand_id(),
                 birth_frame: frame_count,
                 death_frame: frame_count + 6,
-                position_at_birth: kbot.position + dir * kbot_radius * 1.0,
+                position_at_birth: kbot.position + dir * (kbot_radius + 0.25 + 0.01),
                 speed_per_frame_at_birth: dir * 2.0 + Vector3::new(0.0, 0.0, 0.2),
                 accel_per_frame: Vector3::new(0.0, 0.0, -0.08),
                 radius: 0.25,
@@ -499,7 +503,11 @@ pub fn update_units(
     //Movement compute
 
     for (id, mobile) in kbots.iter_mut() {
-        if mobile.speed.magnitude_squared() > 0.001 || mobile.target.is_some() || !mobile.grounded {
+        if mobile.con_completed < 1.0 {
+        } else if mobile.speed.magnitude_squared() > 0.001
+            || mobile.move_target.is_some()
+            || !mobile.grounded
+        {
             let botdef = bot_defs.get(&mobile.botdef_id).unwrap();
             let grid_pos = grid_pos(mobile);
             let mut neighbors_id: Vec<Id<KBot>> = grid[grid_pos].clone();
@@ -528,7 +536,7 @@ pub fn update_units(
             // });
 
             if stop_tracking {
-                mobile.target = None;
+                mobile.move_target = None;
             }
 
             let dir = avoidance_force + target_force;
@@ -570,7 +578,7 @@ pub fn update_units(
                 1.0
             };
 
-            let accel = if mobile.target != None && thrust > 0.0 {
+            let accel = if mobile.move_target != None && thrust > 0.0 {
                 botdef.accel * dir_intensity * thrust
             } else {
                 -botdef.break_accel * thrust.abs()
@@ -669,7 +677,7 @@ struct TargetForce {
     stop_tracking: bool,
 }
 fn to_target_force(me: &KBot, botdef: &botdef::BotDef) -> TargetForce {
-    if let Some(target) = me.target {
+    if let Some(target) = me.move_target {
         let to_target = (target.coords - (me.position.coords + me.speed)).xy();
         let to_target_distance = to_target.norm();
         let will_to_go_target = if to_target_distance > botdef.radius {

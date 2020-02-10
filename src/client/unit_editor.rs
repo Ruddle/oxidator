@@ -34,6 +34,8 @@ impl UnitEditor {
             accel: 0.1,
             break_accel: 0.3,
             max_speed: 1.0,
+            build_power: 1,
+            build_dist: 5.0,
             part_tree: root,
         };
 
@@ -105,6 +107,8 @@ impl App {
                     accel,
                     break_accel,
                     max_speed,
+                    build_power,
+                    build_dist,
                     part_tree,
                 } = &unit_editor.botdef;
 
@@ -157,13 +161,25 @@ impl App {
                 let mut life = max_life.clone();
                 ui.drag_int(im_str!("health"), &mut life).build();
 
-                unit_editor.botdef.max_turn_rate = max_turn_rate_human * to_frame * to_rad;
+                let mut build_power_ = build_power.clone();
+                ui.drag_int(im_str!("build power"), &mut build_power_)
+                    .build();
 
+                let mut build_dist_ = build_dist.clone();
+                ui.drag_float(im_str!("build distance (m)"), &mut build_dist_)
+                    .speed(0.01)
+                    .min(0.01)
+                    .max(100.0)
+                    .build();
+
+                unit_editor.botdef.max_turn_rate = max_turn_rate_human * to_frame * to_rad;
                 unit_editor.botdef.turn_accel = turn_accel_human * to_frame * to_frame * to_rad;
                 unit_editor.botdef.max_speed = max_speed_human * to_frame;
                 unit_editor.botdef.accel = accel_human * to_frame * to_frame;
                 unit_editor.botdef.break_accel = break_accel_human * to_frame * to_frame;
                 unit_editor.botdef.max_life = life.max(0);
+                unit_editor.botdef.build_power = build_power_.max(0);
+                unit_editor.botdef.build_dist = build_dist_;
                 ui.separator();
                 Self::ui_part_tree(
                     ui,

@@ -10,6 +10,8 @@
   "accel": 0.1,
   "break_accel": 0.3,
   "max_speed": 1.0,
+  "build_power": 1,
+  "build_dist": 5.0,
   "part_tree": {
     "id": {
       "value": 197135912884473854,

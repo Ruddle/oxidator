@@ -32,6 +32,7 @@ impl App {
         unit_part_gpu: &mut UnitPartGpu,
         selected: f32,
         team: f32,
+        con_completed: f32,
         weapon0_dir: Vector3<f32>,
         wheel0_angle: f32,
     ) {
@@ -85,8 +86,12 @@ impl App {
                         buf.push(euler.0);
                         buf.push(euler.1);
                         buf.push(euler.2);
-                        buf.push(selected);
-                        buf.push(team);
+
+                        let bitpacked: f32 =
+                            if selected == 1.0 { -1.0 } else { 1.0 } * (team + 0.5);
+
+                        buf.push(bitpacked);
+                        buf.push(con_completed);
                     }
                     _ => {}
                 }
@@ -96,6 +101,7 @@ impl App {
                     unit_part_gpu,
                     selected,
                     team,
+                    con_completed,
                     weapon0_dir,
                     wheel0_angle,
                 );
@@ -106,6 +112,7 @@ impl App {
                     unit_part_gpu,
                     selected,
                     team,
+                    con_completed,
                     weapon0_dir,
                     wheel0_angle,
                 );
@@ -143,6 +150,7 @@ impl App {
                         &mut self.unit_part_gpu,
                         0.0,
                         0.0,
+                        1.0,
                         Vector3::new(f32::cos(t), f32::sin(t), f32::sin(t / 5.0) * 0.1).normalize(),
                         (t * 2.0),
                     );
@@ -172,6 +180,7 @@ impl App {
                                 &mut self.unit_part_gpu,
                                 is_selected,
                                 team as f32,
+                                mobile.con_completed,
                                 client_kbot.weapon0_dir,
                                 client_kbot.wheel0_angle,
                             );
@@ -225,10 +234,6 @@ impl App {
                     &Vector3::new(0.0, 0.0, 1.0),
                 );
 
-                let is_selected = 0.0;
-
-                let team = -1.0;
-
                 let isometry: Isometry3<f32> =
                     unsafe { na::convert_unchecked::<Matrix4<f32>, Isometry3<f32>>(mat) };
                 let euler = isometry.rotation.euler_angles();
@@ -239,8 +244,8 @@ impl App {
                 self.vertex_attr_buffer_f32.push(euler.0);
                 self.vertex_attr_buffer_f32.push(euler.1);
                 self.vertex_attr_buffer_f32.push(euler.2);
-                self.vertex_attr_buffer_f32.push(is_selected);
-                self.vertex_attr_buffer_f32.push(team)
+                self.vertex_attr_buffer_f32.push(255.);
+                self.vertex_attr_buffer_f32.push(1.0)
             }
 
             self.kinematic_projectile_gpu
@@ -298,7 +303,14 @@ impl App {
                     .get(&kbot.botdef_id)
                     .unwrap();
                 let life = kbot.life as f32 / botdef.max_life as f32;
-                if alpha > 0.0 && life < 1.0 {
+
+                let con_completed = kbot.con_completed;
+
+                let display_life = life < 1.0;
+                let display_con_completed = con_completed < 1.0;
+                let display_one = display_life || display_con_completed;
+
+                if alpha > 0.0 && display_one {
                     let w = self.gpu.sc_desc.width as f32;
                     let h = self.gpu.sc_desc.height as f32;
                     let half_size = Vector2::new(20.0 / w, 3.0 / h) * size_factor;
@@ -363,7 +375,7 @@ impl App {
                 {
                     for (kbot, client_kbot) in self.game_state.kbots.iter() {
                         if see_all_order || self.game_state.selected.contains(&kbot.id.value) {
-                            if let Some(target) = kbot.target {
+                            if let Some(target) = kbot.move_target {
                                 let min = view_proj * client_kbot.position.to_homogeneous();
                                 let max = view_proj * target.to_homogeneous();
                                 if (min.z > 0.0

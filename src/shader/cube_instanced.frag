@@ -4,7 +4,8 @@ layout(location = 0) in vec2 v_TexCoord;
 layout(location = 1) in vec3 world_pos;
 layout(location = 2) in float v_selected;
 layout(location = 3) in float v_team;
-layout(location = 4) in vec3 v_world_normal;
+layout(location = 4) in float v_con_completed;
+layout(location = 5) in vec3 v_world_normal;
 
 layout(location = 0) out vec4 o_Target;
 layout(location = 1) out vec4 position_att;
@@ -31,7 +32,7 @@ void main() {
     position_att = vec4(world_pos, v_selected );
 
     vec3 color = vec3(1);
-    if(v_team < -0.1){
+    if(v_team > 254.0){
         color = vec3(1);
     }
     else if( v_team == 0.0){
@@ -69,27 +70,31 @@ void main() {
     specular*specColor);
 
 
-    // bool diag = int((gl_FragCoord.x +gl_FragCoord.y )/3.0) %2 == 0;
-    // bool hori = int((gl_FragCoord.y)/2.0) %2==0;
 
-    // bool hatch = true;
-    // if (length(phong) <0.5){
-    //     hatch = diag||hori;
-    // }else if (length(phong) <0.8){
-    //      hatch = diag;
-    // } else {
-    //     hatch = false;
-    // } 
+    if(v_con_completed < 0.9999){
+        bool diag = int((gl_FragCoord.x +gl_FragCoord.y )/3.0) %2 == 0;
+        bool hori = int((gl_FragCoord.y)/2.0) %2==0;
 
-    // float m = 0.3;
-    // float f = 1+m;
-    // if ( hatch){
-    //     f= 1-m;
-    // }
+        bool hatch = true;
+        if (length(phong) <0.5){
+            hatch = diag||hori;
+        }else if (length(phong) <0.8){
+            hatch = diag;
+        } else {
+            hatch = false;
+        } 
 
-    // phong = vec3(ambientColor*f +
-    // lambertian* diffuse*f +
-    // specular*specColor*f);
+        float m = 0.3;
+        float f = 1+m;
+        if ( hatch){
+            f= 1-m;
+        }
+
+        phong = mix(vec3(ambientColor*f +
+        lambertian* diffuse*f +
+        specular*specColor*f) , vec3(0,v_con_completed,0), hatch ? 1.0:0.0);
+    }
+  
     
 
     o_normal = normal.xy;
