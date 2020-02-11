@@ -33,8 +33,10 @@ layout(set = 0, binding = 0) uniform Locals {
 
 void main() {
     v_TexCoord = a_TexCoord;
-    v_team = abs(bitpack_selected_team_na_na)-0.5;
-    v_selected = bitpack_selected_team_na_na <= 0.0 ? 1.0 : 0.0;
+
+    v_selected=  floor(bitpack_selected_team_na_na/100.0);
+    v_team = round(bitpack_selected_team_na_na-v_selected*100.0);
+    // v_selected = bitpack_selected_team_na_na <= 0.0 ? 1.0 : 0.0;
     v_con_completed = con_completed;
 
     float sr = sin(inst_euler.x);

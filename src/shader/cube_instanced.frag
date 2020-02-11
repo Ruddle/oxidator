@@ -32,7 +32,7 @@ void main() {
     position_att = vec4(world_pos, v_selected );
 
     vec3 color = vec3(1);
-    if(v_team > 254.0){
+    if(v_team >= 99.0){
         color = vec3(1);
     }
     else if( v_team == 0.0){

@@ -46,14 +46,16 @@ void main() {
     // //Unit selection
     bool is_selected_area = pos_attachment.a >= 0.99;
 
+
+    float highlight_index= 0.0;
     bool is_edge_area = false;
     for(int i = -1; i<= 1; i++){
         for(int j = -1; j<= 1; j++){
             if (!is_edge_area && (i!= 0 || j!= 0)){
-                is_edge_area = is_edge_area || 
-                texture(
+                highlight_index = round(texture(
                     sampler2D(t_pos, s_pos), 
-                    v_TexCoord + vec2(i,j)/resolution).a >=0.99;
+                    v_TexCoord + vec2(i,j)/resolution).a);
+                is_edge_area = highlight_index> 0.0;
             }
         }
     }
@@ -71,13 +73,21 @@ void main() {
             }
         }
     }
+
+  
+    vec3 highlight_color = vec3(0,1,0);
+    if (highlight_index ==2){
+        highlight_color = vec3(0.0,0.5,1);
+    } else if (highlight_index ==3){
+        highlight_color = vec3(0.4,1,0.4);
+    } 
     
     if (!is_selected_area && is_edge_area ){
         alpha = 1.0;
-        color = vec3(0.0,1.0,0.0);
+        color = highlight_color;
     } else if(!is_selected_area && is_edge2_area){
         alpha = 0.5;
-        color = vec3(0.0,0.5,0.0);
+        color = mix(highlight_color,vec3(0),0.5);
     }
 
     if (start_drag != mouse_pos){

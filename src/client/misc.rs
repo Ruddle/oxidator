@@ -30,7 +30,7 @@ impl App {
         part_tree: &unit::PartTree,
         root_trans: &Matrix4<f32>,
         unit_part_gpu: &mut UnitPartGpu,
-        selected: f32,
+        highlight_factor: f32,
         team: f32,
         con_completed: f32,
         weapon0_dir: Vector3<f32>,
@@ -87,8 +87,10 @@ impl App {
                         buf.push(euler.1);
                         buf.push(euler.2);
 
-                        let bitpacked: f32 =
-                            if selected == 1.0 { -1.0 } else { 1.0 } * (team + 0.5);
+                        //Bit representation in decimal order
+                        //SELECTED TEAM TEAM
+                        //ex : team 5 and selected = 1 0 5
+                        let bitpacked: f32 = highlight_factor * 100. + team;
 
                         buf.push(bitpacked);
                         buf.push(con_completed);
@@ -99,7 +101,7 @@ impl App {
                     c,
                     &combined,
                     unit_part_gpu,
-                    selected,
+                    highlight_factor,
                     team,
                     con_completed,
                     weapon0_dir,
@@ -110,7 +112,7 @@ impl App {
                     c,
                     root_trans,
                     unit_part_gpu,
-                    selected,
+                    highlight_factor,
                     team,
                     con_completed,
                     weapon0_dir,
@@ -164,11 +166,17 @@ impl App {
                         })
                     {
                         let mat = client_kbot.trans.unwrap();
-                        let is_selected = if self.game_state.selected.contains(&mobile.id) {
-                            1.0
-                        } else {
-                            0.0
+
+                        let highlight_factor: f32 = match (
+                            self.game_state.selected.contains(&mobile.id),
+                            self.game_state.under_mouse == Some(mobile.id),
+                        ) {
+                            (true, false) => 1.0,
+                            (false, false) => 0.0,
+                            (false, true) => 2.0,
+                            (true, true) => 3.0,
                         };
+
                         let team = mobile.team;
 
                         if let Some(botdef) =
@@ -178,7 +186,7 @@ impl App {
                                 &botdef.part_tree,
                                 &mat,
                                 &mut self.unit_part_gpu,
-                                is_selected,
+                                highlight_factor,
                                 team as f32,
                                 mobile.con_completed,
                                 client_kbot.weapon0_dir,
@@ -244,7 +252,7 @@ impl App {
                 self.vertex_attr_buffer_f32.push(euler.0);
                 self.vertex_attr_buffer_f32.push(euler.1);
                 self.vertex_attr_buffer_f32.push(euler.2);
-                self.vertex_attr_buffer_f32.push(255.);
+                self.vertex_attr_buffer_f32.push(99.);
                 self.vertex_attr_buffer_f32.push(1.0)
             }
 
