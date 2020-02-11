@@ -148,7 +148,57 @@ impl App {
                     .mouse_release
                     .contains(&winit::event::MouseButton::Left)
                 {
-                    self.game_state.selected.clear();
+                    // self.game_state.selected.clear();
+                    //Single Picking
+
+                    let (x, y) = self.input_state.cursor_pos;
+
+                    let (x0, y0) = (x - 7, y - 7);
+                    let (x1, y1) = (x + 7, y + 7);
+
+                    let min_x = (x0.min(x1) as f32 / self.gpu.sc_desc.width as f32) * 2.0 - 1.0;
+                    let min_y = (y0.min(y1) as f32 / self.gpu.sc_desc.height as f32) * 2.0 - 1.0;
+                    let max_x = (x0.max(x1) as f32 / self.gpu.sc_desc.width as f32) * 2.0 - 1.0;
+                    let max_y = (y0.max(y1) as f32 / self.gpu.sc_desc.height as f32) * 2.0 - 1.0;
+
+                    if let Some(mpos) = self.game_state.mouse_world_pos {
+                        let mut closest = None;
+                        let mut screen_only = true;
+                        let mut distance = 999999999.0_f32;
+                        for e in self.game_state.kbots.iter() {
+                            if e.1.is_in_screen && me.kbots.contains(&e.0.id) {
+                                let dist = (e.1.position.coords - mpos).magnitude_squared();
+                                //TODO replace 1.0 with bot radius
+                                if dist < 1.0 && dist < distance {
+                                    closest = Some(e.0.id.value);
+                                    distance = dist;
+                                    screen_only = false
+                                } else if screen_only
+                                    && e.1.screen_pos.x > min_x
+                                    && e.1.screen_pos.x < max_x
+                                    && e.1.screen_pos.y < max_y
+                                    && e.1.screen_pos.y > min_y
+                                {
+                                    let dist = {
+                                        let dx = x as f32 - e.1.screen_pos.x;
+                                        let dy = y as f32 - e.1.screen_pos.y;
+                                        (dx * dx + dy * dy).sqrt() * 3000.0
+                                    };
+
+                                    if dist < distance {
+                                        closest = Some(e.0.id.value);
+                                        distance = dist
+                                    }
+                                }
+                            }
+                        }
+                        self.game_state.selected.clear();
+                        if let Some(closest) = closest {
+                            self.game_state.selected.insert(closest);
+                        }
+                    } else {
+                        self.game_state.selected.clear();
+                    }
                 }
             }
         });
