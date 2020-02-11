@@ -699,6 +699,7 @@ impl App {
             self.health_bar.render(&mut rpass, &self.bind_group);
             self.unit_icon.render(&mut rpass, &self.bind_group);
             self.line_gpu.render(&mut rpass, &self.bind_group);
+            self.cursor_icon.render(&mut rpass, &self.bind_group);
         }
 
         //Copy on frame view

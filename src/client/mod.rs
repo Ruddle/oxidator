@@ -5,6 +5,7 @@ use na::{Isometry3, Matrix4, Point3, Vector2, Vector3, Vector4};
 use gpu_obj::imgui_wgpu::Renderer;
 
 use gpu_obj::arrow_gpu::ArrowGpu;
+use gpu_obj::blit_texture::BlitTextureGpu;
 use gpu_obj::gpu;
 use gpu_obj::heightmap_gpu::HeightmapGpu;
 use gpu_obj::model_gpu::ModelGpu;
@@ -110,6 +111,7 @@ pub struct App {
     post_bicopy: gpu_obj::texture_view_bicopy::TextureViewBiCopy,
     health_bar: gpu_obj::health_bar::HealthBarGpu,
     line_gpu: gpu_obj::line::LineGpu,
+    cursor_icon: BlitTextureGpu,
     unit_icon: gpu_obj::unit_icon::UnitIconGpu,
     explosion_gpu: gpu_obj::explosion::ExplosionGpu,
 
@@ -392,6 +394,14 @@ impl App {
 
         let line_gpu = gpu_obj::line::LineGpu::new(&gpu.device, format, &bind_group_layout);
 
+        let cursor_icon = BlitTextureGpu::new(
+            &mut init_encoder,
+            &gpu.device,
+            format,
+            &bind_group_layout,
+            crate::utils::ImageRGBA8::open("./src/asset/repair.png"),
+        );
+
         let unit_icon =
             gpu_obj::unit_icon::UnitIconGpu::new(&gpu.device, format, &bind_group_layout);
 
@@ -574,6 +584,7 @@ impl App {
             post_bicopy,
             health_bar,
             line_gpu,
+            cursor_icon,
             unit_icon,
             explosion_gpu,
 
@@ -1015,6 +1026,20 @@ impl App {
                 }) {
                     log::info!("Reloading water.vert/water.frag");
                     self.water_gpu.reload_shader(
+                        &self.gpu.device,
+                        &self.bind_group_layout,
+                        self.gpu.sc_desc.format,
+                    );
+                }
+
+                if event.paths.iter().any(|p| {
+                    p.file_name().iter().any(|name| {
+                        name.to_os_string() == "blit_texture.frag"
+                            || name.to_os_string() == "blit_texture.vert"
+                    })
+                }) {
+                    log::info!("Reloading blit_texture.vert/blit_texture.frag");
+                    self.cursor_icon.reload_shader(
                         &self.gpu.device,
                         &self.bind_group_layout,
                         self.gpu.sc_desc.format,

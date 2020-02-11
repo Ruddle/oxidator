@@ -1,6 +1,8 @@
 use super::client::*;
 use crate::*;
 use unit_part_gpu::*;
+
+use super::uitool::UiTool;
 impl App {
     pub fn clear_gpu_instance_and_game_state(&mut self) {
         self.game_state.players.clear();
@@ -387,6 +389,42 @@ impl App {
                 self.vertex_attr_buffer_f32.push(team);
             }
             self.unit_icon
+                .update_instance(&self.vertex_attr_buffer_f32[..], &self.gpu.device);
+
+            //Cursor Icon
+            self.vertex_attr_buffer_f32.clear();
+            {
+                let cursor_icon_size = 48;
+                let cursor_icon_size_half = cursor_icon_size / 2;
+                let (x, y) = self.input_state.cursor_pos;
+
+                let min_screen = Vector2::new(
+                    (x - cursor_icon_size_half) as f32 / self.gpu.sc_desc.width as f32,
+                    (y - cursor_icon_size_half) as f32 / self.gpu.sc_desc.height as f32,
+                );
+                let max_screen = Vector2::new(
+                    (x + cursor_icon_size_half) as f32 / self.gpu.sc_desc.width as f32,
+                    (y + cursor_icon_size_half) as f32 / self.gpu.sc_desc.height as f32,
+                );
+                let min_texture = Vector2::new(0.0, 0.0);
+                let mut max_texture = Vector2::new(0.0, 0.0);
+
+                match self.game_state.uitool {
+                    UiTool::Repair => {
+                        max_texture = Vector2::new(1.0, 1.0);
+                    }
+                    _ => {}
+                }
+                self.vertex_attr_buffer_f32
+                    .extend_from_slice(min_screen.as_slice());
+                self.vertex_attr_buffer_f32
+                    .extend_from_slice(max_screen.as_slice());
+                self.vertex_attr_buffer_f32
+                    .extend_from_slice(min_texture.as_slice());
+                self.vertex_attr_buffer_f32
+                    .extend_from_slice(max_texture.as_slice());
+            }
+            self.cursor_icon
                 .update_instance(&self.vertex_attr_buffer_f32[..], &self.gpu.device);
 
             //Line

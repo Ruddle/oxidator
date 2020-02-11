@@ -165,3 +165,40 @@ impl FileTree {
         }
     }
 }
+
+pub struct ImageRGBA8 {
+    pub w: u32,
+    pub h: u32,
+    pub data: Vec<u8>,
+}
+
+impl ImageRGBA8 {
+    pub fn open(path: &str) -> ImageRGBA8 {
+        use byteorder::{BigEndian, ReadBytesExt};
+        use std::fs::File;
+
+        // The decoder is a build for reader and can be used to set various decoding options
+        // via `Transformations`. The default output transformation is `Transformations::EXPAND
+        // | Transformations::STRIP_ALPHA`.
+        let mut decoder = png::Decoder::new(File::open(path).unwrap());
+        decoder.set_transformations(png::Transformations::IDENTITY);
+        let (info, mut reader) = decoder.read_info().unwrap();
+
+        // Display image metadata.
+        log::debug!("info: {:?}", info.width);
+        log::debug!("height: {:?}", info.height);
+        log::debug!("bit depth: {:?}", info.bit_depth);
+        log::debug!("buffer size: {:?}", info.buffer_size());
+
+        // Allocate the output buffer.
+        let mut buf = vec![0; info.buffer_size()];
+        // Read the next frame. Currently this function should only called once.
+        // The default options
+        reader.next_frame(&mut buf).unwrap();
+        ImageRGBA8 {
+            w: info.width,
+            h: info.height,
+            data: buf,
+        }
+    }
+}
