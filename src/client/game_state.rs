@@ -47,6 +47,7 @@ pub struct State {
     pub kinematic_projectiles: Vec<Point3<f32>>,
 
     pub selected: HashSet<Id<KBot>>,
+    pub under_mouse: Option<Id<KBot>>,
     pub botdef_selected_for_con: Option<Id<botdef::BotDef>>,
 
     pub start_time: Instant,
@@ -87,6 +88,7 @@ impl State {
             server_sec: 0.0,
 
             selected: HashSet::new(),
+            under_mouse: None,
             botdef_selected_for_con: None,
 
             players: HashMap::new(),
