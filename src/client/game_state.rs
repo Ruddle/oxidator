@@ -46,7 +46,7 @@ pub struct State {
     pub kinematic_projectiles_cache: HashMap<Id<KinematicProjectile>, KinematicProjectile>,
     pub kinematic_projectiles: Vec<Point3<f32>>,
 
-    pub selected: HashSet<IdValue>,
+    pub selected: HashSet<Id<KBot>>,
     pub botdef_selected_for_con: Option<Id<botdef::BotDef>>,
 
     pub start_time: Instant,
@@ -130,7 +130,7 @@ impl State {
 
         self.selected = self
             .selected
-            .difference(&self.frame_zero.kbots_dead.iter().map(|e| e.value).collect())
+            .difference(&self.frame_zero.kbots_dead.iter().cloned().collect())
             .copied()
             .collect();
 

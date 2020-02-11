@@ -164,7 +164,7 @@ impl App {
                         })
                     {
                         let mat = client_kbot.trans.unwrap();
-                        let is_selected = if self.game_state.selected.contains(&mobile.id.value) {
+                        let is_selected = if self.game_state.selected.contains(&mobile.id) {
                             1.0
                         } else {
                             0.0
@@ -369,7 +369,7 @@ impl App {
                     ((1.0 / (client_kbot.distance_to_camera / unit_icon_distance)) * 15.0).max(4.0);
                 self.vertex_attr_buffer_f32.push(size);
 
-                let is_selected = self.game_state.selected.contains(&kbot.id.value);
+                let is_selected = self.game_state.selected.contains(&kbot.id);
                 let team = if is_selected { -1.0 } else { kbot.team as f32 };
                 self.vertex_attr_buffer_f32.push(team);
             }
@@ -386,7 +386,7 @@ impl App {
                     .contains(&winit::event::VirtualKeyCode::LShift);
                 {
                     for (kbot, client_kbot) in self.game_state.kbots.iter() {
-                        if see_all_order || self.game_state.selected.contains(&kbot.id.value) {
+                        if see_all_order || self.game_state.selected.contains(&kbot.id) {
                             fn add_line(
                                 view_proj: &Matrix4<f32>,
                                 buffer: &mut Vec<f32>,

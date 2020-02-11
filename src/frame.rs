@@ -37,13 +37,13 @@ impl Player {
 pub enum FrameEventFromPlayer {
     ConOrder {
         id: Id<Player>,
-        selected: HashSet<IdValue>,
+        selected: HashSet<Id<KBot>>,
         mouse_world_pos: Vector3<f32>,
         botdef_id: Id<botdef::BotDef>,
     },
     MoveOrder {
         id: Id<Player>,
-        selected: HashSet<IdValue>,
+        selected: HashSet<Id<KBot>>,
         mouse_world_pos: Vector3<f32>,
     },
     ReplaceFrame(Frame),

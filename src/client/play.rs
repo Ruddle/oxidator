@@ -4,6 +4,7 @@ use crate::frame::FrameEventFromPlayer;
 use crate::frame::Player;
 use crate::*;
 use imgui::*;
+use mobile::*;
 use na::{Isometry3, Matrix4, Point3, Vector2, Vector3, Vector4};
 use std::collections::{HashMap, HashSet};
 use std::time::{Duration, Instant};
@@ -125,7 +126,7 @@ impl App {
                     let min_y = (y0.min(y1) as f32 / self.gpu.sc_desc.height as f32) * 2.0 - 1.0;
                     let max_x = (x0.max(x1) as f32 / self.gpu.sc_desc.width as f32) * 2.0 - 1.0;
                     let max_y = (y0.max(y1) as f32 / self.gpu.sc_desc.height as f32) * 2.0 - 1.0;
-                    let selected: HashSet<IdValue> = self
+                    let selected: HashSet<utils::Id<KBot>> = self
                         .game_state
                         .kbots
                         .iter()
@@ -137,7 +138,7 @@ impl App {
                                 && e.1.screen_pos.y < max_y
                                 && e.1.screen_pos.y > min_y
                         })
-                        .map(|e| e.0.id.value)
+                        .map(|e| e.0.id)
                         .collect();
 
                     log::trace!("Selection took {}us", start_sel.elapsed().as_micros());
@@ -170,7 +171,7 @@ impl App {
                                 let dist = (e.1.position.coords - mpos).magnitude_squared();
                                 //TODO replace 1.0 with bot radius
                                 if dist < 1.0 && dist < distance {
-                                    closest = Some(e.0.id.value);
+                                    closest = Some(e.0.id);
                                     distance = dist;
                                     screen_only = false
                                 } else if screen_only
@@ -186,7 +187,7 @@ impl App {
                                     };
 
                                     if dist < distance {
-                                        closest = Some(e.0.id.value);
+                                        closest = Some(e.0.id);
                                         distance = dist
                                     }
                                 }

@@ -115,7 +115,7 @@ impl FrameServerCache {
                     m.life = 1;
 
                     for selected_raw_id in &selected {
-                        for kbot in frame.kbots.get_mut(&Id::new(*selected_raw_id)) {
+                        for kbot in frame.kbots.get_mut(selected_raw_id) {
                             kbot.current_command = Command::Build(m.id.clone())
                         }
                     }
@@ -165,7 +165,7 @@ impl FrameServerCache {
 
 pub fn update_mobile_target(
     mouse_world_pos: Vector3<f32>,
-    selected: &HashSet<IdValue>,
+    selected: &HashSet<Id<KBot>>,
     kbots: &mut HashMap<Id<KBot>, KBot>,
 ) {
     let selected_count = selected.len();
@@ -190,7 +190,7 @@ pub fn update_mobile_target(
 
     let mut id_to_pos = Vec::new();
     for &s in selected.iter() {
-        if let Some(mobile) = kbots.get(&Id::new(s)) {
+        if let Some(mobile) = kbots.get(&s) {
             id_to_pos.push((mobile.id, mobile.position.coords));
             center += mobile.position.coords;
             tap += 1.0;
