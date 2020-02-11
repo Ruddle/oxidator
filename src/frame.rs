@@ -118,7 +118,7 @@ impl Frame {
         Frame {
             number: 0,
             players: HashMap::new(),
-            moddef : moddef::ModDef::new(),
+            moddef: moddef::ModDef::new(),
             kbots: HashMap::new(),
             kinematic_projectiles: HashMap::new(),
             arrows: Vec::new(),

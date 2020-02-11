@@ -337,6 +337,18 @@ impl App {
                         .extend_from_slice(max.as_slice());
                     self.vertex_attr_buffer_f32.push(life);
                     self.vertex_attr_buffer_f32.push(alpha);
+
+                    let mut next_bar_offset = Vector2::new(0., -3. * half_size.y);
+                    if display_con_completed {
+                        let min = min + next_bar_offset;
+                        let max = max + next_bar_offset;
+                        self.vertex_attr_buffer_f32
+                            .extend_from_slice(min.as_slice());
+                        self.vertex_attr_buffer_f32
+                            .extend_from_slice(max.as_slice());
+                        self.vertex_attr_buffer_f32.push(con_completed);
+                        self.vertex_attr_buffer_f32.push(alpha);
+                    }
                 }
             }
             self.health_bar
@@ -375,9 +387,16 @@ impl App {
                 {
                     for (kbot, client_kbot) in self.game_state.kbots.iter() {
                         if see_all_order || self.game_state.selected.contains(&kbot.id.value) {
-                            if let Some(target) = kbot.move_target {
-                                let min = view_proj * client_kbot.position.to_homogeneous();
-                                let max = view_proj * target.to_homogeneous();
+                            fn add_line(
+                                view_proj: &Matrix4<f32>,
+                                buffer: &mut Vec<f32>,
+                                start: &Point3<f32>,
+                                end: &Point3<f32>,
+                                type_: f32,
+                                count: &mut i32,
+                            ) {
+                                let min = view_proj * start.to_homogeneous();
+                                let max = view_proj * end.to_homogeneous();
                                 if (min.z > 0.0
                                     && min.x > -min.w
                                     && min.x < min.w
@@ -389,14 +408,44 @@ impl App {
                                         && max.y > -max.w
                                         && max.y < max.w)
                                 {
-                                    count += 1;
-                                    self.vertex_attr_buffer_f32.push(min.x / min.w);
-                                    self.vertex_attr_buffer_f32.push(min.y / min.w);
-                                    self.vertex_attr_buffer_f32.push(max.x / max.w);
-                                    self.vertex_attr_buffer_f32.push(max.y / max.w);
-                                    self.vertex_attr_buffer_f32.push(0.0);
-                                    self.vertex_attr_buffer_f32.push(0.0);
+                                    *count += 1;
+                                    buffer.push(min.x / min.w);
+                                    buffer.push(min.y / min.w);
+                                    buffer.push(max.x / max.w);
+                                    buffer.push(max.y / max.w);
+                                    //0.0 is move line
+                                    //1.0 is build line
+                                    buffer.push(type_);
+                                    buffer.push(0.0);
                                 }
+                            }
+
+                            if let Some(target) = kbot.move_target {
+                                add_line(
+                                    view_proj,
+                                    &mut self.vertex_attr_buffer_f32,
+                                    &client_kbot.position,
+                                    &target,
+                                    0.0,
+                                    &mut count,
+                                );
+                            }
+                            match kbot.current_command {
+                                mobile::Command::Build(id_builded) => {
+                                    for target_kbot in
+                                        self.game_state.frame_zero.kbots.get(&id_builded)
+                                    {
+                                        add_line(
+                                            view_proj,
+                                            &mut self.vertex_attr_buffer_f32,
+                                            &client_kbot.position,
+                                            &target_kbot.position,
+                                            1.0,
+                                            &mut count,
+                                        );
+                                    }
+                                }
+                                _ => {}
                             }
                         }
                     }

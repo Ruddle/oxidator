@@ -104,6 +104,12 @@ impl From<f32> for Angle {
 }
 
 #[derive(Clone, TypeName, Debug, Serialize, Deserialize, PartialEq)]
+pub enum Command {
+    None,
+    Build(Id<KBot>),
+}
+
+#[derive(Clone, TypeName, Debug, Serialize, Deserialize, PartialEq)]
 pub struct KBot {
     pub id: Id<KBot>,
     pub position: Point3<f32>,
@@ -113,6 +119,7 @@ pub struct KBot {
     pub angular_velocity: f32,
     pub up: Vector3<f32>,
     pub move_target: Option<Point3<f32>>,
+    pub current_command: Command,
     pub life: i32,
     pub con_completed: f32,
     pub team: i32,
@@ -134,6 +141,7 @@ impl KBot {
             angle: Angle::new(0.0),
             up: Vector3::new(0.0, 0.0, 1.0),
             move_target: None,
+            current_command: Command::None,
             id: utils::rand_id(),
             frame_last_shot: 0,
             reload_frame_count: 3,

@@ -3,7 +3,7 @@
 layout(location = 0) in vec2 v_TexCoord;
 layout(location = 1) in vec2 v_min;
 layout(location = 2) in vec2 v_max;
-layout(location = 3) in float v_life;
+layout(location = 3) in float v_type;
 layout(location = 4) in float v_count;
 layout(location = 5) in float v_l;
 layout(location = 6) in float v_w;
@@ -27,7 +27,15 @@ void main() {
     float alpha = 1-abs(v_TexCoord.y-0.5)/0.5;
     alpha = pow(alpha,2);
     alpha = min(alpha, pow(sin(v_TexCoord.x*v_l*0.2)*0.5+0.5,2)  )  ;
-    vec3 color = vec3(0,0.5+ 0.5*pow(alpha,0.7),pow(alpha,0.7)*0.5);
+
+     vec3 color = vec3(0);
+    if (v_type ==0 ){
+        color = vec3(0,0.5+ 0.5*pow(alpha,0.7),pow(alpha,0.7)*0.5);
+    } 
+    else if (v_type ==1 ){
+        color = vec3(0,pow(alpha,0.7)*0.5,0.5+ 0.5*pow(alpha,0.7));
+    }
+
     
     float calpha = pow(1.0/max(v_count-50.0,1.0),0.25);
     alpha*=calpha;

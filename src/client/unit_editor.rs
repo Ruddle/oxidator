@@ -36,6 +36,7 @@ impl UnitEditor {
             max_speed: 1.0,
             build_power: 1,
             build_dist: 5.0,
+            metal_cost: 100,
             part_tree: root,
         };
 
@@ -109,6 +110,7 @@ impl App {
                     max_speed,
                     build_power,
                     build_dist,
+                    metal_cost,
                     part_tree,
                 } = &unit_editor.botdef;
 

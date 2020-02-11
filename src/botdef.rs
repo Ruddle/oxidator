@@ -24,6 +24,8 @@ pub struct BotDef {
     pub build_power: i32,
     ///m
     pub build_dist: f32,
+    ///metal
+    pub metal_cost: i32,
 
     pub part_tree: unit::PartTree,
 }

@@ -108,19 +108,25 @@ impl FrameServerCache {
                     botdef_id,
                 } => {
                     //TODO Validate selected are owned by id && botdef_id is constructable by at least 1 selected
-                    log::debug!(
-                        "ConOrder {:?}",
-                        FrameEventFromPlayer::ConOrder {
-                            id,
-                            selected,
-                            mouse_world_pos,
-                            botdef_id,
-                        }
-                    );
+                    // log::debug!(
+                    //     "ConOrder {:?}",
+                    //     FrameEventFromPlayer::ConOrder {
+                    //         id,
+                    //         selected,
+                    //         mouse_world_pos,
+                    //         botdef_id,
+                    //     }
+                    // );
 
                     let botdef = frame.bot_defs.get(&botdef_id).unwrap();
                     let mut m = KBot::new(Point3::from(mouse_world_pos), botdef);
                     m.con_completed = 0.0;
+
+                    for selected_raw_id in &selected {
+                        for kbot in frame.kbots.get_mut(&Id::new(*selected_raw_id)) {
+                            kbot.current_command = Command::Build(m.id.clone())
+                        }
+                    }
 
                     let player = frame.players.get_mut(&id).unwrap();
                     player.kbots.insert(m.id);
@@ -233,6 +239,7 @@ pub fn update_mobile_target(
         if let Some(mobile) = kbots.get_mut(id) {
             log::trace!("New order for {}", mobile.id);
             mobile.move_target = Some(Point3::<f32>::from(spot[*spot_id]));
+            mobile.current_command = Command::None;
         }
     }
 }
@@ -503,130 +510,155 @@ pub fn update_units(
     //Movement compute
 
     for (id, mobile) in kbots.iter_mut() {
-        if mobile.con_completed < 1.0 {
-        } else if mobile.speed.magnitude_squared() > 0.001
-            || mobile.move_target.is_some()
-            || !mobile.grounded
-        {
-            let botdef = bot_defs.get(&mobile.botdef_id).unwrap();
-            let grid_pos = grid_pos(mobile);
-            let mut neighbors_id: Vec<Id<KBot>> = grid[grid_pos].clone();
-            let to_remove = neighbors_id.iter().position(|e| e == id).unwrap();
-            neighbors_id.remove(to_remove);
-
-            let avoidance_force = avoid_neighbors_force(mobile, neighbors_id, &mobiles2) * 0.3;
-
-            let TargetForce {
-                target_force,
-                stop_tracking,
-            } = to_target_force(mobile, botdef);
-
-            // arrows.push(Arrow {
-            //     position: mobile.position,
-            //     color: [target_force.norm(), 0.0, 0.0, 0.0],
-            //     end: mobile.position
-            //         + Vector3::new(target_force.x * 2.0, target_force.y * 2.0, 0.0),
-            // });
-
-            // arrows.push(Arrow {
-            //     position: mobile.position,
-            //     color: [0.0, avoidance_force.norm(), 0.0, 0.0],
-            //     end: mobile.position
-            //         + Vector3::new(avoidance_force.x * 2.0, avoidance_force.y * 2.0, 0.0),
-            // });
-
-            if stop_tracking {
-                mobile.move_target = None;
+        if mobile.con_completed >= 1.0 {
+            // Look at current_command, change move_target if necessary
+            match mobile.current_command {
+                Command::Build(to_build) => match mobiles2.get(&to_build) {
+                    Some(to_build) => {
+                        if to_build.con_completed < 1.0 {
+                            let dist =
+                                (to_build.position.coords - mobile.position.coords).magnitude();
+                            let botdef = bot_defs.get(&mobile.botdef_id).unwrap();
+                            if dist <= botdef.build_dist {
+                                mobile.move_target = None;
+                            } else {
+                                mobile.move_target = Some(to_build.position);
+                            }
+                        } else {
+                            mobile.current_command = Command::None;
+                        }
+                    }
+                    None => {
+                        mobile.current_command = Command::None;
+                    }
+                },
+                _ => {}
             }
 
-            let dir = avoidance_force + target_force;
-            let dir_intensity = (avoidance_force.norm() + target_force.norm())
-                .max(0.0)
-                .min(1.0);
+            if mobile.speed.magnitude_squared() > 0.001
+                || mobile.move_target.is_some()
+                || !mobile.grounded
+            {
+                let botdef = bot_defs.get(&mobile.botdef_id).unwrap();
+                let grid_pos = grid_pos(mobile);
+                let mut neighbors_id: Vec<Id<KBot>> = grid[grid_pos].clone();
+                let to_remove = neighbors_id.iter().position(|e| e == id).unwrap();
+                neighbors_id.remove(to_remove);
 
-            //Clamp in cone
-            let wanted_angle: Angle = dir.into();
-            let current_angle = mobile.angle;
+                let avoidance_force = avoid_neighbors_force(mobile, neighbors_id, &mobiles2) * 0.3;
 
-            fn clamp_abs(x: f32, max_abs: f32) -> f32 {
-                let sign = x.signum();
-                sign * (x.abs().min(max_abs))
+                let TargetForce {
+                    target_force,
+                    stop_tracking,
+                } = to_target_force(mobile, botdef);
+
+                // arrows.push(Arrow {
+                //     position: mobile.position,
+                //     color: [target_force.norm(), 0.0, 0.0, 0.0],
+                //     end: mobile.position
+                //         + Vector3::new(target_force.x * 2.0, target_force.y * 2.0, 0.0),
+                // });
+
+                // arrows.push(Arrow {
+                //     position: mobile.position,
+                //     color: [0.0, avoidance_force.norm(), 0.0, 0.0],
+                //     end: mobile.position
+                //         + Vector3::new(avoidance_force.x * 2.0, avoidance_force.y * 2.0, 0.0),
+                // });
+
+                if stop_tracking {
+                    mobile.move_target = None;
+                }
+
+                let dir = avoidance_force + target_force;
+                let dir_intensity = (avoidance_force.norm() + target_force.norm())
+                    .max(0.0)
+                    .min(1.0);
+
+                //Clamp in cone
+                let wanted_angle: Angle = dir.into();
+                let current_angle = mobile.angle;
+
+                fn clamp_abs(x: f32, max_abs: f32) -> f32 {
+                    let sign = x.signum();
+                    sign * (x.abs().min(max_abs))
+                }
+
+                let diff = (wanted_angle - (current_angle + mobile.angular_velocity.into())).rad;
+
+                mobile.angular_velocity = clamp_abs(
+                    mobile.angular_velocity + clamp_abs(diff, botdef.turn_accel),
+                    botdef.max_turn_rate,
+                );
+
+                let new_angle = current_angle + mobile.angular_velocity.into();
+                // current_angle.clamp_around(wanted_angle, mobile.angular_velocity.into());
+                mobile.angle = new_angle;
+                let new_dir: Vector2<f32> = new_angle.into();
+                mobile.dir = Vector3::new(new_dir.x, new_dir.y, 0.0);
+
+                //TODO drift factor ?
+                //drift = 1 (adherence = 0)
+                // mobile.speed = mobile.speed + mobile.dir * botdef.accel * dir_intensity;
+                //drift = 0 (adherence = 1)
+
+                let speed_scalar = mobile.speed.xy().magnitude();
+                let thrust = if speed_scalar > 0.01 {
+                    dir.normalize().dot(&(mobile.speed.xy() / speed_scalar))
+                } else {
+                    1.0
+                };
+
+                let accel = if mobile.move_target != None && thrust > 0.0 {
+                    botdef.accel * dir_intensity * thrust
+                } else {
+                    -botdef.break_accel * thrust.abs()
+                };
+
+                // arrows.push(Arrow {
+                //     position: mobile.position + Vector3::new(0.0, 0.0, 2.0),
+                //     color: [0.0, 0.0, accel, 0.0],
+                //     end: mobile.position
+                //         + Vector3::new(dir.x, dir.y, 0.0) * 4.0
+                //         + Vector3::new(0.0, 0.0, 2.0),
+                // });
+
+                // arrows.push(Arrow {
+                //     position: mobile.position + Vector3::new(0.0, 0.0, 1.0),
+                //     color: [0.0, 0.0, accel, 0.0],
+                //     end: mobile.position + mobile.dir * accel * 4.0 + Vector3::new(0.0, 0.0, 1.0),
+                // });
+
+                mobile.speed = mobile.dir * (accel + mobile.speed.magnitude()).max(0.0);
+
+                let speed = mobile.speed.magnitude();
+                if speed > botdef.max_speed {
+                    mobile.speed /= speed / botdef.max_speed;
+                }
+
+                mobile.position += mobile.speed;
+                mobile.position.x = mobile
+                    .position
+                    .x
+                    .max(0.0)
+                    .min(heightmap_phy.width as f32 - 1.0);
+                mobile.position.y = mobile
+                    .position
+                    .y
+                    .max(0.0)
+                    .min(heightmap_phy.height as f32 - 1.0);
+                mobile.position.z = heightmap_phy.z_linear(mobile.position.x, mobile.position.y);
+                mobile.grounded = true;
+                mobile.up = heightmap_phy.normal(mobile.position.x, mobile.position.y);
+
+                let y = -mobile.dir.cross(&mobile.up);
+                let x = y.cross(&mobile.up);
+                mobile.dir = x;
+
+                mobile.weapon0_dir = (mobile.weapon0_dir + mobile.dir).normalize();
+                //w = v/r
+                mobile.wheel0_angle += mobile.speed.norm() / 0.5;
             }
-
-            let diff = (wanted_angle - (current_angle + mobile.angular_velocity.into())).rad;
-
-            mobile.angular_velocity = clamp_abs(
-                mobile.angular_velocity + clamp_abs(diff, botdef.turn_accel),
-                botdef.max_turn_rate,
-            );
-
-            let new_angle = current_angle + mobile.angular_velocity.into();
-            // current_angle.clamp_around(wanted_angle, mobile.angular_velocity.into());
-            mobile.angle = new_angle;
-            let new_dir: Vector2<f32> = new_angle.into();
-            mobile.dir = Vector3::new(new_dir.x, new_dir.y, 0.0);
-
-            //TODO drift factor ?
-            //drift = 1 (adherence = 0)
-            // mobile.speed = mobile.speed + mobile.dir * botdef.accel * dir_intensity;
-            //drift = 0 (adherence = 1)
-
-            let speed_scalar = mobile.speed.xy().magnitude();
-            let thrust = if speed_scalar > 0.01 {
-                dir.normalize().dot(&(mobile.speed.xy() / speed_scalar))
-            } else {
-                1.0
-            };
-
-            let accel = if mobile.move_target != None && thrust > 0.0 {
-                botdef.accel * dir_intensity * thrust
-            } else {
-                -botdef.break_accel * thrust.abs()
-            };
-
-            // arrows.push(Arrow {
-            //     position: mobile.position + Vector3::new(0.0, 0.0, 2.0),
-            //     color: [0.0, 0.0, accel, 0.0],
-            //     end: mobile.position
-            //         + Vector3::new(dir.x, dir.y, 0.0) * 4.0
-            //         + Vector3::new(0.0, 0.0, 2.0),
-            // });
-
-            // arrows.push(Arrow {
-            //     position: mobile.position + Vector3::new(0.0, 0.0, 1.0),
-            //     color: [0.0, 0.0, accel, 0.0],
-            //     end: mobile.position + mobile.dir * accel * 4.0 + Vector3::new(0.0, 0.0, 1.0),
-            // });
-
-            mobile.speed = mobile.dir * (accel + mobile.speed.magnitude()).max(0.0);
-
-            let speed = mobile.speed.magnitude();
-            if speed > botdef.max_speed {
-                mobile.speed /= speed / botdef.max_speed;
-            }
-
-            mobile.position += mobile.speed;
-            mobile.position.x = mobile
-                .position
-                .x
-                .max(0.0)
-                .min(heightmap_phy.width as f32 - 1.0);
-            mobile.position.y = mobile
-                .position
-                .y
-                .max(0.0)
-                .min(heightmap_phy.height as f32 - 1.0);
-            mobile.position.z = heightmap_phy.z_linear(mobile.position.x, mobile.position.y);
-            mobile.grounded = true;
-            mobile.up = heightmap_phy.normal(mobile.position.x, mobile.position.y);
-
-            let y = -mobile.dir.cross(&mobile.up);
-            let x = y.cross(&mobile.up);
-            mobile.dir = x;
-
-            mobile.weapon0_dir = (mobile.weapon0_dir + mobile.dir).normalize();
-            //w = v/r
-            mobile.wheel0_angle += mobile.speed.norm() / 0.5;
         }
     }
     frame_profiler.add("02  movement", start.elapsed());

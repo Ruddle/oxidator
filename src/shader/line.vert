@@ -3,14 +3,14 @@
 layout(location = 0) out vec2 v_TexCoord;
 layout(location = 1) out vec2 v_min;
 layout(location = 2) out vec2 v_max;
-layout(location = 3) out float v_life;
+layout(location = 3) out float v_type;
 layout(location = 4) out float v_count;
 layout(location = 5) out float v_l;
 layout(location = 6) out float v_w;
 
 layout(location = 0) in vec2 min;
 layout(location = 1) in vec2 max;
-layout(location = 2) in float life;
+layout(location = 2) in float type;
 layout(location = 3) in float count;
 
 layout(set = 0, binding = 0) uniform Locals {
@@ -30,7 +30,7 @@ layout(set = 0, binding = 0) uniform Locals {
 void main() {
     v_min = min;
     v_max = max;
-    v_life = life;
+    v_type = type;
     v_count = count;
     v_l = length(max*resolution-min*resolution);
     v_w = 8;
