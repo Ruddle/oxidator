@@ -108,19 +108,11 @@ impl FrameServerCache {
                     botdef_id,
                 } => {
                     //TODO Validate selected are owned by id && botdef_id is constructable by at least 1 selected
-                    // log::debug!(
-                    //     "ConOrder {:?}",
-                    //     FrameEventFromPlayer::ConOrder {
-                    //         id,
-                    //         selected,
-                    //         mouse_world_pos,
-                    //         botdef_id,
-                    //     }
-                    // );
 
                     let botdef = frame.bot_defs.get(&botdef_id).unwrap();
                     let mut m = KBot::new(Point3::from(mouse_world_pos), botdef);
                     m.con_completed = 0.0;
+                    m.life = 1;
 
                     for selected_raw_id in &selected {
                         for kbot in frame.kbots.get_mut(&Id::new(*selected_raw_id)) {
@@ -507,8 +499,13 @@ pub fn update_units(
 
     let start = std::time::Instant::now();
     let mobiles2 = kbots.clone();
-    //Movement compute
 
+    struct BuildPart {
+        amount: i32,
+        to: Id<KBot>,
+    }
+    let mut build_throughputs = Vec::new();
+    //Build compute
     for (id, mobile) in kbots.iter_mut() {
         if mobile.con_completed >= 1.0 {
             // Look at current_command, change move_target if necessary
@@ -521,20 +518,41 @@ pub fn update_units(
                             let botdef = bot_defs.get(&mobile.botdef_id).unwrap();
                             if dist <= botdef.build_dist {
                                 mobile.move_target = None;
+                                build_throughputs.push(BuildPart {
+                                    amount: botdef.build_power,
+                                    to: to_build.id,
+                                })
                             } else {
                                 mobile.move_target = Some(to_build.position);
                             }
                         } else {
                             mobile.current_command = Command::None;
+                            mobile.move_target = None;
                         }
                     }
-                    None => {
-                        mobile.current_command = Command::None;
-                    }
+                    None => {}
                 },
                 _ => {}
             }
+        }
+    }
 
+    for BuildPart { amount, to } in build_throughputs {
+        let kbot = kbots.get_mut(&to).unwrap();
+        let botdef = bot_defs.get(&kbot.botdef_id).unwrap();
+
+        let lambda = amount as f32 / botdef.metal_cost as f32;
+        kbot.life = ((kbot.life as f32 + lambda * botdef.max_life as f32).ceil() as i32)
+            .min(botdef.max_life);
+        kbot.con_completed = (kbot.con_completed + lambda).min(1.0);
+    }
+
+    frame_profiler.add("01b build compute", start.elapsed());
+
+    //Movement compute
+
+    for (id, mobile) in kbots.iter_mut() {
+        if mobile.con_completed >= 1.0 {
             if mobile.speed.magnitude_squared() > 0.001
                 || mobile.move_target.is_some()
                 || !mobile.grounded
