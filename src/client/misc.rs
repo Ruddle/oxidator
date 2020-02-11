@@ -337,6 +337,8 @@ impl App {
                         .extend_from_slice(max.as_slice());
                     self.vertex_attr_buffer_f32.push(life);
                     self.vertex_attr_buffer_f32.push(alpha);
+                    //health
+                    self.vertex_attr_buffer_f32.push(0.0);
 
                     let mut next_bar_offset = Vector2::new(0., -3. * half_size.y);
                     if display_con_completed {
@@ -348,6 +350,9 @@ impl App {
                             .extend_from_slice(max.as_slice());
                         self.vertex_attr_buffer_f32.push(con_completed);
                         self.vertex_attr_buffer_f32.push(alpha);
+                        //con_completed
+                        self.vertex_attr_buffer_f32.push(1.0);
+                        next_bar_offset += Vector2::new(0., -3. * half_size.y);
                     }
                 }
             }

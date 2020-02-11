@@ -10,7 +10,7 @@
   "accel": 0.1,
   "break_accel": 0.3,
   "max_speed": 1.0,
-  "build_power": 1,
+  "build_power": 0.5,
   "build_dist": 10.0,
   "metal_cost": 10,
   "part_tree": {

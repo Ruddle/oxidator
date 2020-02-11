@@ -21,7 +21,7 @@ pub struct BotDef {
     ///m/frame
     pub max_speed: f32,
     ///metal/frame
-    pub build_power: i32,
+    pub build_power: f32,
     ///m
     pub build_dist: f32,
     ///metal

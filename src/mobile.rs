@@ -107,6 +107,7 @@ impl From<f32> for Angle {
 pub enum Command {
     None,
     Build(Id<KBot>),
+    Repair(Id<KBot>),
 }
 
 #[derive(Clone, TypeName, Debug, Serialize, Deserialize, PartialEq)]

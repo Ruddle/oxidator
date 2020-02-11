@@ -501,7 +501,7 @@ pub fn update_units(
     let mobiles2 = kbots.clone();
 
     struct BuildPart {
-        amount: i32,
+        amount: f32,
         to: Id<KBot>,
     }
     let mut build_throughputs = Vec::new();
@@ -542,9 +542,10 @@ pub fn update_units(
         let botdef = bot_defs.get(&kbot.botdef_id).unwrap();
 
         let lambda = amount as f32 / botdef.metal_cost as f32;
-        kbot.life = ((kbot.life as f32 + lambda * botdef.max_life as f32).ceil() as i32)
-            .min(botdef.max_life);
         kbot.con_completed = (kbot.con_completed + lambda).min(1.0);
+        kbot.life = ((kbot.life as f32 + lambda * botdef.max_life as f32).ceil() as i32)
+            .min(botdef.max_life)
+            .min((botdef.max_life as f32 * kbot.con_completed).ceil() as i32);
     }
 
     frame_profiler.add("01b build compute", start.elapsed());

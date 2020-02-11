@@ -26,7 +26,7 @@ impl HealthBarGpu {
             )
             .fill_from_slice(&positions);
 
-        let pipeline = Self::create_pipeline(device, main_bind_group_layout, format).unwrap();;
+        let pipeline = Self::create_pipeline(device, main_bind_group_layout, format).unwrap();
 
         HealthBarGpu {
             instance_buf,
@@ -80,7 +80,7 @@ impl HealthBarGpu {
             depth_stencil_state: None,
             index_format: wgpu::IndexFormat::Uint32,
             vertex_buffers: &[wgpu::VertexBufferDescriptor {
-                stride: (4 * (2 + 2 + 2)) as wgpu::BufferAddress,
+                stride: (4 * (2 + 2 + 2 + 1)) as wgpu::BufferAddress,
                 step_mode: wgpu::InputStepMode::Instance,
                 attributes: &[
                     wgpu::VertexAttributeDescriptor {
@@ -102,6 +102,11 @@ impl HealthBarGpu {
                         format: wgpu::VertexFormat::Float,
                         offset: 4 * 5,
                         shader_location: 3,
+                    },
+                    wgpu::VertexAttributeDescriptor {
+                        format: wgpu::VertexFormat::Float,
+                        offset: 4 * 6,
+                        shader_location: 4,
                     },
                 ],
             }],
@@ -129,7 +134,7 @@ impl HealthBarGpu {
             .fill_from_slice(instance_attr);
 
         std::mem::replace(&mut self.instance_buf, temp_buf);
-        self.instance_count = instance_attr.len() as u32 / 6;
+        self.instance_count = instance_attr.len() as u32 / 7;
     }
 }
 
