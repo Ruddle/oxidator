@@ -450,6 +450,20 @@ impl App {
                                         );
                                     }
                                 }
+                                mobile::Command::Repair(id_builded) => {
+                                    for target_kbot in
+                                        self.game_state.frame_zero.kbots.get(&id_builded)
+                                    {
+                                        add_line(
+                                            view_proj,
+                                            &mut self.vertex_attr_buffer_f32,
+                                            &client_kbot.position,
+                                            &target_kbot.position,
+                                            2.0,
+                                            &mut count,
+                                        );
+                                    }
+                                }
                                 _ => {}
                             }
                         }

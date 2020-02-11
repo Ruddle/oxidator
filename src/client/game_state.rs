@@ -9,6 +9,7 @@ use std::collections::{HashMap, HashSet};
 use std::time::Instant;
 use utils::*;
 
+use super::uitool::UiTool;
 use crate::frame::Player;
 use mobile::*;
 
@@ -48,7 +49,7 @@ pub struct State {
 
     pub selected: HashSet<Id<KBot>>,
     pub under_mouse: Option<Id<KBot>>,
-    pub botdef_selected_for_con: Option<Id<botdef::BotDef>>,
+    pub uitool: UiTool,
 
     pub start_time: Instant,
     pub last_frame: Instant,
@@ -89,7 +90,7 @@ impl State {
 
             selected: HashSet::new(),
             under_mouse: None,
-            botdef_selected_for_con: None,
+            uitool: UiTool::None,
 
             players: HashMap::new(),
             my_player_id: None,

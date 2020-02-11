@@ -35,6 +35,9 @@ void main() {
     else if (v_type ==1 ){
         color = vec3(0,pow(alpha,0.7)*0.5,0.5+ 0.5*pow(alpha,0.7));
     }
+    else if (v_type ==2 ){
+        color = vec3(0,0.5+pow(alpha,0.7)*0.5,0.5+ 0.5*pow(alpha,0.7));
+    }
 
     
     float calpha = pow(1.0/max(v_count-50.0,1.0),0.25);

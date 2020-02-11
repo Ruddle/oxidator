@@ -1,4 +1,5 @@
 use super::client::*;
+use super::uitool::UiTool;
 use crate::frame;
 use crate::frame::FrameEventFromPlayer;
 use crate::frame::Player;
@@ -386,7 +387,7 @@ impl App {
                         }
                     }
                     MainMode::Play => {
-                        let mut botdef_selected_for_con = self.game_state.botdef_selected_for_con;
+                        let mut uitool = self.game_state.uitool;
                         let can_be_built = self
                             .game_state
                             .frame_zero
@@ -404,17 +405,22 @@ impl App {
                                 if ui.small_button(im_str!("Create")) {
                                     //TODO
                                     // self.game_state.botdef_selected_for_con = Some()
-                                    botdef_selected_for_con = can_be_built;
+                                    uitool = UiTool::Spawn(can_be_built.unwrap());
+                                }
+                                if ui.small_button(im_str!("Repair")) {
+                                    //TODO
+                                    // self.game_state.botdef_selected_for_con = Some()
+                                    uitool = UiTool::Repair;
                                 }
                             });
 
-                        if self.game_state.botdef_selected_for_con != botdef_selected_for_con {
+                        if self.game_state.uitool != uitool {
                             log::debug!(
-                                "Con state from {:?} to {:?}",
-                                self.game_state.botdef_selected_for_con,
-                                botdef_selected_for_con
+                                "UiTool state from {:?} to {:?}",
+                                self.game_state.uitool,
+                                uitool
                             );
-                            self.game_state.botdef_selected_for_con = botdef_selected_for_con;
+                            self.game_state.uitool = uitool;
                         }
                     }
                     MainMode::MapEditor => {
@@ -817,31 +823,48 @@ impl App {
             self.game_state.my_player_id,
             self.game_state.mouse_world_pos,
         ) {
-            let player_input = match self.game_state.botdef_selected_for_con {
-                None => FrameEventFromPlayer::MoveOrder {
+            let orders = match self.game_state.uitool {
+                UiTool::Move | UiTool::None => vec![FrameEventFromPlayer::MoveOrder {
                     id,
                     selected: self.game_state.selected.clone(),
                     mouse_world_pos,
-                },
+                }],
 
-                Some(id_to_con) => {
-                    self.game_state.botdef_selected_for_con = None;
+                UiTool::Spawn(id_to_con) => {
+                    self.game_state.uitool = UiTool::None;
 
-                    FrameEventFromPlayer::ConOrder {
+                    vec![FrameEventFromPlayer::ConOrder {
                         id,
                         selected: self.game_state.selected.clone(),
                         mouse_world_pos,
                         botdef_id: id_to_con,
+                    }]
+                }
+
+                UiTool::Repair => {
+                    self.game_state.uitool = UiTool::None;
+
+                    if let Some(under) = self.game_state.under_mouse {
+                        vec![FrameEventFromPlayer::RepairOrder {
+                            id,
+                            selected: self.game_state.selected.clone(),
+                            to_repair: under,
+                        }]
+                    } else {
+                        vec![]
                     }
                 }
+                _ => vec![],
             };
 
-            let order_type = &format!("{:?}", player_input)[..8];
-            log::info!("order {} from {}", order_type, id);
+            for order in orders {
+                let order_type = &format!("{:?}", order)[..8];
+                log::info!("order {} from {}", order_type, id);
 
-            let _ = self
-                .sender_from_client_to_manager
-                .try_send(client::FromClient::PlayerInput(player_input));
+                let _ = self
+                    .sender_from_client_to_manager
+                    .try_send(client::FromClient::PlayerInput(order));
+            }
         }
 
         self.input_state.update();

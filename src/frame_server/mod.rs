@@ -124,6 +124,18 @@ impl FrameServerCache {
                     player.kbots.insert(m.id);
                     frame.kbots.insert(m.id, m);
                 }
+
+                FrameEventFromPlayer::RepairOrder {
+                    id,
+                    selected,
+                    to_repair,
+                } => {
+                    for selected_raw_id in &selected {
+                        for kbot in frame.kbots.get_mut(selected_raw_id) {
+                            kbot.current_command = Command::Repair(to_repair)
+                        }
+                    }
+                }
                 _ => {}
             }
         }
@@ -513,6 +525,29 @@ pub fn update_units(
                 Command::Build(to_build) => match mobiles2.get(&to_build) {
                     Some(to_build) => {
                         if to_build.con_completed < 1.0 {
+                            let dist =
+                                (to_build.position.coords - mobile.position.coords).magnitude();
+                            let botdef = bot_defs.get(&mobile.botdef_id).unwrap();
+                            if dist <= botdef.build_dist {
+                                mobile.move_target = None;
+                                build_throughputs.push(BuildPart {
+                                    amount: botdef.build_power,
+                                    to: to_build.id,
+                                })
+                            } else {
+                                mobile.move_target = Some(to_build.position);
+                            }
+                        } else {
+                            mobile.current_command = Command::None;
+                            mobile.move_target = None;
+                        }
+                    }
+                    None => {}
+                },
+                Command::Repair(to_build) => match mobiles2.get(&to_build) {
+                    Some(to_build) => {
+                        let botdef_of_to_build = bot_defs.get(&to_build.botdef_id).unwrap();
+                        if to_build.life < botdef_of_to_build.max_life {
                             let dist =
                                 (to_build.position.coords - mobile.position.coords).magnitude();
                             let botdef = bot_defs.get(&mobile.botdef_id).unwrap();

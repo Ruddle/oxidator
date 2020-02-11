@@ -35,6 +35,11 @@ impl Player {
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub enum FrameEventFromPlayer {
+    RepairOrder {
+        id: Id<Player>,
+        selected: HashSet<Id<KBot>>,
+        to_repair: Id<KBot>,
+    },
     ConOrder {
         id: Id<Player>,
         selected: HashSet<Id<KBot>>,

@@ -25,6 +25,7 @@ mod input_state;
 mod misc;
 mod play;
 mod render;
+mod uitool;
 
 use crate::heightmap_phy;
 use log::info;
