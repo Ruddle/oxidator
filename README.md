@@ -48,7 +48,7 @@ the test for this goal would be to be able implement a [Zero-k](https://zero-k.i
 
 * Deterministic engine: that makes multithreading less efficient and harder. It has nice properties (low file size for replay, debugging) but for my goals they are not worth their price. It is usually done to make networking easier and extremely low bandwidth (because peers only have to share player inputs). I have a plan to keep 80% of those properties with a non-deterministic engine (for 20% the price in dev time). 
 
-* Replacing [Spring Engine](https://springrts.com/): This engine will be far more constrained than spring for performance and time reason. Their will not be a scripting language like Lua to mod. However I will make sure everything that has been done in the most popular mods of spring will be doable here. 
+* Replacing [Spring Engine](https://springrts.com/): This engine will be far more constrained than spring for performance and time reason. There will not be a scripting language like Lua to mod. However I will make sure everything that has been done in the most popular mods of spring will be doable here. 
 
 ## Features
 
@@ -97,16 +97,17 @@ the test for this goal would be to be able implement a [Zero-k](https://zero-k.i
     - [x] working draft of collision detection
     - [x] working draft of flock behavior
     - [x] basic health and damage computation
+    - [x] construction and repair
     - [ ] detection (visual and radar)
     - [ ] user-defined AI for units (follow target, formation, flee, target selection etc)
-    - [ ] construction 
     - [ ] resource counting
     - [ ] integrating pathfinding (I already built a working flowfield pathfinding [here](https://github.com/Ruddle/rustfield))
     
 - UI
-    - [x] select units
+    - [x] select units (picking and rectangle selection)
     - [x] give move order
-    - [x] display current move order (Hold LShift)
+    - [x] give build order
+    - [x] display current order (Hold LShift)
     - [ ] give user defined, unit specific order
     - [ ] display info about game state (current resources etc)
     - [ ] display info about selected units
