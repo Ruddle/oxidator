@@ -547,7 +547,9 @@ pub fn update_units(
                 Command::Repair(to_build) => match mobiles2.get(&to_build) {
                     Some(to_build) => {
                         let botdef_of_to_build = bot_defs.get(&to_build.botdef_id).unwrap();
-                        if to_build.life < botdef_of_to_build.max_life {
+                        if to_build.life < botdef_of_to_build.max_life
+                            || to_build.con_completed < 1.0
+                        {
                             let dist =
                                 (to_build.position.coords - mobile.position.coords).magnitude();
                             let botdef = bot_defs.get(&mobile.botdef_id).unwrap();

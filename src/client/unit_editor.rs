@@ -27,6 +27,7 @@ impl UnitEditor {
 
         let botdef = botdef::BotDef {
             id: utils::rand_id(),
+            file_path: "src/asset/test.json".to_owned(),
             radius: 0.5,
             max_life: 100,
             turn_accel: 1.5,
@@ -93,14 +94,15 @@ impl App {
             unit_editor.asset_dir_cached = FileTree::new(path.to_owned());
         }
 
-        let window = imgui::Window::new(im_str!("Unit Editor"));
-        window
-            .size([400.0, 600.0], imgui::Condition::FirstUseEver)
-            .position([3.0, 115.0], imgui::Condition::FirstUseEver)
+        let window_editor = imgui::Window::new(im_str!("Unit Editor"));
+        window_editor
+            .size([400.0, 700.0], imgui::Condition::FirstUseEver)
+            .position([3.0, 12.0], imgui::Condition::FirstUseEver)
             .collapsed(false, imgui::Condition::FirstUseEver)
             .build(&ui, || {
                 let BotDef {
                     id,
+                    file_path,
                     radius,
                     max_life,
                     turn_accel,
@@ -113,6 +115,8 @@ impl App {
                     metal_cost,
                     part_tree,
                 } = &unit_editor.botdef;
+
+                let file_path = file_path.clone();
 
                 let to_rev = 0.5 / std::f32::consts::PI;
                 let to_rad = 1.0 / to_rev;
@@ -195,19 +199,26 @@ impl App {
                 );
 
                 if ui.button(im_str!("load"), [0.0, 0.0]) {
-                    Self::load_botdef_in_editor(
-                        "src/asset/botdef/unit_example.json",
-                        unit_editor,
-                        unit_part_gpu,
-                    );
+                    Self::load_botdef_in_editor(&file_path, unit_editor, unit_part_gpu);
                 }
                 if ui.button(im_str!("save"), [0.0, 0.0]) {
-                    Self::save_botdef_on_disk(
-                        &unit_editor.botdef,
-                        "src/asset/botdef/unit_example.json",
-                    );
+                    Self::save_botdef_on_disk(&unit_editor.botdef, &file_path);
                     log::info!("Saving {:?}", unit_editor.botdef.part_tree);
                 }
+            });
+
+        let window_selector = imgui::Window::new(im_str!("Unit Selector"));
+        window_selector
+            .size([400.0, 200.0], imgui::Condition::FirstUseEver)
+            .position([400.0, 3.0], imgui::Condition::FirstUseEver)
+            .collapsed(false, imgui::Condition::FirstUseEver)
+            .build(&ui, || {
+                Self::visit_dirs_for_selection(
+                    &unit_editor.asset_dir_cached.clone(),
+                    ui,
+                    unit_editor,
+                    unit_part_gpu,
+                );
             });
     }
 
@@ -219,6 +230,7 @@ impl App {
             .read(true)
             .write(true)
             .create(true)
+            .truncate(true)
             .open(path)
             .unwrap();
         let mut buf_w = BufWriter::new(file);
@@ -274,7 +286,6 @@ impl App {
     ) {
         {
             if !is_root {
-                ui.same_line(0.0);
                 if ui.button(im_str!("remove##{:?}", part_tree.id).as_ref(), [0.0, 0.0]) {
                     let deleter = unit_editor.botdef.part_tree.remove_node(part_tree.id);
                 }
@@ -592,6 +603,46 @@ impl App {
                             unit_part_gpu,
                             id_to_mesh_replace,
                         );
+                    }
+                });
+            }
+        }
+    }
+
+    fn visit_dirs_for_selection(
+        dir: &FileTree,
+        ui: &Ui,
+        unit_editor: &mut UnitEditor,
+        unit_part_gpu: &mut UnitPartGpu,
+    ) {
+        match dir {
+            FileTree::Unknown => {
+                ui.text(im_str!("Error reading asset file"));
+            }
+            FileTree::Leaf { path } => {
+                let file_name = path.file_name().unwrap();
+                let extension = path.extension().unwrap();
+                if extension == "json" {
+                    ui.text(im_str!("{:?}", file_name));
+                    ui.same_line(0.0);
+
+                    if ui.small_button(im_str!("load##{:?}", path).as_ref()) {
+                        log::debug!("load botdef {:?}", path);
+                        Self::load_botdef_in_editor(
+                            path.to_str().unwrap(),
+                            unit_editor,
+                            unit_part_gpu,
+                        );
+                    }
+                }
+            }
+            FileTree::Node { path, children } => {
+                ui.tree_node(
+                    im_str!("{:?}", path.components().last().unwrap().as_os_str()).as_ref(),
+                )
+                .build(|| {
+                    for child in children {
+                        Self::visit_dirs_for_selection(&child, ui, unit_editor, unit_part_gpu);
                     }
                 });
             }

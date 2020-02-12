@@ -1,0 +1,95 @@
+{
+  "id": {
+    "value": 1441884615969752781,
+    "phantom": null
+  },
+  "file_path": "./src/asset/botdef/building_example.json",
+  "radius": 0.5,
+  "max_life": 1000,
+  "turn_accel": 0.0,
+  "max_turn_rate": 0.0,
+  "accel": 0.0,
+  "break_accel": 0.0,
+  "max_speed": 0.0,
+  "build_power": 0.5,
+  "build_dist": 10.0,
+  "metal_cost": 100,
+  "part_tree": {
+    "id": {
+      "value": 19713591288447385,
+      "phantom": null
+    },
+    "placed_mesh": null,
+    "placed_collider": null,
+    "parent_to_self": [
+      1.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      1.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      1.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      1.0
+    ],
+    "joint": "Fix",
+    "children": [
+      {
+        "id": {
+          "value": 6444314735306398051,
+          "phantom": null
+        },
+        "placed_mesh": {
+          "trans": [
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "mesh_path": "./src/asset/cube.obj",
+          "mesh_index": 0
+        },
+        "placed_collider": null,
+        "parent_to_self": [
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        "joint": "Fix",
+        "children": []
+      }
+    ]
+  }
+}

@@ -7,6 +7,7 @@ use utils::Id;
 #[derive(Clone, TypeName, Debug, Serialize, Deserialize, PartialEq)]
 pub struct BotDef {
     pub id: Id<BotDef>,
+    pub file_path: String,
     pub radius: f32,
     pub max_life: i32,
     //Movement

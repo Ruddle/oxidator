@@ -3,6 +3,7 @@
     "value": 14418846159697527818,
     "phantom": null
   },
+  "file_path": "./src/asset/botdef/unit_example.json",
   "radius": 0.5,
   "max_life": 100,
   "turn_accel": 0.44440976,

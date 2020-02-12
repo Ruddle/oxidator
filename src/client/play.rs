@@ -24,7 +24,10 @@ impl App {
 
                 let mut kbots = HashMap::new();
 
-                let tank_example = self.unit_editor.botdef.clone();
+                let tank_example =
+                    Self::load_botdef_on_disk("src/asset/botdef/unit_example.json").unwrap();
+                let building_example =
+                    Self::load_botdef_on_disk("src/asset/botdef/building_example.json").unwrap();
 
                 for i in (100..300).step_by(4) {
                     for j in (100..500).step_by(4) {
@@ -62,6 +65,7 @@ impl App {
 
                 let mut bot_defs = HashMap::new();
                 bot_defs.insert(tank_example.id, tank_example);
+                bot_defs.insert(building_example.id, building_example);
 
                 let mut moddef = crate::moddef::ModDef {
                     units_id: bot_defs.keys().copied().collect(),

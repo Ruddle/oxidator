@@ -388,28 +388,31 @@ impl App {
                     }
                     MainMode::Play => {
                         let mut uitool = self.game_state.uitool;
-                        let can_be_built = self
+                        let can_be_built: Vec<_> = self
                             .game_state
                             .frame_zero
                             .moddef
                             .units_id
                             .iter()
-                            .next()
-                            .cloned();
+                            .cloned()
+                            .collect();
+
+                        let can_be_built = &self.game_state.frame_zero.bot_defs;
+
                         let command_window = imgui::Window::new(im_str!("Command"));
                         command_window
                             .size([400.0, 300.0], imgui::Condition::FirstUseEver)
                             .position([3.0, 415.0], imgui::Condition::FirstUseEver)
                             .collapsed(false, imgui::Condition::FirstUseEver)
                             .build(&ui, || {
-                                if ui.small_button(im_str!("Create")) {
-                                    //TODO
-                                    // self.game_state.botdef_selected_for_con = Some()
-                                    uitool = UiTool::Spawn(can_be_built.unwrap());
+                                for can_be_built in can_be_built {
+                                    let txt = format!("Build {:?}", can_be_built.1.file_path);
+                                    if ui.small_button(&im_str!("{:?}", txt)) {
+                                        uitool = UiTool::Spawn(can_be_built.0.clone());
+                                    }
                                 }
+
                                 if ui.small_button(im_str!("Repair")) {
-                                    //TODO
-                                    // self.game_state.botdef_selected_for_con = Some()
                                     uitool = UiTool::Repair;
                                 }
                             });
