@@ -396,7 +396,10 @@ impl App {
             {
                 let cursor_icon_size = 48;
                 let cursor_icon_size_half = cursor_icon_size / 2;
+                let cursor_icon_size_third = cursor_icon_size / 3;
                 let (x, y) = self.input_state.cursor_pos;
+
+                let (x, y) = (x + cursor_icon_size_third, y - cursor_icon_size_third);
 
                 let min_screen = Vector2::new(
                     (x - cursor_icon_size_half) as f32 / self.gpu.sc_desc.width as f32,
@@ -406,12 +409,26 @@ impl App {
                     (x + cursor_icon_size_half) as f32 / self.gpu.sc_desc.width as f32,
                     (y + cursor_icon_size_half) as f32 / self.gpu.sc_desc.height as f32,
                 );
-                let min_texture = Vector2::new(0.0, 0.0);
+                let mut min_texture = Vector2::new(0.0, 0.0);
                 let mut max_texture = Vector2::new(0.0, 0.0);
+
+                let mut index_to_vector = |x, y| {
+                    min_texture = Vector2::new(x as f32 * 0.25, y as f32 * 0.25);
+                    max_texture = min_texture + Vector2::new(0.25, 0.25);
+                };
 
                 match self.game_state.uitool {
                     UiTool::Repair => {
-                        max_texture = Vector2::new(1.0, 1.0);
+                        index_to_vector(0, 0);
+                    }
+                    UiTool::Spawn(..) => {
+                        index_to_vector(1, 0);
+                    }
+                    UiTool::Guard => {
+                        index_to_vector(2, 1);
+                    }
+                    UiTool::Attack => {
+                        index_to_vector(1, 1);
                     }
                     _ => {}
                 }

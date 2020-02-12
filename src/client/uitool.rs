@@ -6,5 +6,7 @@ pub enum UiTool {
     None,
     Move,
     Repair,
+    Guard,
+    Attack,
     Spawn(Id<botdef::BotDef>),
 }

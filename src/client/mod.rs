@@ -399,7 +399,7 @@ impl App {
             &gpu.device,
             format,
             &bind_group_layout,
-            crate::utils::ImageRGBA8::open("./src/asset/repair.png"),
+            crate::utils::ImageRGBA8::open("./src/asset/cursor_icons.png"),
         );
 
         let unit_icon =
