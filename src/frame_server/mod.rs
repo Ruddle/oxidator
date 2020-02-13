@@ -5,8 +5,8 @@ use crate::heightmap_phy;
 use crate::mobile::*;
 use crate::utils::*;
 use crossbeam_channel::{Receiver, Sender};
+use fnv::{FnvHashMap, FnvHashSet};
 use na::{Matrix4, Point3, Vector2, Vector3};
-use std::collections::{HashMap, HashSet};
 use std::time::Instant;
 
 pub enum ToFrameServer {
@@ -177,8 +177,8 @@ impl FrameServerCache {
 
 pub fn update_mobile_target(
     mouse_world_pos: Vector3<f32>,
-    selected: &HashSet<Id<KBot>>,
-    kbots: &mut HashMap<Id<KBot>, KBot>,
+    selected: &FnvHashSet<Id<KBot>>,
+    kbots: &mut FnvHashMap<Id<KBot>, KBot>,
 ) {
     let selected_count = selected.len();
     let formation_w = (selected_count as f32).sqrt().ceil() as i32;
@@ -250,19 +250,19 @@ pub fn update_mobile_target(
 
 pub fn update_units(
     frame_profiler: &mut ProfilerMap,
-    kbots: &mut HashMap<Id<KBot>, KBot>,
-    kbots_dead: &mut HashSet<Id<KBot>>,
+    kbots: &mut FnvHashMap<Id<KBot>, KBot>,
+    kbots_dead: &mut FnvHashSet<Id<KBot>>,
     kinematic_projectiles_dead: &mut Vec<Id<KinematicProjectile>>,
     kinematic_projectiles_birth: &mut Vec<KinematicProjectile>,
-    kinematic_projectiles: &mut HashMap<Id<KinematicProjectile>, KinematicProjectile>,
+    kinematic_projectiles: &mut FnvHashMap<Id<KinematicProjectile>, KinematicProjectile>,
     heightmap_phy: &heightmap_phy::HeightmapPhy,
     arrows: &mut Vec<Arrow>,
     frame_count: i32,
-    players: &HashMap<Id<Player>, Player>,
+    players: &FnvHashMap<Id<Player>, Player>,
     grid: &mut Vec<Vec<Id<KBot>>>,
     small_grid: &mut Vec<Vec<Id<KBot>>>,
     explosions: &mut Vec<ExplosionEvent>,
-    bot_defs: &HashMap<Id<botdef::BotDef>, botdef::BotDef>,
+    bot_defs: &FnvHashMap<Id<botdef::BotDef>, botdef::BotDef>,
 ) {
     let start = std::time::Instant::now();
     let cell_size = 4;
@@ -381,7 +381,7 @@ pub fn update_units(
                         //Checking collision with current_interp
                         let indices = index_aabb(current_interp, proj.radius, cell_size, grid_w);
 
-                        let kbots_in_proximity: HashSet<_> = indices
+                        let kbots_in_proximity: FnvHashSet<_> = indices
                             .iter()
                             .map(|index| small_grid[*index].clone())
                             .flatten()
@@ -424,12 +424,13 @@ pub fn update_units(
 
     //Projectile fire compute
     {
-        let teams: HashSet<_> = players.values().map(|p| p.team).collect();
+        let teams: FnvHashSet<_> = players.values().map(|p| p.team).collect();
 
         let start = std::time::Instant::now();
         //TODO cache
 
-        let mut id_to_team: HashMap<Id<KBot>, u8> = HashMap::with_capacity(kbots.len());
+        let mut id_to_team: FnvHashMap<Id<KBot>, u8> =
+            FnvHashMap::with_capacity_and_hasher(kbots.len(), Default::default());
 
         for team in teams.iter() {
             let team_players: Vec<_> = players.values().filter(|e| &e.team == team).collect();
@@ -740,7 +741,7 @@ pub fn update_units(
 fn avoid_neighbors_force(
     me: &KBot,
     neighbors_id: Vec<Id<KBot>>,
-    kbots: &HashMap<Id<KBot>, KBot>,
+    kbots: &FnvHashMap<Id<KBot>, KBot>,
 ) -> Vector2<f32> {
     // could be speed/ brake
     // let prediction = 1.0;

@@ -6,8 +6,9 @@ use crate::botdef;
 use crate::mobile;
 use crate::moddef;
 use crate::utils;
+use fnv::{FnvHashMap, FnvHashSet};
+use std::collections::HashMap;
 use na::{Point3, Vector3};
-use std::collections::{HashMap, HashSet};
 use std::time::Duration;
 
 use crate::unit;
@@ -18,7 +19,7 @@ use utils::*;
 #[derive(Clone, TypeName, Debug, Serialize, Deserialize, PartialEq)]
 pub struct Player {
     pub id: Id<Player>,
-    pub kbots: HashSet<Id<KBot>>,
+    pub kbots: FnvHashSet<Id<KBot>>,
     pub team: u8,
 }
 
@@ -27,7 +28,7 @@ impl Player {
         let id = utils::rand_id();
         Player {
             id,
-            kbots: HashSet::new(),
+            kbots: FnvHashSet::default(),
             team: 0,
         }
     }
@@ -37,18 +38,18 @@ impl Player {
 pub enum FrameEventFromPlayer {
     RepairOrder {
         id: Id<Player>,
-        selected: HashSet<Id<KBot>>,
+        selected: FnvHashSet<Id<KBot>>,
         to_repair: Id<KBot>,
     },
     ConOrder {
         id: Id<Player>,
-        selected: HashSet<Id<KBot>>,
+        selected: FnvHashSet<Id<KBot>>,
         mouse_world_pos: Vector3<f32>,
         botdef_id: Id<botdef::BotDef>,
     },
     MoveOrder {
         id: Id<Player>,
-        selected: HashSet<Id<KBot>>,
+        selected: FnvHashSet<Id<KBot>>,
         mouse_world_pos: Vector3<f32>,
     },
     ReplaceFrame(Frame),
@@ -101,18 +102,18 @@ pub struct FrameUpdate {
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct Frame {
     // relevant to send to client on change
-    pub kinematic_projectiles: HashMap<Id<KinematicProjectile>, KinematicProjectile>,
+    pub kinematic_projectiles: FnvHashMap<Id<KinematicProjectile>, KinematicProjectile>,
     pub arrows: Vec<Arrow>,
     pub heightmap_phy: Option<heightmap_phy::HeightmapPhy>,
-    pub players: HashMap<Id<Player>, Player>,
-    pub kbots: HashMap<Id<KBot>, KBot>,
+    pub players: FnvHashMap<Id<Player>, Player>,
+    pub kbots: FnvHashMap<Id<KBot>, KBot>,
     pub moddef: moddef::ModDef,
     // relevant to send to client once
-    pub bot_defs: HashMap<Id<botdef::BotDef>, botdef::BotDef>,
+    pub bot_defs: FnvHashMap<Id<botdef::BotDef>, botdef::BotDef>,
     // relevant to send to client always
     pub number: i32,
     pub explosions: Vec<ExplosionEvent>,
-    pub kbots_dead: HashSet<Id<KBot>>,
+    pub kbots_dead: FnvHashSet<Id<KBot>>,
     pub kinematic_projectiles_dead: Vec<Id<KinematicProjectile>>,
     pub kinematic_projectiles_birth: Vec<KinematicProjectile>,
     pub frame_profiler: ProfilerMap,
@@ -122,18 +123,18 @@ impl Frame {
     pub fn new() -> Self {
         Frame {
             number: 0,
-            players: HashMap::new(),
+            players: FnvHashMap::default(),
             moddef: moddef::ModDef::new(),
-            kbots: HashMap::new(),
-            kinematic_projectiles: HashMap::new(),
+            kbots: FnvHashMap::default(),
+            kinematic_projectiles: FnvHashMap::default(),
             arrows: Vec::new(),
             explosions: Vec::new(),
             heightmap_phy: None,
             frame_profiler: ProfilerMap::new(),
-            kbots_dead: HashSet::new(),
+            kbots_dead: FnvHashSet::default(),
             kinematic_projectiles_dead: Vec::new(),
             kinematic_projectiles_birth: Vec::new(),
-            bot_defs: HashMap::new(),
+            bot_defs: FnvHashMap::default(),
         }
     }
 }

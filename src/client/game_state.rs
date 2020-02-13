@@ -4,8 +4,8 @@ use crate::botdef;
 use crate::frame::Frame;
 use crate::mobile;
 use crate::utils;
+use fnv::{FnvHashMap, FnvHashSet};
 use na::{Matrix4, Point3, Vector2, Vector3};
-use std::collections::{HashMap, HashSet};
 use std::time::Instant;
 use utils::*;
 
@@ -44,10 +44,10 @@ pub struct State {
     pub server_sec: f32,
     //Extrapolated from events
     pub explosions: Vec<Explosion>,
-    pub kinematic_projectiles_cache: HashMap<Id<KinematicProjectile>, KinematicProjectile>,
+    pub kinematic_projectiles_cache: FnvHashMap<Id<KinematicProjectile>, KinematicProjectile>,
     pub kinematic_projectiles: Vec<Point3<f32>>,
 
-    pub selected: HashSet<Id<KBot>>,
+    pub selected: FnvHashSet<Id<KBot>>,
     pub under_mouse: Option<Id<KBot>>,
     pub uitool: UiTool,
 
@@ -56,7 +56,7 @@ pub struct State {
 
     pub my_player_id: Option<Id<Player>>,
 
-    pub players: HashMap<Id<Player>, Player>,
+    pub players: FnvHashMap<Id<Player>, Player>,
 
     pub fps: u64,
 
@@ -82,17 +82,17 @@ impl State {
             frame_zero_time_received: Instant::now(),
 
             kbots: Vec::new(),
-            kinematic_projectiles_cache: HashMap::new(),
+            kinematic_projectiles_cache: FnvHashMap::default(),
             kinematic_projectiles: Vec::new(),
 
             explosions: Vec::new(),
             server_sec: 0.0,
 
-            selected: HashSet::new(),
+            selected: FnvHashSet::default(),
             under_mouse: None,
             uitool: UiTool::None,
 
-            players: HashMap::new(),
+            players: FnvHashMap::default(),
             my_player_id: None,
 
             start_time: Instant::now(),

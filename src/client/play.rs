@@ -3,12 +3,11 @@ use crate::botdef;
 use crate::frame::FrameEventFromPlayer;
 use crate::frame::Player;
 use crate::*;
+use fnv::{FnvHashMap, FnvHashSet};
 use imgui::*;
 use mobile::*;
 use na::{Isometry3, Matrix4, Point3, Vector2, Vector3, Vector4};
-use std::collections::{HashMap, HashSet};
 use std::time::{Duration, Instant};
-
 use utils::*;
 
 impl App {
@@ -22,7 +21,7 @@ impl App {
 
                 let mut player_me = Player::new();
 
-                let mut kbots = HashMap::new();
+                let mut kbots = FnvHashMap::default();
 
                 let tank_example =
                     Self::load_botdef_on_disk("src/asset/botdef/unit_example.json").unwrap();
@@ -63,13 +62,13 @@ impl App {
                     .players
                     .insert(player_ennemy.id, player_ennemy);
 
-                let mut bot_defs = HashMap::new();
+                let mut bot_defs = FnvHashMap::default();
                 bot_defs.insert(tank_example.id, tank_example);
                 bot_defs.insert(building_example.id, building_example);
 
                 let mut moddef = crate::moddef::ModDef {
                     units_id: bot_defs.keys().copied().collect(),
-                    con_map: HashMap::new(),
+                    con_map: FnvHashMap::default(),
                 };
 
                 let replacer = FrameEventFromPlayer::ReplaceFrame(frame::Frame {
@@ -77,7 +76,7 @@ impl App {
                     players: self.game_state.players.clone(),
                     moddef,
                     kbots,
-                    kbots_dead: HashSet::new(),
+                    kbots_dead: HashSet::default(),
                     kinematic_projectiles_dead: Vec::new(),
                     kinematic_projectiles_birth: Vec::new(),
                     kinematic_projectiles: self.game_state.kinematic_projectiles_cache.clone(),
@@ -182,7 +181,7 @@ impl App {
                     let min_y = (y0.min(y1) as f32 / self.gpu.sc_desc.height as f32) * 2.0 - 1.0;
                     let max_x = (x0.max(x1) as f32 / self.gpu.sc_desc.width as f32) * 2.0 - 1.0;
                     let max_y = (y0.max(y1) as f32 / self.gpu.sc_desc.height as f32) * 2.0 - 1.0;
-                    let selected: HashSet<utils::Id<KBot>> = self
+                    let selected: FnvHashSet<utils::Id<KBot>> = self
                         .game_state
                         .kbots
                         .iter()
