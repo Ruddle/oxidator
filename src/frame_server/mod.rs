@@ -110,7 +110,8 @@ impl FrameServerCache {
                     //TODO Validate selected are owned by id && botdef_id is constructable by at least 1 selected
 
                     let botdef = frame.bot_defs.get(&botdef_id).unwrap();
-                    let mut m = KBot::new(Point3::from(mouse_world_pos), botdef);
+                    let mut m = KBot::new(Point3::from(mouse_world_pos), botdef, id);
+                    m.team = frame.players.get(&id).unwrap().team;
                     m.con_completed = 0.0;
                     m.life = 1;
 
@@ -157,7 +158,7 @@ impl FrameServerCache {
                 heightmap,
                 &mut arrows,
                 frame.number,
-                &frame.players,
+                &mut frame.players,
                 &mut self.grid,
                 &mut self.small_grid,
                 &mut frame.explosions,
@@ -258,7 +259,7 @@ pub fn update_units(
     heightmap_phy: &heightmap_phy::HeightmapPhy,
     arrows: &mut Vec<Arrow>,
     frame_count: i32,
-    players: &FnvHashMap<Id<Player>, Player>,
+    players: &mut FnvHashMap<Id<Player>, Player>,
     grid: &mut Vec<Vec<Id<KBot>>>,
     small_grid: &mut Vec<Vec<Id<KBot>>>,
     explosions: &mut Vec<ExplosionEvent>,
@@ -514,7 +515,10 @@ pub fn update_units(
     let mobiles2 = kbots.clone();
 
     struct BuildPart {
-        amount: f32,
+        amount: f64,
+        repair: bool,
+        player: Id<Player>,
+        from: Id<KBot>,
         to: Id<KBot>,
     }
     let mut build_throughputs = Vec::new();
@@ -532,7 +536,10 @@ pub fn update_units(
                             if dist <= botdef.build_dist {
                                 mobile.move_target = None;
                                 build_throughputs.push(BuildPart {
-                                    amount: botdef.build_power,
+                                    amount: botdef.build_power as f64,
+                                    repair: false,
+                                    player: mobile.player_id,
+                                    from: *id,
                                     to: to_build.id,
                                 })
                             } else {
@@ -557,7 +564,10 @@ pub fn update_units(
                             if dist <= botdef.build_dist {
                                 mobile.move_target = None;
                                 build_throughputs.push(BuildPart {
-                                    amount: botdef.build_power,
+                                    amount: botdef.build_power as f64,
+                                    repair: to_build.con_completed >= 1.0,
+                                    player: mobile.player_id,
+                                    from: *id,
                                     to: to_build.id,
                                 })
                             } else {
@@ -575,14 +585,94 @@ pub fn update_units(
         }
     }
 
-    for BuildPart { amount, to } in build_throughputs {
+    //Compute resource usage for each player
+    struct ResourceUsage {
+        metal: f64,
+        energy: f64,
+    }
+    let mut resources_usage = FnvHashMap::<Id<Player>, ResourceUsage>::default();
+
+    for BuildPart {
+        amount,
+        to,
+        repair,
+        from,
+        player,
+    } in build_throughputs.iter()
+    {
+        let stat = resources_usage.entry(*player).or_insert(ResourceUsage {
+            metal: 0.0,
+            energy: 0.0,
+        });
+        *stat = ResourceUsage {
+            metal: stat.metal + if *repair { 0.0 } else { *amount as f64 },
+            energy: 0.0,
+        };
+    }
+    //Compute what proportion of usage is usable without negative stock
+    struct ResourceUsagePropMax {
+        metal: f64,
+        energy: f64,
+    }
+    let mut usage_props_max = FnvHashMap::<Id<Player>, ResourceUsagePropMax>::default();
+    for (player_id, player) in players.iter_mut() {
+        if let Some(ru) = resources_usage.get(player_id) {
+            let current_metal_stock = player.metal;
+            let current_energy_stock = player.energy;
+
+            let metal_needed = ru.metal;
+            let energy_needed = ru.energy;
+
+            //TODO Energy count too
+            let metal_prop_max: f64 = (current_metal_stock / metal_needed)
+                .min(current_energy_stock / energy_needed)
+                .min(1.0);
+            usage_props_max.insert(
+                *player_id,
+                ResourceUsagePropMax {
+                    metal: metal_prop_max,
+                    energy: 1.0,
+                },
+            );
+
+            player.metal = (player.metal - metal_needed * metal_prop_max).max(0.0);
+        }
+    }
+
+    //SYNC beause we modify player directly instead of creating another step next
+    //Compute build percent for each unit, refund player for overcost
+    struct ResourceSurplus {
+        metal: f64,
+        energy: f64,
+    }
+
+    let mut resources_surplus = FnvHashMap::<Id<Player>, ResourceSurplus>::default();
+    for BuildPart {
+        amount,
+        to,
+        from,
+        player,
+        repair,
+    } in build_throughputs
+    {
         let kbot = kbots.get_mut(&to).unwrap();
         let botdef = bot_defs.get(&kbot.botdef_id).unwrap();
+        let metal_available = amount * usage_props_max.get(&player).unwrap().metal;
+        let metal_needed = (1.0 - kbot.con_completed as f64) * botdef.metal_cost as f64;
+        let mut metal_used = metal_available;
+        if metal_needed > metal_available {
+            let metal_built =
+                metal_available + kbot.con_completed as f64 * botdef.metal_cost as f64;
 
-        let lambda = amount as f32 / botdef.metal_cost as f32;
-        kbot.con_completed = (kbot.con_completed + lambda).min(1.0);
+            kbot.con_completed = (metal_built / botdef.metal_cost as f64) as f32;
+        } else {
+            let metal_not_used = metal_available - metal_needed;
+            metal_used = metal_available - metal_not_used;
+            players.get_mut(&player).unwrap().metal += metal_not_used;
+            kbot.con_completed = 1.0;
+        }
+        let lambda = metal_used as f32 / botdef.metal_cost as f32;
         kbot.life = ((kbot.life as f32 + lambda * botdef.max_life as f32).ceil() as i32)
-            .min(botdef.max_life)
             .min((botdef.max_life as f32 * kbot.con_completed).ceil() as i32);
     }
 

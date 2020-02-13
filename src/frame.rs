@@ -7,8 +7,8 @@ use crate::mobile;
 use crate::moddef;
 use crate::utils;
 use fnv::{FnvHashMap, FnvHashSet};
-use std::collections::HashMap;
 use na::{Point3, Vector3};
+use std::collections::HashMap;
 use std::time::Duration;
 
 use crate::unit;
@@ -21,6 +21,8 @@ pub struct Player {
     pub id: Id<Player>,
     pub kbots: FnvHashSet<Id<KBot>>,
     pub team: u8,
+    pub metal: f64,
+    pub energy: f64,
 }
 
 impl Player {
@@ -30,6 +32,8 @@ impl Player {
             id,
             kbots: FnvHashSet::default(),
             team: 0,
+            metal: 500.0,
+            energy: 500.0,
         }
     }
 }

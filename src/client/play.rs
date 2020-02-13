@@ -20,6 +20,8 @@ impl App {
                 self.game_state.dir = Vector3::new(0.0, 0.3, -1.0);
 
                 let mut player_me = Player::new();
+                let mut player_ennemy = Player::new();
+                player_ennemy.team = 1;
 
                 let mut kbots = FnvHashMap::default();
 
@@ -33,6 +35,7 @@ impl App {
                         let m = mobile::KBot::new(
                             Point3::new(i as f32, j as f32, 100.0),
                             &tank_example,
+                            player_me.id,
                         );
                         player_me.kbots.insert(m.id);
                         kbots.insert(m.id, m);
@@ -47,6 +50,7 @@ impl App {
                         let mut m = mobile::KBot::new(
                             Point3::new(i as f32, j as f32, 100.0),
                             &tank_example,
+                            player_ennemy.id,
                         );
                         m.team = 1;
                         player_ennemy.kbots.insert(m.id);

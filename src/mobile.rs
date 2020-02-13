@@ -1,3 +1,4 @@
+use super::frame::Player;
 use crate::botdef;
 use crate::unit;
 use crate::utils;
@@ -123,7 +124,8 @@ pub struct KBot {
     pub current_command: Command,
     pub life: i32,
     pub con_completed: f32,
-    pub team: i32,
+    pub player_id: Id<Player>,
+    pub team: u8,
     pub grounded: bool,
     pub frame_last_shot: i32,
     pub weapon0_dir: Vector3<f32>,
@@ -133,10 +135,11 @@ pub struct KBot {
 }
 
 impl KBot {
-    pub fn new(position: Point3<f32>, botdef: &botdef::BotDef) -> Self {
+    pub fn new(position: Point3<f32>, botdef: &botdef::BotDef, player_id: Id<Player>) -> Self {
         KBot {
             position,
             speed: Vector3::new(0.0, 0.0, 0.0),
+            player_id,
             team: 0,
             dir: Vector3::new(1.0, 0.0, 0.0),
             angle: Angle::new(0.0),

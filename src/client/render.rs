@@ -387,6 +387,20 @@ impl App {
                         }
                     }
                     MainMode::Play => {
+                        if let Some(me) = self.game_state.my_player() {
+                            let resource_window = imgui::Window::new(im_str!("Resources"));
+                            resource_window
+                                .size([400.0, 120.0], imgui::Condition::FirstUseEver)
+                                .position([500.0, 3.0], imgui::Condition::FirstUseEver)
+                                .collapsed(false, imgui::Condition::FirstUseEver)
+                                .build(&ui, || {
+                                    ui.text(im_str!("metal: {:.1}", me.metal));
+                                    ProgressBar::new((me.metal / 500.0) as f32).build(&ui);
+                                    ui.text(im_str!("energy: {:.1}", me.energy));
+                                    ProgressBar::new((me.energy / 500.0) as f32).build(&ui);
+                                });
+                        }
+
                         let mut uitool = self.game_state.uitool;
                         let can_be_built: Vec<_> = self
                             .game_state
@@ -407,7 +421,7 @@ impl App {
                             .build(&ui, || {
                                 for can_be_built in can_be_built {
                                     let txt = format!("Build {:?}", can_be_built.1.file_path);
-                                    if ui.small_button(&im_str!("{:?}", txt)) {
+                                    if ui.small_button(&im_str!("{}", txt)) {
                                         uitool = UiTool::Spawn(can_be_built.0.clone());
                                     }
                                 }
