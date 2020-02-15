@@ -91,6 +91,7 @@ impl FrameServerCache {
         frame.kinematic_projectiles_birth.clear();
         frame.kinematic_projectiles_dead.clear();
 
+        //TODO order event by player then by type before doing any effect. This step should be deterministic
         for event in events {
             match event {
                 FrameEventFromPlayer::MoveOrder {
@@ -112,7 +113,7 @@ impl FrameServerCache {
                     let botdef = frame.bot_defs.get(&botdef_id).unwrap();
                     let mut m = KBot::new(Point3::from(mouse_world_pos), botdef, id);
                     m.team = frame.players.get(&id).unwrap().team;
-                    m.con_completed = 0.0;
+                    m.con_completed = std::f32::MIN_POSITIVE;
                     m.life = 1;
 
                     for selected_raw_id in &selected {
@@ -658,7 +659,11 @@ pub fn update_units(
         let kbot = kbots.get_mut(&to).unwrap();
         let botdef = bot_defs.get(&kbot.botdef_id).unwrap();
         let metal_available = amount * usage_props_max.get(&player).unwrap().metal;
-        let metal_needed = (1.0 - kbot.con_completed as f64) * botdef.metal_cost as f64;
+        let metal_needed = if repair {
+            0.0
+        } else {
+            (1.0 - kbot.con_completed as f64) * botdef.metal_cost as f64
+        };
         let mut metal_used = metal_available;
         if metal_needed > metal_available {
             let metal_built =
@@ -668,10 +673,16 @@ pub fn update_units(
         } else {
             let metal_not_used = metal_available - metal_needed;
             metal_used = metal_available - metal_not_used;
-            players.get_mut(&player).unwrap().metal += metal_not_used;
-            kbot.con_completed = 1.0;
+            if !repair {
+                players.get_mut(&player).unwrap().metal += metal_not_used;
+                kbot.con_completed = 1.0;
+            }
         }
-        let lambda = metal_used as f32 / botdef.metal_cost as f32;
+        let lambda = if repair {
+            amount as f32
+        } else {
+            metal_used as f32
+        } / botdef.metal_cost as f32;
         kbot.life = ((kbot.life as f32 + lambda * botdef.max_life as f32).ceil() as i32)
             .min((botdef.max_life as f32 * kbot.con_completed).ceil() as i32);
     }

@@ -42,9 +42,6 @@ impl App {
                     }
                 }
 
-                let mut player_ennemy = Player::new();
-                player_ennemy.team = 1;
-
                 for i in (320..520).step_by(4) {
                     for j in (100..500).step_by(4) {
                         let mut m = mobile::KBot::new(
@@ -128,7 +125,7 @@ impl App {
             //Under_cursor
             {
                 let (x, y) = self.input_state.cursor_pos;
-
+                let (x, y) = (x as i32, y as i32);
                 let (x0, y0) = (x - 7, y - 7);
                 let (x1, y1) = (x + 7, y + 7);
 

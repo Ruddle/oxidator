@@ -96,7 +96,6 @@ pub struct App {
     water_gpu: WaterGpu,
     unit_part_gpu: UnitPartGpu,
 
-    kbot_gpu: ModelGpu,
     arrow_gpu: ArrowGpu,
     kinematic_projectile_gpu: ModelGpu,
     vertex_attr_buffer_f32: Vec<f32>,
@@ -361,23 +360,15 @@ impl App {
             heightmap_phy::HeightmapPhy::new(2048, 2048),
         );
 
-        let kbot_gpu = ModelGpu::new(
-            // &crate::model::open_obj("./src/asset/tank/tank-base.obj"), //
-            &model::open_obj("./src/asset/cube.obj").unwrap(),
-            &gpu.device,
-            format,
-            &bind_group_layout,
-        );
-
         let kinematic_projectile_gpu = ModelGpu::new(
-            &model::open_obj("./src/asset/small_sphere.obj").unwrap(),
+            &model::open_obj("./src/asset/3d/small_sphere.obj").unwrap(),
             &gpu.device,
             format,
             &bind_group_layout,
         );
 
         let arrow_gpu = ArrowGpu::new(
-            &model::open_obj("./src/asset/arrow.obj").unwrap(),
+            &model::open_obj("./src/asset/3d/arrow.obj").unwrap(),
             &gpu.device,
             format,
             &bind_group_layout,
@@ -385,9 +376,9 @@ impl App {
 
         let mut unit_part_gpu = UnitPartGpu::new();
 
-        unit_part_gpu.append(Path::new("./src/asset/cube.obj").to_owned());
-        unit_part_gpu.append(Path::new("./src/asset/axis_debug.obj").to_owned());
-        unit_part_gpu.append(Path::new("./src/asset/small_sphere.obj").to_owned());
+        unit_part_gpu.append(Path::new("./src/asset/3d/cube.obj").to_owned());
+        unit_part_gpu.append(Path::new("./src/asset/3d/axis_debug.obj").to_owned());
+        unit_part_gpu.append(Path::new("./src/asset/3d/small_sphere.obj").to_owned());
 
         let health_bar =
             gpu_obj::health_bar::HealthBarGpu::new(&gpu.device, format, &bind_group_layout);
@@ -399,7 +390,7 @@ impl App {
             &gpu.device,
             format,
             &bind_group_layout,
-            crate::utils::ImageRGBA8::open("./src/asset/cursor_icons.png"),
+            crate::utils::ImageRGBA8::open("./src/asset/2d/cursor_icons.png"),
         );
 
         let unit_icon =
@@ -564,7 +555,7 @@ impl App {
             bind_group,
             bind_group_layout,
             ub_camera_mat,
-            kbot_gpu,
+
             unit_part_gpu,
             kinematic_projectile_gpu,
             arrow_gpu,
@@ -933,11 +924,6 @@ impl App {
                     })
                 }) {
                     log::info!("Reloading cube_instanced.vert/cube_instanced.frag");
-                    self.kbot_gpu.reload_shader(
-                        &self.gpu.device,
-                        &self.bind_group_layout,
-                        self.gpu.sc_desc.format,
-                    );
                     for (model_gpu_state) in self.unit_part_gpu.states.iter_mut() {
                         match model_gpu_state {
                             unit_part_gpu::ModelGpuState::Ready(model_gpu) => model_gpu

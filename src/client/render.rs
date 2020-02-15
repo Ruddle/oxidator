@@ -608,7 +608,6 @@ impl App {
                     _ => {}
                 }
             }
-            self.kbot_gpu.render(&mut rpass, &self.bind_group);
             self.kinematic_projectile_gpu
                 .render(&mut rpass, &self.bind_group);
             self.arrow_gpu.render(&mut rpass, &self.bind_group);

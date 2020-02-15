@@ -16,7 +16,7 @@ pub fn open_obj(path: &str) -> Result<TriangleList, String> {
     use std::fs::File;
     use std::io::BufReader;
 
-    let input = BufReader::new(File::open(path).unwrap());
+    let input = BufReader::new(File::open(path).expect(&format!("Can't open {}", path)));
     let model: Obj<obj::TexturedVertex> = load_obj(input).map_err(|e| format!("{:?}", e))?;
 
     let vertex_data: Vec<_> = model

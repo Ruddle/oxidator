@@ -1,10 +1,22 @@
 use na::Vector3;
 use serde::{Deserialize, Serialize};
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+pub struct Data {
+    pub metal_spots: Vec<MetalSpot>,
+}
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct HeightmapPhy {
     pub texels: Vec<f32>,
     pub width: usize,
     pub height: usize,
+    pub data: Data,
+}
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+pub struct MetalSpot {
+    metal_per_frame: f32,
+    x: usize,
+    y: usize,
 }
 
 trait HeightMapPhyUsize {
@@ -29,6 +41,9 @@ impl HeightmapPhy {
             texels,
             width,
             height,
+            data: Data {
+                metal_spots: Vec::new(),
+            },
         }
     }
 

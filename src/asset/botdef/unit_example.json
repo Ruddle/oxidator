@@ -65,7 +65,7 @@
             0.0,
             1.0
           ],
-          "mesh_path": "./src/asset/tank/base.obj",
+          "mesh_path": "./src/asset/3d/tank/base.obj",
           "mesh_index": 3
         },
         "placed_collider": null,
@@ -113,7 +113,7 @@
                 0.0,
                 1.0
               ],
-              "mesh_path": "./src/asset/tank/canon.obj",
+              "mesh_path": "./src/asset/3d/tank/canon.obj",
               "mesh_index": 5
             },
             "placed_collider": null,
@@ -162,7 +162,7 @@
                 0.0,
                 1.0
               ],
-              "mesh_path": "./src/asset/tank/wheel.obj",
+              "mesh_path": "./src/asset/3d/tank/wheel.obj",
               "mesh_index": 4
             },
             "placed_collider": null,
@@ -211,7 +211,7 @@
                 0.0,
                 1.0
               ],
-              "mesh_path": "./src/asset/tank/wheel.obj",
+              "mesh_path": "./src/asset/3d/tank/wheel.obj",
               "mesh_index": 4
             },
             "placed_collider": null,
@@ -260,7 +260,7 @@
                 0.0,
                 1.0
               ],
-              "mesh_path": "./src/asset/tank/wheel.obj",
+              "mesh_path": "./src/asset/3d/tank/wheel.obj",
               "mesh_index": 4
             },
             "placed_collider": null,
@@ -309,7 +309,7 @@
                 0.0,
                 1.0
               ],
-              "mesh_path": "./src/asset/tank/wheel.obj",
+              "mesh_path": "./src/asset/3d/tank/wheel.obj",
               "mesh_index": 4
             },
             "placed_collider": null,

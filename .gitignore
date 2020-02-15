@@ -3,3 +3,5 @@
 .idea
 *.iml
 .vscode/tasks.json
+*.blend
+*.blend1

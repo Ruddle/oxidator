@@ -12,7 +12,7 @@ impl App {
         self.game_state.explosions.clear();
         self.game_state.kinematic_projectiles_cache.clear();
         // self.unit_editor.root.children.clear();
-        self.kbot_gpu.update_instance_dirty(&[], &self.gpu.device);
+
         self.health_bar.update_instance(&[], &self.gpu.device);
         self.unit_icon.update_instance(&[], &self.gpu.device);
         self.explosion_gpu.update_instance(&[], &self.gpu.device);
@@ -394,11 +394,11 @@ impl App {
             //Cursor Icon
             self.vertex_attr_buffer_f32.clear();
             {
-                let cursor_icon_size = 48;
+                let cursor_icon_size: i32 = 48;
                 let cursor_icon_size_half = cursor_icon_size / 2;
                 let cursor_icon_size_third = cursor_icon_size / 3;
                 let (x, y) = self.input_state.cursor_pos;
-
+                let (x, y) = (x as i32, y as i32);
                 let (x, y) = (x + cursor_icon_size_third, y - cursor_icon_size_third);
 
                 let min_screen = Vector2::new(

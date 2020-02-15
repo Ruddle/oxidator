@@ -315,7 +315,7 @@ impl ExplosionGpu {
         // The decoder is a build for reader and can be used to set various decoding options
         // via `Transformations`. The default output transformation is `Transformations::EXPAND
         // | Transformations::STRIP_ALPHA`.
-        let mut decoder = png::Decoder::new(File::open(r"src/asset/noise.png").unwrap());
+        let mut decoder = png::Decoder::new(File::open(r"src/asset/2d/noise.png").unwrap());
         decoder.set_transformations(png::Transformations::IDENTITY);
         let (info, mut reader) = decoder.read_info().unwrap();
 

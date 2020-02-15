@@ -65,7 +65,7 @@
             0.0,
             1.0
           ],
-          "mesh_path": "./src/asset/cube.obj",
+          "mesh_path": "./src/asset/3d/cube.obj",
           "mesh_index": 0
         },
         "placed_collider": null,

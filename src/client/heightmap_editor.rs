@@ -15,6 +15,7 @@ pub enum Mode {
 }
 
 pub struct State {
+    pub map_path: String,
     pub pen_radius: u32,
     pub pen_strength: f32,
     pub mode: Mode,
@@ -27,6 +28,7 @@ pub struct State {
 impl State {
     pub fn new() -> Self {
         State {
+            map_path: "src/asset/map/map_example".to_owned(),
             pen_radius: 30,
             pen_strength: 2.0,
             mode: Mode::Raise,
@@ -83,7 +85,7 @@ impl State {
                     .build(&ui, max_z);
 
                 if ui.small_button(im_str!("Save")) {
-                    Self::save(heightmap_gpu);
+                    Self::save(heightmap_gpu, "src/asset/map/map_example");
                 }
 
                 if ui.small_button(im_str!("Clear")) {
@@ -99,9 +101,18 @@ impl State {
                 }
 
                 if ui.small_button(im_str!("Load")) {
-                    Self::load(heightmap_gpu);
+                    Self::load(heightmap_gpu, "src/asset/map/map_example");
                 }
             });
+
+        // let window_selector = imgui::Window::new(im_str!("Map Selector"));
+        // window_selector
+        //     .size([400.0, 200.0], imgui::Condition::FirstUseEver)
+        //     .position([400.0, 3.0], imgui::Condition::FirstUseEver)
+        //     .collapsed(false, imgui::Condition::FirstUseEver)
+        //     .build(&ui, || {
+        //         // Self::visit_dirs_for_selection(ui);
+        //     });
 
         self.max_z = max_z.max(*min_z);
         if update_noise {
@@ -281,21 +292,21 @@ impl State {
         }
     }
 
-    pub fn save(heightmap_gpu: &heightmap_gpu::HeightmapGpu) {
-        //         For reading and opening files
+    pub fn save(heightmap_gpu: &heightmap_gpu::HeightmapGpu, path: &str) {
         use std::fs::File;
         use std::io::BufWriter;
         use std::path::Path;
 
-        let path = Path::new(r"heightmap.png");
-        let file = File::create(path).unwrap();
+        let height_path = format!("{}/height.png", path);
+        let height_path = Path::new(&height_path);
+        let file = File::create(height_path).unwrap();
         let ref mut w = BufWriter::new(file);
 
         let mut encoder = png::Encoder::new(
             w,
             heightmap_gpu.phy.width as u32,
             heightmap_gpu.phy.height as u32,
-        ); // Width is 2 pixels and height is 1.
+        );
         encoder.set_color(png::ColorType::Grayscale);
         encoder.set_depth(png::BitDepth::Sixteen);
         let mut writer = encoder.write_header().unwrap();
@@ -309,33 +320,37 @@ impl State {
             .collect();
         //        let data = &data[..] ;//[255, 0, 0, 255, 0, 0, 0, 255]; // An array containing a RGBA sequence. First pixel is red and second pixel is black.
         writer.write_image_data(&data).unwrap(); // Save
+
+        let json_path = &format!("{}/data.json", path);
+
+        use std::fs::OpenOptions;
+        use std::io::prelude::*;
+        use std::io::BufReader;
+        let file = OpenOptions::new()
+            .read(true)
+            .write(true)
+            .create(true)
+            .truncate(true)
+            .open(json_path)
+            .unwrap();
+        let mut buf_w = BufWriter::new(file);
+        serde_json::to_writer_pretty(buf_w, &heightmap_gpu.phy.data);
     }
 
-    pub fn load(heightmap_gpu: &mut heightmap_gpu::HeightmapGpu) {
+    pub fn load(heightmap_gpu: &mut heightmap_gpu::HeightmapGpu, path: &str) {
         use byteorder::{BigEndian, ReadBytesExt};
         use std::fs::File;
-
         use std::io::Cursor;
-
-        // The decoder is a build for reader and can be used to set various decoding options
-        // via `Transformations`. The default output transformation is `Transformations::EXPAND
-        // | Transformations::STRIP_ALPHA`.
-        let mut decoder = png::Decoder::new(File::open(r"heightmap.png").unwrap());
+        let height_path = format!("{}/height.png", path);
+        let mut decoder = png::Decoder::new(File::open(&height_path).unwrap());
         decoder.set_transformations(png::Transformations::IDENTITY);
         let (info, mut reader) = decoder.read_info().unwrap();
-
-        // Display image metadata.
         log::debug!("info: {:?}", info.width);
         log::debug!("height: {:?}", info.height);
         log::debug!("bit depth: {:?}", info.bit_depth);
         log::debug!("buffer size: {:?}", info.buffer_size());
-
-        // Allocate the output buffer.
         let mut buf = vec![0; info.buffer_size()];
-        // Read the next frame. Currently this function should only called once.
-        // The default options
         reader.next_frame(&mut buf).unwrap();
-
         // Transform buffer into 16 bits slice.
         let mut buffer_u16 = vec![0; (info.width * info.height) as usize];
         let mut buffer_cursor = Cursor::new(buf);
