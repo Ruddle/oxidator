@@ -18,7 +18,7 @@ env_logger = "0.7.1"
 glsl-to-spirv = {version= "0.1", optional= true}
 log = "0.4"
 png = "0.15"
-winit = "0.20.0-alpha4"
+winit = "=0.20.0-alpha4"
 raw-window-handle = "0.3.3"
 imgui = "0.2.1"
 shaderc = {version = "0.6", optional = true} 
