@@ -47,5 +47,5 @@ void main() {
     mat4 t = mat4(mata,matb,matc,matd);
 
     gl_Position = cor_proj_view *t* vec4(pos,1.0);
-//    world_pos = a_Pos.xyz +a_off;
+    world_pos = a_Pos.xyz;
 }
