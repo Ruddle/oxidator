@@ -132,7 +132,32 @@ cargo run --release
 
 ## Fun stuff if you clone this
 
-Shaders are automatically hot-reloaded if you change any .frag or .vert file and you compiled with either "use_glsl_to_spirv" OR "use_shaderc" feature
+Shaders are automatically hot-reloaded if you change any .frag or .vert file and you compiled with either shaderc 
+```text
+cargo run --features use_shaderc --release
+```
+or glsl_to_spirv
+```text
+cargo run --features use_glsl_to_spirv --release
+```
+
+Logs can be enabled via the [environment variable RUST_LOG](https://github.com/sebasmagri/env_logger/).
+for instance:
+```text
+RUST_LOG=oxidator=debug cargo run --release
+```
+
+My go-to command when I develop:
+```text
+RUST_LOG=oxidator=debug cargo run --features use_shaderc --release
+```
+
+You can also compile all the shaders to spirv without starting the full application. The compiled shaders will be saved in /src/shader/compiled. This folder is used when no shader compiler flag is enabled.
+
+```text
+cargo run --features use_shaderc --release compile
+```
+
 
 ## Roadmap
 
