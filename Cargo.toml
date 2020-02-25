@@ -6,11 +6,10 @@ edition = "2018"
 default-run = "oxidator"
 
 [features]
-#Choose one method of loading spirv out of the three. use_spirv uses the precompiled shaders, but does not support hotreloading.
+#Choose one method of loading spirv out of the three. default uses the precompiled shaders, but does not support hot-reloading.
 use_shaderc =["shaderc"]
 use_glsl_to_spirv =["glsl-to-spirv"]
-use_spirv =[]
-default = ["use_spirv"]
+default = []
 
 [dependencies]
 wgpu = { version = "0.4.0" }

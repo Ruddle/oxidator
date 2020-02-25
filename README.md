@@ -132,7 +132,7 @@ cargo run --release
 
 ## Fun stuff if you clone this
 
-Shaders are automatically hot-reloaded if you change any .frag or .vert file and you compiled with either "use_glsl_to_spirv" OR "use_shaderc" feature (default is "use_spirv")
+Shaders are automatically hot-reloaded if you change any .frag or .vert file and you compiled with either "use_glsl_to_spirv" OR "use_shaderc" feature
 
 ## Roadmap
 

@@ -44,7 +44,7 @@ impl error::Error for ShaderCompilationError {
 #[cfg(feature = "use_glsl_to_spirv")]
 pub fn load(rel_path: &str) -> Result<Vec<u32>> {
     let stage = str_to_shader_stage(rel_path);
-    log::info!("glsl_to_spirv : compiling {}", rel_path);
+    log::debug!("glsl_to_spirv : compiling {}", rel_path);
     let glsl_code = std::fs::read_to_string(std::path::Path::new(rel_path)).unwrap();
     let ty = match stage {
         ShaderStage::Vertex => glsl_to_spirv::ShaderType::Vertex,
@@ -68,7 +68,7 @@ pub fn load(rel_path: &str) -> Result<Vec<u32>> {
 #[cfg(feature = "use_shaderc")]
 pub fn load(rel_path: &str) -> Result<Vec<u32>> {
     let stage = str_to_shader_stage(rel_path);
-    log::info!("shaderc : compiling {}", rel_path);
+    log::debug!("shaderc : compiling {}", rel_path);
     let glsl_code = std::fs::read_to_string(std::path::Path::new(rel_path)).unwrap();
 
     let ty = match stage {
@@ -89,7 +89,7 @@ pub fn load(rel_path: &str) -> Result<Vec<u32>> {
     Ok(binary_result.as_binary().to_owned())
 }
 
-#[cfg(feature = "use_spirv")]
+#[cfg(not(any(feature = "use_shaderc", feature = "use_glsl_to_spirv")))]
 pub fn load(rel_path: &str) -> Result<Vec<u32>> {
     let glsl_path = std::path::Path::new(rel_path);
     let file_name = glsl_path.file_name().unwrap();
@@ -100,7 +100,7 @@ pub fn load(rel_path: &str) -> Result<Vec<u32>> {
     spirv_path.push(file_name);
     let spirv_path = spirv_path.with_extension(format!("{}.spirv", ext));
 
-    log::trace!("spirv : reading {:?}", spirv_path);
+    log::debug!("spirv : reading {:?}", spirv_path);
     let spirv = std::fs::read(spirv_path).unwrap();
 
     use std::convert::TryInto;
