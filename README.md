@@ -7,7 +7,7 @@ This project is inspired by Total Annihilation, Supreme Commander, [Spring Engin
 ## Demo
 
 ![Map editor](etc/map_editor.gif)
-Map editor [HQ version](https://streamable.com/e5zdj)
+Map editor [HQ version](https://streamable.com/9vn0z)
 
 ![Unit editor](etc/unit_editor.gif)
 Unit editor [HQ version](https://streamable.com/ywr44)
