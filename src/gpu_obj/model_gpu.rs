@@ -43,7 +43,7 @@ impl ModelGpu {
             )
             .fill_from_slice(&positions);
 
-        let pipeline = Self::create_pipeline(device, main_bind_group_layout, format).unwrap();;
+        let pipeline = Self::create_pipeline(device, main_bind_group_layout, format).unwrap();
 
         ModelGpu {
             instance_attr_cpu_buf: Vec::new(),

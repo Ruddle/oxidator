@@ -59,7 +59,7 @@ impl WaterGpu {
 
         let pipeline =
             Self::create_pipeline(device, &bind_group_layout, main_bind_group_layout, format)
-                .unwrap();;
+                .unwrap();
         WaterGpu {
             pipeline,
             bind_group,
