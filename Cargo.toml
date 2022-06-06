@@ -23,7 +23,7 @@ imgui = "0.2.1"
 shaderc = {version = "0.6", optional = true} 
 noise = "0.6.0"
 nalgebra = {version=  "0.19", features= ["serde-serialize"]}
-crossbeam-channel = "0.3"
+crossbeam-channel = "0.4"
 rand = "0.7.3"
 notify = "=5.0.0-pre.1"
 byteorder = "1.3.2"
