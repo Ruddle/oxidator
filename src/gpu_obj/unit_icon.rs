@@ -26,7 +26,7 @@ impl UnitIconGpu {
             )
             .fill_from_slice(&positions);
 
-        let pipeline = Self::create_pipeline(device, main_bind_group_layout, format).unwrap();;
+        let pipeline = Self::create_pipeline(device, main_bind_group_layout, format).unwrap();
 
         UnitIconGpu {
             instance_buf,
